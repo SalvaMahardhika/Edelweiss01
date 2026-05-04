@@ -25,7 +25,7 @@
             <img src="{{ asset('img/dashboard/assets/1.png') }}" 
                  class="w-full h-full object-cover">
 
-            <div class="absolute inset-0 bg-black/40"></div>
+            <div class="absolute inset-0 bg-black/40 pointer-events-none"></div>
         </div>
 
         {{-- Glow --}}

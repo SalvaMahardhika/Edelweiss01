@@ -6,9 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class Produk extends Model
 {
+    // ================= TABLE =================
     protected $table = 'produk';
     protected $primaryKey = 'id_produk';
 
+    public $timestamps = true;
+
+    // ================= FILLABLE =================
     protected $fillable = [
         'nama_produk',
         'gambar',
@@ -18,5 +22,27 @@ class Produk extends Model
         'id_user'
     ];
 
-    public $timestamps = true;
+    // ================= CAST =================
+    protected $casts = [
+        'harga' => 'integer',
+        'status' => 'boolean'
+    ];
+
+    // ================= RELATION =================
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'id_user');
+    }
+
+    // ================= ACCESSOR GAMBAR =================
+    public function getGambarUrlAttribute()
+    {
+        return asset('storage/' . $this->gambar);
+    }
+
+    // ================= SCOPE =================
+    public function scopeAktif($query)
+    {
+        return $query->where('status', 1);
+    }
 }

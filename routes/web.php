@@ -19,6 +19,9 @@ Route::controller(MenuController::class)->group(function () {
     Route::get('/', 'dashboard')->name('home');
     Route::get('/menu', 'index')->name('menu');
 
+    // 🔥 DETAIL PRODUK (WAJIB untuk slider)
+    Route::get('/menu/{id}', 'show')->name('menu.show');
+
 });
 
 Route::get('/galeri', [GaleriController::class, 'index'])->name('galeri');
@@ -43,7 +46,6 @@ Route::post('/logout', [AuthController::class, 'logout'])
 # ================= USER =================
 Route::middleware('auth')->group(function () {
 
-    // PROFILE
     Route::controller(ProfileController::class)->group(function () {
 
         Route::get('/profile', 'index')->name('profile');
@@ -57,11 +59,20 @@ Route::middleware('auth')->group(function () {
 # ================= ADMIN =================
 Route::middleware(['auth'])->group(function () {
 
-    // GALERI CRUD (admin & super admin)
+    // ================= GALERI =================
     Route::controller(GaleriController::class)->group(function () {
 
         Route::post('/galeri', 'store')->name('galeri.store');
         Route::delete('/galeri/{id}', 'destroy')->name('galeri.destroy');
+
+    });
+
+    // ================= PRODUK (ALBUM SYSTEM) =================
+    Route::prefix('admin/menu')->controller(MenuController::class)->group(function () {
+
+        Route::post('/', 'store')->name('produk.store');
+        Route::put('/{id}', 'update')->name('produk.update');
+        Route::delete('/{id}', 'destroy')->name('produk.destroy');
 
     });
 

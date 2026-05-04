@@ -1,8 +1,8 @@
-<header id="navbar" class="fixed top-0 w-full z-50 backdrop-blur-3xl bg-white/60 border-b border-white/10 shadow-lg">
+<header id="navbar" class="fixed top-0 w-full z-40 backdrop-blur-3xl bg-white/60 border-b border-white/10 shadow-lg">
 
-    {{-- Ellipse shadow --}}
-    <div class="absolute inset-0 pointer-events-none">
-        <div class="absolute left-1/2 -translate-x-1/2 top-0 w-[700px] h-[200px] bg-black/30 blur-3xl opacity-70"></div>
+    {{-- Ellipse shadow (FIX: pindah ke belakang) --}}
+    <div class="absolute inset-0 pointer-events-none -z-10">
+        <div class="absolute left-1/2 -translate-x-1/2 top-0 w-[700px] h-[200px] bg-black/20 blur-3xl opacity-60"></div>
     </div>
 
     <div class="relative max-w-6xl mx-auto px-6 flex items-center justify-between py-4">
@@ -40,7 +40,7 @@
                 Contact
             </a>
 
-            {{-- 🔥 KHUSUS SUPER ADMIN --}}
+            {{-- SUPER ADMIN --}}
             @auth
                 @if(auth()->user()->role === 'super_admin')
                 <a href="{{ route('admin.index') }}" 
@@ -50,7 +50,7 @@
                 @endif
             @endauth
 
-            {{-- ================= USER ================= --}}
+            {{-- USER --}}
             @auth
             <div class="relative" id="userDropdownWrapper">
 
@@ -63,7 +63,7 @@
 
                 {{-- Dropdown --}}
                 <div id="userDropdown"
-                     class="hidden absolute right-0 mt-3 w-56 backdrop-blur-xl bg-white/80 border border-white/40 rounded-2xl shadow-xl overflow-hidden">
+                     class="hidden absolute right-0 mt-3 w-56 backdrop-blur-xl bg-white/80 border border-white/40 rounded-2xl shadow-xl overflow-hidden z-50">
 
                     {{-- Info --}}
                     <div class="px-4 py-3 border-b text-sm">
@@ -80,8 +80,6 @@
                        class="block px-4 py-3 text-sm hover:bg-[#3e2723]/10 transition">
                         Edit Akun
                     </a>
-
-                    
 
                     {{-- Logout --}}
                     <form method="POST" action="{{ route('logout') }}">
@@ -104,18 +102,18 @@
 
 {{-- JS DROPDOWN --}}
 <script>
-    const btn = document.getElementById('userDropdownBtn');
-    const menu = document.getElementById('userDropdown');
+const btn = document.getElementById('userDropdownBtn');
+const menu = document.getElementById('userDropdown');
 
-    if(btn){
-        btn.addEventListener('click', () => {
-            menu.classList.toggle('hidden');
-        });
+if(btn){
+    btn.addEventListener('click', () => {
+        menu.classList.toggle('hidden');
+    });
 
-        document.addEventListener('click', function(e){
-            if (!btn.contains(e.target) && !menu.contains(e.target)) {
-                menu.classList.add('hidden');
-            }
-        });
-    }
+    document.addEventListener('click', function(e){
+        if (!btn.contains(e.target) && !menu.contains(e.target)) {
+            menu.classList.add('hidden');
+        }
+    });
+}
 </script>
