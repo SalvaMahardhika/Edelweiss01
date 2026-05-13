@@ -2,201 +2,408 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detail Produk</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
+
+    {{-- SWIPER --}}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper/swiper-bundle.min.css"/>
 
     <style>
-        .glass {
+        .glass{
             backdrop-filter: blur(20px);
             background: rgba(255,255,255,0.25);
         }
     </style>
 </head>
 
-<body class="bg-gradient-to-br from-[#f5f0ea] via-[#ede3d6] to-[#e6d8c7] text-[#3e2723]">
+<body class="bg-[#f5f0ea] text-[#3e2723]">
 
 @include('layouts.navbar')
 
-<main class="pt-32 max-w-4xl mx-auto px-6 pb-20">
+@php
+    $folder = public_path('img/menu/' . $produk->gambar);
+    $files = file_exists($folder) ? scandir($folder) : [];
+    $images = array_values(array_diff($files, ['.', '..']));
+@endphp
 
-    {{-- BACK --}}
-    <a href="{{ route('menu') }}" 
-       class="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-xl bg-white/40 backdrop-blur-xl border border-white/30 shadow hover:scale-105 transition">
-        ← Kembali ke Menu
-    </a>
+<main class="pt-20 md:pt-28 pb-24">
 
-    @php
-        $folder = public_path('img/menu/' . $produk->gambar);
-        $files = file_exists($folder) ? scandir($folder) : [];
-        $images = array_values(array_diff($files, ['.', '..']));
-    @endphp
+    {{-- ================= MOBILE STYLE TOKOPEDIA/SHOPEE ================= --}}
+    <div class="max-w-6xl mx-auto">
 
-    {{-- ================= SLIDER ================= --}}
-    <div class="glass border border-white/40 rounded-3xl shadow-xl p-6 mb-6">
+        {{-- GRID --}}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
 
-        <div class="swiper mySwiper">
+            {{-- ================= LEFT : IMAGE ================= --}}
+            <div class="lg:sticky lg:top-28 h-fit">
 
-            <div class="swiper-wrapper">
+                {{-- SLIDER --}}
+                <div class="bg-white shadow-lg overflow-hidden lg:rounded-3xl">
 
-                @foreach($images as $img)
-                <div class="swiper-slide flex justify-center items-center">
+                    <div class="swiper mySwiper">
 
-                    {{-- 🔥 WRAPPER FLEXIBLE --}}
-                    <div class="bg-white/20 backdrop-blur-xl rounded-2xl p-4 shadow-lg flex justify-center items-center">
+                        <div class="swiper-wrapper">
 
-                        <img src="{{ asset('img/menu/' . $produk->gambar . '/' . $img) }}"
-                             class="w-auto h-auto max-h-[500px] object-contain">
+                            @foreach($images as $img)
+
+                            <div class="swiper-slide">
+
+                                <div class="w-full bg-[#f8f8f8] flex items-center justify-center">
+
+                                    <img
+                                        src="{{ asset('img/menu/' . $produk->gambar . '/' . $img) }}"
+                                        class="w-full aspect-square object-cover"
+                                    >
+
+                                </div>
+
+                            </div>
+
+                            @endforeach
+
+                        </div>
+
+                        <div class="swiper-pagination"></div>
 
                     </div>
 
                 </div>
-                @endforeach
 
-            </div>
+                {{-- THUMBNAIL --}}
+                <div class="flex gap-3 overflow-x-auto mt-4 px-4 lg:px-0">
 
-            <div class="swiper-pagination mt-4"></div>
+                    @foreach($images as $img)
 
-        </div>
+                    <div class="min-w-[80px] h-[80px] rounded-2xl overflow-hidden border border-white shadow-md">
 
-        {{-- ================= UPLOAD (TIDAK DIUBAH LOGIC) ================= --}}
-        @auth
-        @if(in_array(auth()->user()->role, ['admin','super_admin']))
+                        <img
+                            src="{{ asset('img/menu/' . $produk->gambar . '/' . $img) }}"
+                            class="w-full h-full object-cover"
+                        >
 
-        <form method="POST" action="{{ route('produk.update',$produk->id_produk) }}" enctype="multipart/form-data"
-              class="mt-6 border border-white/30 rounded-xl p-4 bg-white/20 backdrop-blur-xl">
+                    </div>
 
-            @csrf
-            @method('PUT')
+                    @endforeach
 
-            <label class="block text-sm mb-2 font-medium">Tambah Gambar</label>
-
-            <input type="file" name="gambar[]" multiple 
-                class="w-full text-sm mb-3 file:mr-4 file:px-3 file:py-1 file:rounded-lg file:border-0 file:bg-[#3e2723] file:text-white hover:file:bg-[#2c1b18]">
-
-            <button class="px-4 py-2 bg-[#3e2723] text-white rounded-lg shadow hover:bg-[#2c1b18] transition">
-                Upload
-            </button>
-        </form>
-
-        {{-- DELETE IMAGE --}}
-        <div class="flex flex-wrap gap-2 mt-4">
-            @foreach($images as $img)
-            <form method="POST" action="{{ route('produk.update',$produk->id_produk) }}">
-                @csrf
-                @method('PUT')
-                <input type="hidden" name="delete_image" value="{{ $img }}">
-
-                <button class="px-3 py-1 text-xs bg-red-500/80 text-white rounded-lg hover:bg-red-600 transition">
-                    ✕ {{ $img }}
-                </button>
-            </form>
-            @endforeach
-        </div>
-
-        @endif
-        @endauth
-
-    </div>
-
-    {{-- ================= DETAIL ================= --}}
-    <div class="glass border border-white/40 rounded-3xl shadow-xl p-6">
-
-        {{-- NAMA --}}
-        <div class="mb-5">
-            <div class="flex justify-between items-center">
-                <h1 class="text-2xl font-bold">{{ $produk->nama_produk }}</h1>
-
-                @auth
-                @if(in_array(auth()->user()->role, ['admin','super_admin']))
-                <button onclick="toggleEdit('nama')" class="text-sm text-blue-500">Edit</button>
-                @endif
-                @endauth
-            </div>
-
-            <form id="edit-nama" class="hidden mt-3" method="POST" action="{{ route('produk.update',$produk->id_produk) }}">
-                @csrf @method('PUT')
-                <input type="hidden" name="field" value="nama_produk">
-
-                <div class="flex gap-2">
-                    <input type="text" name="value" value="{{ $produk->nama_produk }}"
-                        class="flex-1 px-3 py-2 rounded-lg border bg-white/60 backdrop-blur">
-                    <button class="px-3 bg-[#3e2723] text-white rounded-lg">✔</button>
                 </div>
-            </form>
-        </div>
 
-        {{-- HARGA --}}
-        <div class="mb-5">
-            <div class="flex justify-between items-center">
-                <p class="text-xl text-[#c8a97e] font-semibold">
-                    Rp {{ number_format($produk->harga, 0, ',', '.') }}
-                </p>
-
-                @auth
-                @if(in_array(auth()->user()->role, ['admin','super_admin']))
-                <button onclick="toggleEdit('harga')" class="text-sm text-blue-500">Edit</button>
-                @endif
-                @endauth
             </div>
 
-            <form id="edit-harga" class="hidden mt-3" method="POST" action="{{ route('produk.update',$produk->id_produk) }}">
-                @csrf @method('PUT')
-                <input type="hidden" name="field" value="harga">
+            {{-- ================= RIGHT : DETAIL ================= --}}
+            <div class="px-4 lg:px-0">
 
-                <div class="flex gap-2">
-                    <input type="number" name="value" value="{{ $produk->harga }}"
-                        class="flex-1 px-3 py-2 rounded-lg border bg-white/60">
-                    <button class="px-3 bg-[#3e2723] text-white rounded-lg">✔</button>
+                {{-- CARD --}}
+                <div class="glass border border-white/30 shadow-xl rounded-3xl p-5 md:p-8">
+
+                    {{-- BACK --}}
+                    <a href="{{ route('menu') }}"
+                       class="inline-flex items-center gap-2 mb-5 text-sm text-[#6b4f4f] hover:text-[#3e2723] transition">
+
+                        ← Kembali ke Menu
+
+                    </a>
+
+                    {{-- TITLE --}}
+                    <div class="mb-5">
+
+                        <div class="flex items-start justify-between gap-4">
+
+                            <h1 class="text-2xl md:text-4xl font-bold leading-tight">
+                                {{ $produk->nama_produk }}
+                            </h1>
+
+                            @auth
+                            @if(in_array(auth()->user()->role, ['admin','super_admin']))
+
+                            <button
+                                onclick="toggleEdit('nama')"
+                                class="text-sm text-blue-500 whitespace-nowrap">
+
+                                Edit
+
+                            </button>
+
+                            @endif
+                            @endauth
+
+                        </div>
+
+                        {{-- FORM EDIT --}}
+                        <form
+                            id="edit-nama"
+                            class="hidden mt-4"
+                            method="POST"
+                            action="{{ route('produk.update',$produk->id_produk) }}">
+
+                            @csrf
+                            @method('PUT')
+
+                            <input type="hidden" name="field" value="nama_produk">
+
+                            <div class="flex flex-col sm:flex-row gap-3">
+
+                                <input
+                                    type="text"
+                                    name="value"
+                                    value="{{ $produk->nama_produk }}"
+                                    class="flex-1 px-4 py-3 rounded-xl border bg-white/70">
+
+                                <button
+                                    class="px-5 py-3 bg-[#3e2723] text-white rounded-xl">
+
+                                    Simpan
+
+                                </button>
+
+                            </div>
+
+                        </form>
+
+                    </div>
+
+                    {{-- PRICE --}}
+                    <div class="mb-6">
+
+                        <div class="flex items-center justify-between">
+
+                            <div>
+
+                                <p class="text-sm text-[#8b6f63] mb-1">
+                                    Harga
+                                </p>
+
+                                <h2 class="text-3xl md:text-4xl font-black text-[#c8a97e]">
+
+                                    Rp {{ number_format($produk->harga, 0, ',', '.') }}
+
+                                </h2>
+
+                            </div>
+
+                            @auth
+                            @if(in_array(auth()->user()->role, ['admin','super_admin']))
+
+                            <button
+                                onclick="toggleEdit('harga')"
+                                class="text-sm text-blue-500">
+
+                                Edit
+
+                            </button>
+
+                            @endif
+                            @endauth
+
+                        </div>
+
+                        {{-- FORM EDIT --}}
+                        <form
+                            id="edit-harga"
+                            class="hidden mt-4"
+                            method="POST"
+                            action="{{ route('produk.update',$produk->id_produk) }}">
+
+                            @csrf
+                            @method('PUT')
+
+                            <input type="hidden" name="field" value="harga">
+
+                            <div class="flex flex-col sm:flex-row gap-3">
+
+                                <input
+                                    type="number"
+                                    name="value"
+                                    value="{{ $produk->harga }}"
+                                    class="flex-1 px-4 py-3 rounded-xl border bg-white/70">
+
+                                <button
+                                    class="px-5 py-3 bg-[#3e2723] text-white rounded-xl">
+
+                                    Simpan
+
+                                </button>
+
+                            </div>
+
+                        </form>
+
+                    </div>
+
+                    {{-- DESCRIPTION --}}
+                    <div class="border-t border-white/30 pt-6">
+
+                        <div class="flex items-start justify-between gap-4 mb-4">
+
+                            <h3 class="text-xl font-semibold">
+                                Deskripsi Produk
+                            </h3>
+
+                            @auth
+                            @if(in_array(auth()->user()->role, ['admin','super_admin']))
+
+                            <button
+                                onclick="toggleEdit('deskripsi')"
+                                class="text-sm text-blue-500">
+
+                                Edit
+
+                            </button>
+
+                            @endif
+                            @endauth
+
+                        </div>
+
+                        <p class="text-[#6b4f4f] leading-relaxed text-sm md:text-base">
+
+                            {{ $produk->deskripsi }}
+
+                        </p>
+
+                        {{-- FORM EDIT --}}
+                        <form
+                            id="edit-deskripsi"
+                            class="hidden mt-4"
+                            method="POST"
+                            action="{{ route('produk.update',$produk->id_produk) }}">
+
+                            @csrf
+                            @method('PUT')
+
+                            <input type="hidden" name="field" value="deskripsi">
+
+                            <textarea
+                                name="value"
+                                rows="4"
+                                class="w-full px-4 py-3 rounded-xl border bg-white/70">{{ $produk->deskripsi }}</textarea>
+
+                            <button
+                                class="mt-3 px-5 py-3 bg-[#3e2723] text-white rounded-xl">
+
+                                Simpan
+
+                            </button>
+
+                        </form>
+
+                    </div>
+
                 </div>
-            </form>
-        </div>
 
-        {{-- DESKRIPSI --}}
-        <div>
-            <div class="flex justify-between items-start">
-                <p class="text-[#6b4f4f] leading-relaxed">
-                    {{ $produk->deskripsi }}
-                </p>
-
+                {{-- ================= ADMIN SECTION ================= --}}
                 @auth
                 @if(in_array(auth()->user()->role, ['admin','super_admin']))
-                <button onclick="toggleEdit('deskripsi')" class="text-sm text-blue-500">Edit</button>
+
+                <div class="glass border border-white/30 shadow-xl rounded-3xl p-5 md:p-6 mt-6">
+
+                    <h3 class="text-xl font-semibold mb-5">
+                        Kelola Gambar
+                    </h3>
+
+                    {{-- UPLOAD --}}
+                    <form
+                        method="POST"
+                        action="{{ route('produk.update',$produk->id_produk) }}"
+                        enctype="multipart/form-data">
+
+                        @csrf
+                        @method('PUT')
+
+                        <input
+                            type="file"
+                            name="gambar[]"
+                            multiple
+                            class="w-full text-sm mb-4
+                                   file:mr-4
+                                   file:px-4
+                                   file:py-2
+                                   file:rounded-xl
+                                   file:border-0
+                                   file:bg-[#3e2723]
+                                   file:text-white">
+
+                        <button
+                            class="w-full sm:w-auto px-5 py-3 bg-[#3e2723] text-white rounded-xl shadow">
+
+                            Upload Gambar
+
+                        </button>
+
+                    </form>
+
+                    {{-- DELETE IMAGE --}}
+                    <div class="flex flex-wrap gap-3 mt-6">
+
+                        @foreach($images as $img)
+
+                        <form
+                            method="POST"
+                            action="{{ route('produk.update',$produk->id_produk) }}">
+
+                            @csrf
+                            @method('PUT')
+
+                            <input
+                                type="hidden"
+                                name="delete_image"
+                                value="{{ $img }}">
+
+                            <button
+                                class="px-3 py-2 text-xs rounded-xl bg-red-500 text-white">
+
+                                ✕ {{ $img }}
+
+                            </button>
+
+                        </form>
+
+                        @endforeach
+
+                    </div>
+
+                </div>
+
                 @endif
                 @endauth
+
             </div>
 
-            <form id="edit-deskripsi" class="hidden mt-3" method="POST" action="{{ route('produk.update',$produk->id_produk) }}">
-                @csrf @method('PUT')
-                <input type="hidden" name="field" value="deskripsi">
-
-                <textarea name="value" rows="3"
-                    class="w-full px-3 py-2 rounded-lg border bg-white/60">{{ $produk->deskripsi }}</textarea>
-
-                <button class="mt-2 px-3 py-1 bg-[#3e2723] text-white rounded-lg">✔ Simpan</button>
-            </form>
         </div>
 
     </div>
 
 </main>
 
+@include('layouts.footer')
+
 <script src="https://cdn.jsdelivr.net/npm/swiper/swiper-bundle.min.js"></script>
 
 <script>
+
 new Swiper(".mySwiper", {
+
     loop: true,
+
     spaceBetween: 20,
+
     pagination: {
         el: ".swiper-pagination",
         clickable: true
     }
+
 });
 
 function toggleEdit(type){
-    document.getElementById('edit-'+type).classList.toggle('hidden');
+
+    document
+        .getElementById('edit-' + type)
+        .classList
+        .toggle('hidden');
+
 }
+
 </script>
 
 </body>

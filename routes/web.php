@@ -61,10 +61,9 @@ Route::middleware(['auth'])->group(function () {
 
     // ================= GALERI =================
     Route::controller(GaleriController::class)->group(function () {
-
         Route::post('/galeri', 'store')->name('galeri.store');
+        Route::put('/galeri/{id}', 'update')->name('galeri.update'); // Tambahkan baris ini
         Route::delete('/galeri/{id}', 'destroy')->name('galeri.destroy');
-
     });
 
     // ================= PRODUK (ALBUM SYSTEM) =================

@@ -90,82 +90,165 @@
     @endauth
 
     {{-- GRID --}}
-    <section class="max-w-6xl mx-auto px-6 pb-24">
+<section class="max-w-7xl mx-auto px-4 sm:px-6 pb-20 sm:pb-24">
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+    <div class="grid 
+                grid-cols-2 
+                md:grid-cols-3 
+                xl:grid-cols-4 
+                gap-4 sm:gap-6 lg:gap-8">
 
-            @foreach($produk as $item)
+        @foreach($produk as $item)
 
-            @php
-                $folder = public_path('img/menu/' . $item->gambar);
-                $files = file_exists($folder) ? scandir($folder) : [];
-                $images = array_values(array_diff($files, ['.', '..']));
-            @endphp
+        @php
+            $folder = public_path('img/menu/' . $item->gambar);
 
-            <div class="relative group glass-shine backdrop-blur-2xl bg-white/30 border border-white/40 rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.2)] transition hover:scale-[1.04]">
+            $files = file_exists($folder) ? scandir($folder) : [];
 
-                {{-- DELETE --}}
-                @auth
-                @if(in_array(auth()->user()->role, ['admin','super_admin']))
-                <form method="POST" action="{{ route('produk.destroy', $item->id_produk) }}"
-                      class="absolute top-4 right-4 z-20">
-                    @csrf
-                    @method('DELETE')
-                    <button class="w-8 h-8 rounded-full bg-red-500/90 text-white text-sm shadow hover:scale-110 transition">
-                        ✕
-                    </button>
-                </form>
+            $images = array_values(array_diff($files, ['.', '..']));
+        @endphp
+
+        {{-- CARD --}}
+        <div class="relative group glass-shine
+                    backdrop-blur-2xl
+                    bg-white/30
+                    border border-white/40
+                    rounded-2xl sm:rounded-3xl
+                    overflow-hidden
+                    shadow-[0_10px_40px_rgba(0,0,0,0.15)]
+                    transition duration-500
+                    hover:scale-[1.03]">
+
+            {{-- DELETE --}}
+            @auth
+            @if(in_array(auth()->user()->role, ['admin','super_admin']))
+
+            <form method="POST"
+                  action="{{ route('produk.destroy', $item->id_produk) }}"
+                  class="absolute top-2 right-2 sm:top-4 sm:right-4 z-20">
+
+                @csrf
+                @method('DELETE')
+
+                <button
+                    class="w-7 h-7 sm:w-8 sm:h-8
+                           rounded-full
+                           bg-red-500/90
+                           text-white
+                           text-xs sm:text-sm
+                           shadow
+                           hover:scale-110
+                           transition">
+
+                    ✕
+
+                </button>
+
+            </form>
+
+            @endif
+            @endauth
+
+            {{-- IMAGE --}}
+            <div class="relative overflow-hidden
+                        h-40 sm:h-52 md:h-56">
+
+                @if(count($images) > 0)
+
+                <img
+                    src="{{ asset('img/menu/' . $item->gambar . '/' . $images[0]) }}"
+                    class="w-full h-full object-cover
+                           transition duration-500
+                           group-hover:scale-110"
+                >
+
                 @endif
-                @endauth
 
-                {{-- IMAGE --}}
-                <div class="h-56 overflow-hidden relative">
-
-                    @if(count($images) > 0)
-                    <img src="{{ asset('img/menu/' . $item->gambar . '/' . $images[0]) }}" 
-                         class="w-full h-full object-cover transition duration-500 group-hover:scale-110">
-                    @endif
-
-                    {{-- OVERLAY --}}
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-
-                    {{-- DETAIL --}}
-                    <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                        <a href="{{ route('menu.show', $item->id_produk) }}"
-                           class="px-5 py-2 rounded-xl bg-white/80 backdrop-blur text-[#3e2723] font-medium shadow hover:scale-105 transition">
-                            Detail →
-                        </a>
-                    </div>
-
+                {{-- OVERLAY --}}
+                <div class="absolute inset-0
+                            bg-gradient-to-t
+                            from-black/50
+                            to-transparent">
                 </div>
 
-                {{-- CONTENT --}}
-                <div class="p-6 bg-white/30 backdrop-blur-xl">
+                {{-- DETAIL --}}
+                <div class="absolute inset-0
+                            flex items-center justify-center
+                            opacity-0 group-hover:opacity-100
+                            transition">
 
-                    <div class="flex justify-between items-center mb-2">
+                    <a href="{{ route('menu.show', $item->id_produk) }}"
+                       class="px-3 py-2 sm:px-5
+                              rounded-xl
+                              bg-white/80
+                              backdrop-blur
+                              text-[#3e2723]
+                              text-xs sm:text-sm
+                              font-medium
+                              shadow
+                              hover:scale-105
+                              transition">
 
-                        <h3 class="font-semibold text-lg text-[#2d1f1b] glow-hover">
-                            {{ $item->nama_produk }}
-                        </h3>
+                        Detail →
 
-                        <span class="text-sm font-semibold gold-text">
-                            Rp {{ number_format($item->harga, 0, ',', '.') }}
-                        </span>
-
-                    </div>
-
-                    <p class="text-[#5c4033] text-sm leading-relaxed glow-hover">
-                        {{ $item->deskripsi }}
-                    </p>
+                    </a>
 
                 </div>
 
             </div>
-                        @endforeach
+
+            {{-- CONTENT --}}
+            <div class="p-3 sm:p-5 md:p-6
+                        bg-white/30
+                        backdrop-blur-xl">
+
+                <div class="flex flex-col sm:flex-row
+                            sm:justify-between
+                            sm:items-center
+                            gap-1 sm:gap-2
+                            mb-2">
+
+                    {{-- NAMA --}}
+                    <h3 class="font-semibold
+                               text-sm sm:text-base lg:text-lg
+                               text-[#2d1f1b]
+                               glow-hover
+                               line-clamp-1">
+
+                        {{ $item->nama_produk }}
+
+                    </h3>
+
+                    {{-- HARGA --}}
+                    <span class="text-xs sm:text-sm
+                                 font-semibold
+                                 gold-text">
+
+                        Rp {{ number_format($item->harga, 0, ',', '.') }}
+
+                    </span>
+
+                </div>
+
+                {{-- DESKRIPSI --}}
+                <p class="text-[#5c4033]
+                          text-xs sm:text-sm
+                          leading-relaxed
+                          line-clamp-2">
+
+                    {{ $item->deskripsi }}
+
+                </p>
+
+            </div>
 
         </div>
 
-    </section>
+        @endforeach
+
+    </div>
+
+</section>
 
 
     {{-- ================= MODAL TAMBAH PRODUK ================= --}}

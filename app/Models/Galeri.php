@@ -16,4 +16,13 @@ class Galeri extends Model
         'deskripsi',
         'id_user'
     ];
+
+    // ================= RELATION USER =================
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'id_user');
+    }
+
+    // ================= AUTO TIMESTAMP =================
+    public $timestamps = true;
 }
