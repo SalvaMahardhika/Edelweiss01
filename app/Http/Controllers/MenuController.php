@@ -12,7 +12,14 @@ class MenuController extends Controller
     // ================= PUBLIC =================
     public function index()
     {
-        $produk = Produk::aktif()->latest()->get();
+        // Admin & super admin bisa melihat semua menu (termasuk yang OFF)
+        if (auth()->check() && in_array(auth()->user()->role, ['admin', 'super_admin'])) {
+            $produk = Produk::latest()->get();
+        } else {
+            // Pengunjung biasa hanya melihat menu yang aktif
+            $produk = Produk::aktif()->latest()->get();
+        }
+
         return view('menu', compact('produk'));
     }
 
@@ -24,10 +31,22 @@ class MenuController extends Controller
 
     public function show($id)
     {
-        $produk = Produk::where('id_produk', $id)
-            ->aktif()
-            ->firstOrFail();
+        // 1. Cari produk berdasarkan ID tanpa filter 'aktif' terlebih dahulu
+        $produk = Produk::where('id_produk', $id)->firstOrFail();
 
+        // 2. Jika produk statusnya NONAKTIF (false / 0)
+        if (!$produk->status) {
+            
+            // Cek apakah user yang login adalah admin atau super_admin
+            $isAdmin = auth()->check() && in_array(auth()->user()->role, ['admin', 'super_admin']);
+            
+            // Jika BUKAN admin, kunci aksesnya (bisa pakai abort 404 atau 403)
+            if (!$isAdmin) {
+                abort(404); // Menggunakan 404 agar pengunjung mengira halaman memang tidak ada
+            }
+        }
+
+        // 3. Jika lolos pengecekan (produk aktif ATAU pembukanya adalah admin)
         return view('menu.show', compact('produk'));
     }
 
@@ -80,74 +99,100 @@ class MenuController extends Controller
 
 
     public function update(Request $request, $id)
-{
-    if (!in_array(auth()->user()->role, ['admin','super_admin'])) {
-        abort(403);
-    }
-
-    $produk = Produk::findOrFail($id);
-
-    $folderName = 'menu_' . $produk->id_produk;
-    $folderPath = public_path('img/menu/' . $folderName);
-
-    // ================= DELETE IMAGE =================
-    if ($request->has('delete_image')) {
-        $filePath = $folderPath . '/' . $request->delete_image;
-
-        if (File::exists($filePath)) {
-            File::delete($filePath);
+    {
+        if (!in_array(auth()->user()->role, ['admin','super_admin'])) {
+            abort(403);
         }
 
-        return back()->with('success', 'Gambar berhasil dihapus');
-    }
-
-    // ================= EDIT FIELD =================
-    if ($request->has('field')) {
-        $field = $request->field;
-
-        if (in_array($field, ['nama_produk','harga','deskripsi'])) {
-            $produk->$field = $request->value;
-            $produk->save();
-
-            return back()->with('success', 'Data berhasil diupdate');
-        }
-    }
-
-    // ================= TAMBAH GAMBAR =================
-    if ($request->hasFile('gambar')) {
-
-        if (!File::exists($folderPath)) {
-            File::makeDirectory($folderPath, 0755, true);
+        // 🔥 PROTEKSI FAILSAFE: Jika form mengirim request toggle_status, 
+        // langsung alihkan ke method toggleStatus() agar terhindar dari error validasi di bawah.
+        if ($request->has('toggle_status')) {
+            return $this->toggleStatus($id);
         }
 
-        $existingFiles = File::files($folderPath);
-        $count = count($existingFiles);
+        $produk = Produk::findOrFail($id);
+        $folderName = 'menu_' . $produk->id_produk;
+        $folderPath = public_path('img/menu/' . $folderName);
 
-        foreach ($request->file('gambar') as $i => $file) {
-            $filename = ($count + $i + 1) . '.' . $file->getClientOriginalExtension();
-            $file->move($folderPath, $filename);
+        // ================= DELETE IMAGE =================
+        if ($request->has('delete_image')) {
+            $filePath = $folderPath . '/' . $request->delete_image;
+
+            if (File::exists($filePath)) {
+                File::delete($filePath);
+            }
+
+            return back()->with('success', 'Gambar berhasil dihapus');
         }
 
-        return back()->with('success', 'Gambar berhasil ditambahkan');
+        // ================= EDIT FIELD =================
+        if ($request->has('field')) {
+            $field = $request->field;
+
+            if (in_array($field, ['nama_produk','harga','deskripsi'])) {
+                $produk->$field = $request->value;
+                $produk->save();
+
+                return back()->with('success', 'Data berhasil diupdate');
+            }
+        }
+
+        // ================= TAMBAH GAMBAR =================
+        if ($request->hasFile('gambar')) {
+
+            if (!File::exists($folderPath)) {
+                File::makeDirectory($folderPath, 0755, true);
+            }
+
+            $existingFiles = File::files($folderPath);
+            $count = count($existingFiles);
+
+            foreach ($request->file('gambar') as $i => $file) {
+                $filename = ($count + $i + 1) . '.' . $file->getClientOriginalExtension();
+                $file->move($folderPath, $filename);
+            }
+
+            return back()->with('success', 'Gambar berhasil ditambahkan');
+        }
+
+        // ================= UPDATE FULL DATA =================
+        $request->validate([
+            'nama_produk' => 'required',
+            'harga' => 'required|numeric',
+            'deskripsi' => 'required',
+        ]);
+
+        $produk->update([
+            'nama_produk' => $request->nama_produk,
+            'harga' => $request->harga,
+            'deskripsi' => $request->deskripsi,
+        ]);
+
+        return back()->with('success', 'Produk berhasil diupdate');
     }
 
-    // ================= UPDATE FULL DATA =================
-    $request->validate([
-        'nama_produk' => 'required',
-        'harga' => 'required|numeric',
-        'deskripsi' => 'required',
-    ]);
+    // ================= TOGGLE STATUS =================
+    public function toggleStatus($id)
+    {
+        if (!in_array(auth()->user()->role, ['admin','super_admin'])) {
+            abort(403);
+        }
 
-    $produk->update([
-        'nama_produk' => $request->nama_produk,
-        'harga' => $request->harga,
-        'deskripsi' => $request->deskripsi,
-    ]);
+        $produk = Produk::findOrFail($id);
 
-    return back()->with('success', 'Produk berhasil diupdate');
-}
+        // Mengubah status (0 jadi 1, atau 1 jadi 0)
+        $produk->status = !$produk->status;
+        $produk->save();
 
+        return back()->with(
+            'success',
+            $produk->status
+                ? 'Menu berhasil ditampilkan'
+                : 'Menu berhasil disembunyikan'
+        );
+    }
 
+    // ================= DESTROY =================
     public function destroy($id)
     {
         if (!in_array(auth()->user()->role, ['admin','super_admin'])) {

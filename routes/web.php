@@ -72,6 +72,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/', 'store')->name('produk.store');
         Route::put('/{id}', 'update')->name('produk.update');
         Route::delete('/{id}', 'destroy')->name('produk.destroy');
+        
+        // ✨ ROUTE BARU: TOGGLE STATUS (ON/OFF)
+        Route::patch('/{id}/toggle-status', 'toggleStatus')->name('produk.toggleStatus');
 
     });
 

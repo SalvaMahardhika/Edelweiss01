@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Menu - Edelweiss Bakery</title>
+    <link rel="icon" href="{{ asset('img/logo/logo2.png') }}">
 
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -94,7 +95,7 @@
 
     <div class="grid 
                 grid-cols-2 
-                md:grid-cols-3 
+                md:grid-cols-2 
                 xl:grid-cols-4 
                 gap-4 sm:gap-6 lg:gap-8">
 
@@ -110,6 +111,7 @@
 
         {{-- CARD --}}
         <div class="relative group glass-shine
+                    {{ !$item->status ? 'opacity-60 grayscale-[20%]' : '' }}
                     backdrop-blur-2xl
                     bg-white/30
                     border border-white/40
@@ -119,13 +121,14 @@
                     transition duration-500
                     hover:scale-[1.03]">
 
-            {{-- DELETE --}}
+            {{-- DELETE & TOGGLE STATUS --}}
             @auth
             @if(in_array(auth()->user()->role, ['admin','super_admin']))
 
+            {{-- DELETE BUTTON --}}
             <form method="POST"
                   action="{{ route('produk.destroy', $item->id_produk) }}"
-                  class="absolute top-2 right-2 sm:top-4 sm:right-4 z-20">
+                  class="absolute top-2 right-2 sm:top-4 sm:right-4 z-30">
 
                 @csrf
                 @method('DELETE')
@@ -136,14 +139,44 @@
                            bg-red-500/90
                            text-white
                            text-xs sm:text-sm
-                           shadow
+                           shadow-lg
                            hover:scale-110
                            transition">
-
                     ✕
-
                 </button>
+            </form>
 
+            {{-- TOGGLE STATUS --}}
+            <form method="POST"
+                  action="{{ route('produk.update', $item->id_produk) }}"
+                  class="absolute top-2 left-2 sm:top-4 sm:left-4 z-30">
+
+                @csrf
+                @method('PUT')
+
+                <input type="hidden" name="toggle_status" value="1">
+
+                <button type="submit"
+                    class="relative w-14 h-8 rounded-full
+                           transition duration-300
+                           shadow-[0_8px_24px_rgba(0,0,0,0.25)]
+                           border border-white/30
+                           backdrop-blur-xl
+                           {{ $item->status ? 'bg-green-500/90' : 'bg-red-500/80' }}">
+
+                    {{-- BULATAN TOGGLE --}}
+                    <div class="absolute top-1 w-6 h-6
+                                rounded-full
+                                bg-white
+                                shadow-lg
+                                transition-all duration-300
+                                flex items-center justify-center
+                                text-[10px] font-bold
+                                text-[#3e2723]
+                                {{ $item->status ? 'left-7' : 'left-1' }}">
+                        {{ $item->status ? 'ON' : 'OFF' }}
+                    </div>
+                </button>
             </form>
 
             @endif
@@ -154,14 +187,12 @@
                         h-40 sm:h-52 md:h-56">
 
                 @if(count($images) > 0)
-
                 <img
                     src="{{ asset('img/menu/' . $item->gambar . '/' . $images[0]) }}"
                     class="w-full h-full object-cover
                            transition duration-500
                            group-hover:scale-110"
                 >
-
                 @endif
 
                 {{-- OVERLAY --}}
@@ -188,19 +219,46 @@
                               shadow
                               hover:scale-105
                               transition">
-
                         Detail →
-
                     </a>
-
                 </div>
-
             </div>
 
             {{-- CONTENT --}}
             <div class="p-3 sm:p-5 md:p-6
                         bg-white/30
                         backdrop-blur-xl">
+
+                {{-- STATUS BADGE --}}
+                @auth
+                @if(in_array(auth()->user()->role, ['admin','super_admin']))
+                <div class="mb-3">
+                    @if($item->status)
+                    <span class="inline-flex items-center gap-1
+                                 px-3 py-1 rounded-full
+                                 text-[11px] sm:text-xs
+                                 font-semibold
+                                 bg-green-500/15
+                                 text-green-700
+                                 border border-green-500/20
+                                 backdrop-blur-xl">
+                        ● Produk Aktif
+                    </span>
+                    @else
+                    <span class="inline-flex items-center gap-1
+                                 px-3 py-1 rounded-full
+                                 text-[11px] sm:text-xs
+                                 font-semibold
+                                 bg-red-500/15
+                                 text-red-700
+                                 border border-red-500/20
+                                 backdrop-blur-xl">
+                        ● Produk Disembunyikan
+                    </span>
+                    @endif
+                </div>
+                @endif
+                @endauth
 
                 <div class="flex flex-col sm:flex-row
                             sm:justify-between
@@ -214,20 +272,15 @@
                                text-[#2d1f1b]
                                glow-hover
                                line-clamp-1">
-
                         {{ $item->nama_produk }}
-
                     </h3>
 
                     {{-- HARGA --}}
                     <span class="text-xs sm:text-sm
                                  font-semibold
                                  gold-text">
-
                         Rp {{ number_format($item->harga, 0, ',', '.') }}
-
                     </span>
-
                 </div>
 
                 {{-- DESKRIPSI --}}
@@ -235,13 +288,9 @@
                           text-xs sm:text-sm
                           leading-relaxed
                           line-clamp-2">
-
                     {{ $item->deskripsi }}
-
                 </p>
-
             </div>
-
         </div>
 
         @endforeach
