@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\File;
 
 class MenuController extends Controller
 {
-    // ================= PUBLIC =================
+    // ==========================================
+    // PUBLIC METHODS
+    // ==========================================
+
     public function index()
     {
         // Admin & super admin bisa melihat semua menu (termasuk yang OFF)
@@ -29,28 +32,30 @@ class MenuController extends Controller
         return view('dashboard.dashboard', compact('produk'));
     }
 
-    public function show($id)
+    /**
+     * Menampilkan detail produk menggunakan Route Model Binding terenkripsi.
+     * Objek $produk sudah otomatis didekripsi dan dicari oleh RouteServiceProvider.
+     */
+    public function show(Produk $produk)
     {
-        // 1. Cari produk berdasarkan ID tanpa filter 'aktif' terlebih dahulu
-        $produk = Produk::where('id_produk', $id)->firstOrFail();
-
-        // 2. Jika produk statusnya NONAKTIF (false / 0)
+        // Proteksi tambahan: Jika produk statusnya NONAKTIF (0)
         if (!$produk->status) {
             
             // Cek apakah user yang login adalah admin atau super_admin
             $isAdmin = auth()->check() && in_array(auth()->user()->role, ['admin', 'super_admin']);
             
-            // Jika BUKAN admin, kunci aksesnya (bisa pakai abort 404 atau 403)
+            // Jika BUKAN admin, lempar 404 agar halaman dikira tidak ada
             if (!$isAdmin) {
-                abort(404); // Menggunakan 404 agar pengunjung mengira halaman memang tidak ada
+                abort(404);
             }
         }
 
-        // 3. Jika lolos pengecekan (produk aktif ATAU pembukanya adalah admin)
         return view('menu.show', compact('produk'));
     }
 
-    // ================= ADMIN CRUD =================
+    // ==========================================
+    // ADMIN CRUD METHODS
+    // ==========================================
 
     public function store(Request $request)
     {
@@ -65,7 +70,7 @@ class MenuController extends Controller
             'gambar.*' => 'image'
         ]);
 
-        // 1. simpan produk dulu
+        // 1. Simpan produk terlebih dahulu
         $produk = Produk::create([
             'nama_produk' => $request->nama_produk,
             'harga' => $request->harga,
@@ -74,7 +79,7 @@ class MenuController extends Controller
             'id_user' => Auth::id()
         ]);
 
-        // 2. buat folder
+        // 2. Buat folder penyimpanan gambar
         $folderName = 'menu_' . $produk->id_produk;
         $folderPath = public_path('img/menu/' . $folderName);
 
@@ -82,7 +87,7 @@ class MenuController extends Controller
             File::makeDirectory($folderPath, 0755, true);
         }
 
-        // 3. simpan gambar
+        // 3. Pindahkan file gambar ke folder
         if ($request->hasFile('gambar')) {
             foreach ($request->file('gambar') as $i => $file) {
                 $filename = ($i + 1) . '.' . $file->getClientOriginalExtension();
@@ -90,13 +95,12 @@ class MenuController extends Controller
             }
         }
 
-        // 4. simpan nama folder ke DB
+        // 4. Simpan nama folder ke database
         $produk->gambar = $folderName;
         $produk->save();
 
         return back()->with('success', 'Produk berhasil ditambahkan');
     }
-
 
     public function update(Request $request, $id)
     {
@@ -104,8 +108,7 @@ class MenuController extends Controller
             abort(403);
         }
 
-        // 🔥 PROTEKSI FAILSAFE: Jika form mengirim request toggle_status, 
-        // langsung alihkan ke method toggleStatus() agar terhindar dari error validasi di bawah.
+        // Failsafe rute: Mengalihkan ke toggleStatus jika ada parameter terkait
         if ($request->has('toggle_status')) {
             return $this->toggleStatus($id);
         }
@@ -114,7 +117,7 @@ class MenuController extends Controller
         $folderName = 'menu_' . $produk->id_produk;
         $folderPath = public_path('img/menu/' . $folderName);
 
-        // ================= DELETE IMAGE =================
+        // Hapus Gambar Tertentu
         if ($request->has('delete_image')) {
             $filePath = $folderPath . '/' . $request->delete_image;
 
@@ -125,7 +128,7 @@ class MenuController extends Controller
             return back()->with('success', 'Gambar berhasil dihapus');
         }
 
-        // ================= EDIT FIELD =================
+        // Update Field Satuan via Inline Edit
         if ($request->has('field')) {
             $field = $request->field;
 
@@ -137,9 +140,8 @@ class MenuController extends Controller
             }
         }
 
-        // ================= TAMBAH GAMBAR =================
+        // Tambah Gambar Baru
         if ($request->hasFile('gambar')) {
-
             if (!File::exists($folderPath)) {
                 File::makeDirectory($folderPath, 0755, true);
             }
@@ -155,7 +157,7 @@ class MenuController extends Controller
             return back()->with('success', 'Gambar berhasil ditambahkan');
         }
 
-        // ================= UPDATE FULL DATA =================
+        // Update Keseluruhan Data Form
         $request->validate([
             'nama_produk' => 'required',
             'harga' => 'required|numeric',
@@ -171,7 +173,6 @@ class MenuController extends Controller
         return back()->with('success', 'Produk berhasil diupdate');
     }
 
-    // ================= TOGGLE STATUS =================
     public function toggleStatus($id)
     {
         if (!in_array(auth()->user()->role, ['admin','super_admin'])) {
@@ -186,13 +187,10 @@ class MenuController extends Controller
 
         return back()->with(
             'success',
-            $produk->status
-                ? 'Menu berhasil ditampilkan'
-                : 'Menu berhasil disembunyikan'
+            $produk->status ? 'Menu berhasil ditampilkan' : 'Menu berhasil disembunyikan'
         );
     }
 
-    // ================= DESTROY =================
     public function destroy($id)
     {
         if (!in_array(auth()->user()->role, ['admin','super_admin'])) {
@@ -200,10 +198,9 @@ class MenuController extends Controller
         }
 
         $produk = Produk::findOrFail($id);
-
         $folderPath = public_path('img/menu/' . $produk->gambar);
 
-        // hapus folder
+        // Hapus folder beserta seluruh isinya
         if (File::exists($folderPath)) {
             File::deleteDirectory($folderPath);
         }

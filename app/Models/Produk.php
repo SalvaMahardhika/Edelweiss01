@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Helpers\CryptoHelper; // Pastikan Helper yang kita buat kemarin sudah ada
 
 class Produk extends Model
 {
@@ -34,10 +35,19 @@ class Produk extends Model
         return $this->belongsTo(User::class, 'id_user');
     }
 
-    // ================= ACCESSOR GAMBAR =================
+    // ================= ACCESSOR =================
     public function getGambarUrlAttribute()
     {
         return asset('storage/' . $this->gambar);
+    }
+
+    /**
+     * ACCESSOR BARU: Mengubah id_produk asli menjadi string terenkripsi AES-256-CBC
+     * Panggil di Blade menggunakan: $produk->encrypted_id
+     */
+    public function getEncryptedIdAttribute()
+    {
+        return CryptoHelper::encryptId($this->attributes['id_produk']);
     }
 
     // ================= SCOPE =================

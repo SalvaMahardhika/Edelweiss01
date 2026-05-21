@@ -208,7 +208,7 @@
                             opacity-0 group-hover:opacity-100
                             transition">
 
-                    <a href="{{ route('menu.show', $item->id_produk) }}"
+                    <a href="{{ route('menu.show', $item->encrypted_id) }}"
                        class="px-3 py-2 sm:px-5
                               rounded-xl
                               bg-white/80
