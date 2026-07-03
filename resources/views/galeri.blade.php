@@ -258,7 +258,7 @@ use Illuminate\Support\Facades\File;
 
                 <form
                     method="POST"
-                    action="{{ route('galeri.destroy', $album->id_galeri) }}"
+                    action="{{ route('galeri.destroy', $album->id) }}"
                     class="absolute top-0 right-0">
 
                     @csrf
@@ -294,7 +294,7 @@ use Illuminate\Support\Facades\File;
                         @if(in_array(auth()->user()->role, ['admin','super_admin']))
 
                         <button
-                            onclick="toggleEdit('editJudul{{ $album->id_galeri }}')"
+                            onclick="toggleEdit('editJudul{{ $album->id }}')"
                             class="w-full sm:w-auto px-4 py-2 rounded-xl glass-soft border border-white/30 text-sm font-semibold hover:scale-105 transition">
 
                             Edit Judul
@@ -319,7 +319,7 @@ use Illuminate\Support\Facades\File;
                         @if(in_array(auth()->user()->role, ['admin','super_admin']))
 
                         <button
-                            onclick="toggleEdit('editDeskripsi{{ $album->id_galeri }}')"
+                            onclick="toggleEdit('editDeskripsi{{ $album->id }}')"
                             class="w-full sm:w-auto px-3 py-2 rounded-xl glass-soft border border-white/30 text-sm font-semibold hover:scale-105 transition shrink-0">
 
                             Edit Deskripsi
@@ -338,9 +338,9 @@ use Illuminate\Support\Facades\File;
                 @if(in_array(auth()->user()->role, ['admin','super_admin']))
 
                 <form
-                    id="editJudul{{ $album->id_galeri }}"
+                    id="editJudul{{ $album->id }}"
                     method="POST"
-                    action="{{ route('galeri.update', $album->id_galeri) }}"
+                    action="{{ route('galeri.update', $album->id) }}"
                     class="hidden mb-6">
 
                     @csrf
@@ -376,9 +376,9 @@ use Illuminate\Support\Facades\File;
                 @if(in_array(auth()->user()->role, ['admin','super_admin']))
 
                 <form
-                    id="editDeskripsi{{ $album->id_galeri }}"
+                    id="editDeskripsi{{ $album->id }}"
                     method="POST"
-                    action="{{ route('galeri.update', $album->id_galeri) }}"
+                    action="{{ route('galeri.update', $album->id) }}"
                     class="hidden mb-8">
 
                     @csrf
@@ -441,7 +441,7 @@ use Illuminate\Support\Facades\File;
 
                             <form
                                 method="POST"
-                                action="{{ route('galeri.update', $album->id_galeri) }}"
+                                action="{{ route('galeri.update', $album->id) }}"
                                 class="absolute top-2 right-2 md:top-3 md:right-3 z-20 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition duration-300">
 
                                 @csrf
@@ -494,7 +494,7 @@ use Illuminate\Support\Facades\File;
 
                     <form
                         method="POST"
-                        action="{{ route('galeri.update', $album->id_galeri) }}"
+                        action="{{ route('galeri.update', $album->id) }}"
                         enctype="multipart/form-data"
                         class="glass-soft border border-white/30 rounded-[2rem] p-5 md:p-6">
 

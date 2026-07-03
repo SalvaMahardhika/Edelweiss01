@@ -3,26 +3,23 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Galeri extends Model
 {
+    use HasFactory;
     protected $table = 'galeri';
-
-    protected $primaryKey = 'id_galeri';
 
     protected $fillable = [
         'judul',
         'album',
         'deskripsi',
-        'id_user'
+        'user_id'
     ];
 
     // ================= RELATION USER =================
     public function user()
     {
-        return $this->belongsTo(User::class, 'id_user');
+        return $this->belongsTo(User::class);
     }
-
-    // ================= AUTO TIMESTAMP =================
-    public $timestamps = true;
 }

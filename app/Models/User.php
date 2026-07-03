@@ -4,22 +4,21 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class User extends Authenticatable
 {
-    use Notifiable;
+    use Notifiable, HasFactory;
 
-    protected $table = 'user'; // sesuai tabel kamu
-    protected $primaryKey = 'id_user';
-
-    public $timestamps = true;
+    protected $table = 'users';
 
     protected $fillable = [
-        'nama',
+        'name',
         'email',
         'password',
         'role',
-        'status'
+        'status',
+        'phone',
     ];
 
     protected $hidden = [
@@ -35,6 +34,7 @@ class User extends Authenticatable
     |--------------------------------------------------------------------------
     | HELPER ROLE (BIAR CLEAN)
     |--------------------------------------------------------------------------
+    |
     */
 
     public function isSuperAdmin()

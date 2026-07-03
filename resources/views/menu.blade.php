@@ -127,9 +127,8 @@
 
             {{-- DELETE BUTTON --}}
             <form method="POST"
-                  action="{{ route('produk.destroy', $item->id_produk) }}"
+                  action="{{ route('produk.destroy', $item->id) }}"
                   class="absolute top-2 right-2 sm:top-4 sm:right-4 z-30">
-
                 @csrf
                 @method('DELETE')
 
@@ -148,7 +147,7 @@
 
             {{-- TOGGLE STATUS --}}
             <form method="POST"
-                  action="{{ route('produk.update', $item->id_produk) }}"
+                  action="{{ route('produk.update', $item->id) }}"
                   class="absolute top-2 left-2 sm:top-4 sm:left-4 z-30">
 
                 @csrf

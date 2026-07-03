@@ -76,11 +76,11 @@ class MenuController extends Controller
             'harga' => $request->harga,
             'deskripsi' => $request->deskripsi,
             'status' => 1,
-            'id_user' => Auth::id()
+            'user_id' => Auth::id()
         ]);
 
         // 2. Buat folder penyimpanan gambar
-        $folderName = 'menu_' . $produk->id_produk;
+        $folderName = 'menu_' . $produk->id;
         $folderPath = public_path('img/menu/' . $folderName);
 
         if (!File::exists($folderPath)) {

@@ -55,22 +55,18 @@ class="fixed top-0 w-full z-50 backdrop-blur-3xl bg-white/60 border-b border-whi
 
                 {{-- SUPER ADMIN --}}
                 @auth
-                    @if(auth()->user()->role === 'super_admin')
-
-                    <a href="{{ route('admin.index') }}"
-                       class="px-4 py-2 rounded-xl
-                              bg-[#3e2723]/90
-                              text-white
-                              shadow-lg
-                              hover:bg-[#2c1b18]
-                              transition">
-
-                        Kelola Admin
-
-                    </a>
-
-                    @endif
-                @endauth
+    @if(auth()->user()->role === 'super_admin')
+        <a href="{{ route('admin.users') }}"
+           class="px-4 py-2 rounded-xl
+                  bg-[#3e2723]/90
+                  text-white
+                  shadow-lg
+                  hover:bg-[#2c1b18]
+                  transition">
+            Kelola User
+        </a>
+    @endif
+@endauth
 
                 {{-- USER --}}
                 @auth

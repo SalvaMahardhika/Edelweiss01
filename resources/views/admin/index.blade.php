@@ -47,7 +47,7 @@
     {{-- GRID --}}
     <div class="max-w-6xl mx-auto px-6 grid md:grid-cols-2 lg:grid-cols-3 gap-10">
 
-        @foreach($admins->where('id_user','!=',1) as $user)
+        @foreach($users as $user)
 
         <div class="backdrop-blur bg-white/40 border rounded-3xl p-6 shadow-xl">
 
@@ -72,13 +72,13 @@
             <div class="flex justify-center gap-2 mt-5">
 
                 {{-- EDIT --}}
-                <button onclick="openEdit({{ $user->id_user }}, '{{ $user->nama }}', '{{ $user->email }}')" 
+                <button onclick="openEdit({{ $user->id }}, '{{ $user->nama }}', '{{ $user->email }}')"
                     class="px-3 py-1 text-xs rounded-lg bg-[#c8a97e] text-white">
                     Edit
                 </button>
 
                 {{-- TOGGLE STATUS --}}
-                <form method="POST" action="{{ route('admin.update', $user->id_user) }}">
+                <form method="POST" action="{{ route('admin.update', $user->id) }}">
                     @csrf
                     @method('PUT')
 
@@ -95,7 +95,7 @@
                 </form>
 
                 {{-- DELETE --}}
-                <button onclick="confirmDelete({{ $user->id_user }})"
+                <button onclick="confirmDelete({{ $user->id }})"
                     class="px-3 py-1 text-xs rounded-lg bg-red-500 text-white">
                     Hapus
                 </button>
@@ -103,6 +103,7 @@
             </div>
 
         </div>
+
 
         @endforeach
 
@@ -208,7 +209,7 @@ function confirmDelete(id){
     if(confirm('Yakin hapus admin ini?')){
         let form = document.createElement('form');
         form.method = 'POST';
-        form.action = '/admin/' + id;
+        form.action = '{{ url("admin/users") }}/' + id;
 
         form.innerHTML = `
             @csrf
@@ -224,7 +225,7 @@ function openEdit(id, nama, email){
     document.getElementById('editNama').value = nama;
     document.getElementById('editEmail').value = email;
 
-    document.getElementById('editForm').action = '/admin/' + id;
+    document.getElementById('editForm').action = '{{ url("admin/users") }}/' + id;
 
     openModal('editModal');
 }

@@ -9,8 +9,13 @@ use App\Http\Controllers\AdminController;
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes
+| Edelweiss Bakery - Dokumen Rute Web (web.php)
 |--------------------------------------------------------------------------
+|
+| File ini mendefinisikan seluruh rute web untuk aplikasi Edelweiss Bakery.
+| Rute-rute di sini dimuat oleh RouteServiceProvider dan menggunakan grup
+| middleware "web" serta middleware keamanan/autentikasi tambahan.
+|
 */
 
 // ==========================================
@@ -72,17 +77,37 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{id}', 'destroy')->name('produk.destroy');
         Route::patch('/{id}/toggle-status', 'toggleStatus')->name('produk.toggleStatus');
     });
+
+    // ADMIN AREA – accessible by admin & super_admin
+    Route::prefix('admin')->middleware(['role:admin,super_admin'])->group(function () {
+        Route::get('/', fn() => response('admin home'))->name('admin.index');
+    });
+
+    // ADMIN USERS – only super_admin
+    Route::prefix('admin/users')->middleware(['role:super_admin'])->group(function () {
+        Route::get('/', [App\Http\Controllers\AdminController::class, 'index'])->name('admin.users');
+        // CRUD routes
+        Route::post('/', [App\Http\Controllers\AdminController::class, 'store'])->name('admin.store');
+        Route::put('/{id}', [App\Http\Controllers\AdminController::class, 'update'])->name('admin.update');
+        Route::delete('/{id}', [App\Http\Controllers\AdminController::class, 'destroy'])->name('admin.destroy');
+    });
 });
 
 
 // ==========================================
 // SUPER ADMIN ROUTES
 // ==========================================
-Route::middleware(['auth', 'role:super_admin'])->group(function () {
-    Route::controller(AdminController::class)->group(function () {
-        Route::get('/admin', 'index')->name('admin.index');
-        Route::post('/admin', 'store')->name('admin.store');
-        Route::put('/admin/{id}', 'update')->name('admin.update');
-        Route::delete('/admin/{id}', 'destroy')->name('admin.destroy');
-    });
-});
+// Super‑admin specific admin management routes removed to avoid conflict with custom admin middleware routes.
+// You can re‑add them under a different prefix (e.g., /super-admin) if needed.
+
+
+/*
+|--------------------------------------------------------------------------
+| Akhir dari File Rute Web (web.php)
+|--------------------------------------------------------------------------
+|
+| Semua rute aplikasi Edelweiss Bakery didefinisikan di atas. Pastikan untuk
+| selalu memperhatikan hak akses (middleware) seperti 'auth' dan 'role:super_admin'
+| saat menambahkan rute baru demi menjaga keamanan sistem.
+|
+*/

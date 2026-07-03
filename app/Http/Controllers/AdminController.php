@@ -11,8 +11,8 @@ class AdminController extends Controller
     // ================= LIST ADMIN =================
     public function index()
     {
-        $admins = User::whereIn('role', ['admin', 'super_admin'])->get();
-        return view('admin.index', compact('admins'));
+        $users = User::where('id', '!=', 1)->get();
+        return view('admin.index', compact('users'));
     }
 
     // ================= CREATE =================
@@ -20,8 +20,9 @@ class AdminController extends Controller
     {
         $request->validate([
             'nama' => 'required',
-            'email' => 'required|email|unique:user,email',
-            'password' => 'required|min:6'
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:6',
+            'role' => 'required|in:admin,customer',
         ]);
 
         User::create([
@@ -41,7 +42,7 @@ class AdminController extends Controller
         $user = User::findOrFail($id);
 
         // 🔒 proteksi super admin utama
-        if ($user->id_user == 1) {
+        if ($user->id == 1) {
             return back()->with('error', 'Super admin utama tidak bisa diubah');
         }
 
@@ -59,7 +60,7 @@ class AdminController extends Controller
         // ================= UPDATE DATA =================
         $request->validate([
             'nama' => 'required',
-            'email' => 'required|email|unique:user,email,' . $id . ',id_user',
+            'email' => 'required|email|unique:users,email,' . $id . ',id',
             'password' => 'nullable|min:6'
         ]);
 
@@ -82,7 +83,7 @@ class AdminController extends Controller
         $user = User::findOrFail($id);
 
         // 🔒 super admin tidak bisa dihapus
-        if ($user->role === 'super_admin' || $user->id_user == 1) {
+        if ($user->role === 'super_admin' || $user->id == 1) {
             return back()->with('error', 'Super admin tidak bisa dihapus');
         }
 
