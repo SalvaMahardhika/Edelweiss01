@@ -18,7 +18,7 @@ class OrderFactory extends Factory
         $paymentPlan = fake()->randomElement(['full', 'dp']);
 
         return [
-            'order_number' => 'EDL-' . now()->format('Ymd') . '-' . fake()->unique()->numberBetween(1000, 9999),
+            'order_number' => 'EDL-'.now()->format('Ymd').'-'.fake()->unique()->numberBetween(1000, 9999),
             'user_id' => User::factory(),
             'customer_name' => fake()->name(),
             'customer_phone' => fake()->phoneNumber(),

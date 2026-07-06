@@ -19,7 +19,7 @@ class ReservationFactory extends Factory
             'reserved_at' => fake()->dateTimeBetween('now', '+7 days'),
             'party_size' => fake()->numberBetween(1, 10),
             'status' => fake()->randomElement(['pending', 'confirmed', 'seated', 'completed', 'cancelled']),
-            'table_number' => 'T-' . fake()->numberBetween(1, 15),
+            'table_number' => 'T-'.fake()->numberBetween(1, 15),
             'notes' => fake()->sentence(),
         ];
     }

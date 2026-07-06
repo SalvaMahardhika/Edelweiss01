@@ -20,7 +20,7 @@ class PaymentFactory extends Factory
             'amount' => fake()->randomFloat(2, 50000, 200000),
             'currency' => 'IDR',
             'status' => fake()->randomElement(['pending', 'settlement', 'paid', 'failed']),
-            'reference' => 'MID-' . fake()->unique()->uuid(),
+            'reference' => 'MID-'.fake()->unique()->uuid(),
             'snap_token' => fake()->md5(),
             'payload' => json_encode(['test' => 'data']),
             'paid_at' => now(),

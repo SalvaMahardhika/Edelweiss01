@@ -1,11 +1,11 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\MenuController;
-use App\Http\Controllers\GaleriController;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\GaleriController;
+use App\Http\Controllers\MenuController;
+use App\Http\Controllers\ProfileController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -24,7 +24,7 @@ use App\Http\Controllers\AdminController;
 Route::controller(MenuController::class)->group(function () {
     Route::get('/', 'dashboard')->name('home');
     Route::get('/menu', 'index')->name('menu');
-    
+
     // Menggunakan {produk} untuk mendukung Custom Route Model Binding (AES-256)
     Route::get('/menu/{produk}', 'show')->name('menu.show');
 });
@@ -32,7 +32,6 @@ Route::controller(MenuController::class)->group(function () {
 Route::get('/galeri', [GaleriController::class, 'index'])->name('galeri');
 Route::view('/about', 'about')->name('about');
 Route::view('/kontak', 'kontak')->name('kontak');
-
 
 // ==========================================
 // AUTHENTICATION ROUTES
@@ -46,7 +45,6 @@ Route::post('/logout', [AuthController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
 
-
 // ==========================================
 // USER ROUTES (AUTHENTICATED)
 // ==========================================
@@ -56,7 +54,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/profile', 'update')->name('profile.update');
     });
 });
-
 
 // ==========================================
 // ADMIN ROUTES
@@ -80,26 +77,24 @@ Route::middleware(['auth'])->group(function () {
 
     // ADMIN AREA – accessible by admin & super_admin
     Route::prefix('admin')->middleware(['role:admin,super_admin'])->group(function () {
-        Route::get('/', fn() => response('admin home'))->name('admin.index');
+        Route::get('/', fn () => response('admin home'))->name('admin.index');
     });
 
     // ADMIN USERS – only super_admin
     Route::prefix('admin/users')->middleware(['role:super_admin'])->group(function () {
-        Route::get('/', [App\Http\Controllers\AdminController::class, 'index'])->name('admin.users');
+        Route::get('/', [AdminController::class, 'index'])->name('admin.users');
         // CRUD routes
-        Route::post('/', [App\Http\Controllers\AdminController::class, 'store'])->name('admin.store');
-        Route::put('/{id}', [App\Http\Controllers\AdminController::class, 'update'])->name('admin.update');
-        Route::delete('/{id}', [App\Http\Controllers\AdminController::class, 'destroy'])->name('admin.destroy');
+        Route::post('/', [AdminController::class, 'store'])->name('admin.store');
+        Route::put('/{id}', [AdminController::class, 'update'])->name('admin.update');
+        Route::delete('/{id}', [AdminController::class, 'destroy'])->name('admin.destroy');
     });
 });
-
 
 // ==========================================
 // SUPER ADMIN ROUTES
 // ==========================================
 // Super‑admin specific admin management routes removed to avoid conflict with custom admin middleware routes.
 // You can re‑add them under a different prefix (e.g., /super-admin) if needed.
-
 
 /*
 |--------------------------------------------------------------------------

@@ -5,14 +5,14 @@ namespace App\Models;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentPlan;
 use App\Enums\PaymentStatus;
-use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Carbon;
 
 class Order extends Model
 {
-    use SoftDeletes, HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'orders';
 
@@ -58,21 +58,25 @@ class Order extends Model
     {
         static::saving(function ($order) {
             // Order tak boleh completed / diserahkan sebelum isFullyPaid()
-            if ($order->status === OrderStatus::Completed && !$order->isFullyPaid()) {
-                throw new \DomainException("Order cannot be completed before it is fully paid.");
+            if ($order->status === OrderStatus::Completed && ! $order->isFullyPaid()) {
+                throw new \DomainException('Order cannot be completed before it is fully paid.');
             }
 
-            // fulfill_at must be in the future
-            if ($order->fulfill_at && $order->fulfill_at->lessThanOrEqualTo(Carbon::now())) {
-                throw new \DomainException("Fulfill date must be in the future.");
+            // PERBAIKAN BUG: Validasi fulfill_at HANYA jalan jika data baru atau tanggalnya diedit
+            if ($order->isDirty('fulfill_at') && $order->fulfill_at) {
+                if ($order->fulfill_at->lessThanOrEqualTo(Carbon::now())) {
+                    throw new \DomainException('Fulfill date must be in the future.');
+                }
             }
 
-            // dp_amount must be between 10% and 90% of total_amount when using DP plan
+            // PERBAIKAN BUG: Validasi range nominal DP HANYA jalan jika ada perubahan skema/nominal uang
             if ($order->payment_plan === PaymentPlan::Dp) {
-                $min = bcmul((string) $order->total_amount, '0.10', 2);
-                $max = bcmul((string) $order->total_amount, '0.90', 2);
-                if (bccomp((string) $order->dp_amount, $min, 2) < 0 || bccomp((string) $order->dp_amount, $max, 2) > 0) {
-                    throw new \DomainException("Down‑payment amount must be between 10% and 90% of total amount.");
+                if ($order->isDirty(['payment_plan', 'total_amount', 'dp_amount'])) {
+                    $min = bcmul((string) $order->total_amount, '0.10', 2);
+                    $max = bcmul((string) $order->total_amount, '0.90', 2);
+                    if (bccomp((string) $order->dp_amount, $min, 2) < 0 || bccomp((string) $order->dp_amount, $max, 2) > 0) {
+                        throw new \DomainException('Down‑payment amount must be between 10% and 90% of total amount.');
+                    }
                 }
             }
         });
@@ -96,7 +100,7 @@ class Order extends Model
     // Helper turunan — sisa tagihan TIDAK disimpan, dihitung
     public function remaining(): string
     {
-        return bcsub((string)$this->total_amount, (string)$this->amount_paid, 2);
+        return bcsub((string) $this->total_amount, (string) $this->amount_paid, 2);
     }
 
     public function isFullyPaid(): bool
@@ -110,7 +114,7 @@ class Order extends Model
     public function recalculateTotals()
     {
         $subtotal = '0.00';
-        
+
         // Refresh relation to load newly added items
         if ($this->relationLoaded('items')) {
             $this->unsetRelation('items');
@@ -122,8 +126,8 @@ class Order extends Model
 
             $item->product_name = $product ? $product->nama_produk : $item->product_name;
             $item->unit_price = $price;
-            $item->subtotal = bcmul((string)$price, (string)$item->quantity, 2);
-            
+            $item->subtotal = bcmul((string) $price, (string) $item->quantity, 2);
+
             if ($item->isDirty()) {
                 $item->save();
             }
@@ -151,9 +155,9 @@ class Order extends Model
             ->whereIn('status', ['settlement', 'paid'])
             ->sum('amount');
 
-        if (bccomp((string)$this->amount_paid, (string)$this->total_amount, 2) >= 0) {
+        if (bccomp((string) $this->amount_paid, (string) $this->total_amount, 2) >= 0) {
             $this->payment_status = PaymentStatus::Paid;
-        } elseif ($this->payment_plan === PaymentPlan::Dp && bccomp((string)$this->amount_paid, (string)$this->dp_amount, 2) >= 0) {
+        } elseif ($this->payment_plan === PaymentPlan::Dp && bccomp((string) $this->amount_paid, (string) $this->dp_amount, 2) >= 0) {
             $this->payment_status = PaymentStatus::Partial;
         } else {
             $this->payment_status = PaymentStatus::Unpaid;

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class AdminController extends Controller
@@ -12,6 +12,7 @@ class AdminController extends Controller
     public function index()
     {
         $users = User::where('id', '!=', 1)->get();
+
         return view('admin.index', compact('users'));
     }
 
@@ -30,7 +31,7 @@ class AdminController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => 'admin',
-            'status' => 1
+            'status' => 1,
         ]);
 
         return back()->with('success', 'Admin berhasil ditambahkan');
@@ -51,7 +52,7 @@ class AdminController extends Controller
 
         if (count($onlyFields) === 1 && in_array('status', $onlyFields)) {
             $user->update([
-                'status' => (int) $request->status
+                'status' => (int) $request->status,
             ]);
 
             return back()->with('success', 'Status berhasil diubah');
@@ -60,8 +61,8 @@ class AdminController extends Controller
         // ================= UPDATE DATA =================
         $request->validate([
             'nama' => 'required',
-            'email' => 'required|email|unique:users,email,' . $id . ',id',
-            'password' => 'nullable|min:6'
+            'email' => 'required|email|unique:users,email,'.$id.',id',
+            'password' => 'nullable|min:6',
         ]);
 
         $user->nama = $request->nama;

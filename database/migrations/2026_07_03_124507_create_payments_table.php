@@ -18,7 +18,7 @@ return new class extends Migration
             $table->decimal('amount', 12, 2);
             $table->string('currency', 3)->default('IDR');
             $table->string('status')->default('pending'); // pending|settlement|paid|failed|expired|refunded
-            $table->string('reference')->nullable(); // id transaksi gateway, unik cegah callback dobel
+            $table->string('reference')->nullable()->unique(); // id transaksi gateway, unik cegah callback dobel // id transaksi gateway, unik cegah callback dobel
             $table->string('snap_token')->nullable();
             $table->json('payload')->nullable();
             $table->timestamp('paid_at')->nullable();

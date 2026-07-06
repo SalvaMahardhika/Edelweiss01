@@ -2,14 +2,14 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Models\Order;
-use App\Models\User;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentPlan;
 use App\Enums\PaymentStatus;
+use App\Models\Order;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Tests\TestCase;
 
 class OrderInvariantTest extends TestCase
 {
@@ -24,22 +24,22 @@ class OrderInvariantTest extends TestCase
         $user = User::factory()->create();
 
         Order::create([
-            'order_number'   => 'EDL-' . now()->format('Ymd') . '-0001',
-            'user_id'        => $user->id,
-            'customer_name'  => 'Test Customer',
+            'order_number' => 'EDL-'.now()->format('Ymd').'-0001',
+            'user_id' => $user->id,
+            'customer_name' => 'Test Customer',
             'customer_phone' => '08123456789',
             'customer_email' => 'test@example.com',
-            'order_type'     => 'pickup',
-            'status'         => OrderStatus::Completed,
-            'payment_plan'   => PaymentPlan::Full,
+            'order_type' => 'pickup',
+            'status' => OrderStatus::Completed,
+            'payment_plan' => PaymentPlan::Full,
             'payment_status' => PaymentStatus::Unpaid,
-            'subtotal'       => '1000.00',
-            'tax_amount'     => '110.00',
-            'total_amount'   => '1110.00',
-            'dp_amount'      => '0.00',
-            'amount_paid'    => '0.00',
-            'fulfill_at'     => Carbon::now()->addDay(),
-            'settlement_due_at'=> Carbon::now()->addDay(),
+            'subtotal' => '1000.00',
+            'tax_amount' => '110.00',
+            'total_amount' => '1110.00',
+            'dp_amount' => '0.00',
+            'amount_paid' => '0.00',
+            'fulfill_at' => Carbon::now()->addDay(),
+            'settlement_due_at' => Carbon::now()->addDay(),
         ]);
     }
 
@@ -52,22 +52,22 @@ class OrderInvariantTest extends TestCase
         $user = User::factory()->create();
 
         Order::create([
-            'order_number'   => 'EDL-' . now()->format('Ymd') . '-0002',
-            'user_id'        => $user->id,
-            'customer_name'  => 'Test Customer',
+            'order_number' => 'EDL-'.now()->format('Ymd').'-0002',
+            'user_id' => $user->id,
+            'customer_name' => 'Test Customer',
             'customer_phone' => '08123456789',
             'customer_email' => 'test@example.com',
-            'order_type'     => 'delivery',
-            'status'         => OrderStatus::Pending,
-            'payment_plan'   => PaymentPlan::Full,
+            'order_type' => 'delivery',
+            'status' => OrderStatus::Pending,
+            'payment_plan' => PaymentPlan::Full,
             'payment_status' => PaymentStatus::Unpaid,
-            'subtotal'       => '500.00',
-            'tax_amount'     => '55.00',
-            'total_amount'   => '555.00',
-            'dp_amount'      => '0.00',
-            'amount_paid'    => '0.00',
-            'fulfill_at'     => Carbon::now()->subDay(),
-            'settlement_due_at'=> Carbon::now()->addDay(),
+            'subtotal' => '500.00',
+            'tax_amount' => '55.00',
+            'total_amount' => '555.00',
+            'dp_amount' => '0.00',
+            'amount_paid' => '0.00',
+            'fulfill_at' => Carbon::now()->subDay(),
+            'settlement_due_at' => Carbon::now()->addDay(),
         ]);
     }
 
@@ -80,23 +80,23 @@ class OrderInvariantTest extends TestCase
         $user = User::factory()->create();
 
         Order::create([
-            'order_number'   => 'EDL-' . now()->format('Ymd') . '-0003',
-            'user_id'        => $user->id,
-            'customer_name'  => 'Test Customer',
+            'order_number' => 'EDL-'.now()->format('Ymd').'-0003',
+            'user_id' => $user->id,
+            'customer_name' => 'Test Customer',
             'customer_phone' => '08123456789',
             'customer_email' => 'test@example.com',
-            'order_type'     => 'pickup',
-            'status'         => OrderStatus::Pending,
-            'payment_plan'   => PaymentPlan::Dp,
+            'order_type' => 'pickup',
+            'status' => OrderStatus::Pending,
+            'payment_plan' => PaymentPlan::Dp,
             'payment_status' => PaymentStatus::Unpaid,
-            'subtotal'       => '1000.00',
-            'tax_amount'     => '110.00',
-            'total_amount'   => '1110.00',
+            'subtotal' => '1000.00',
+            'tax_amount' => '110.00',
+            'total_amount' => '1110.00',
             // 5% of total (invalid, below 10%)
-            'dp_amount'      => '55.00',
-            'amount_paid'    => '0.00',
-            'fulfill_at'     => Carbon::now()->addDay(),
-            'settlement_due_at'=> Carbon::now()->addDay(),
+            'dp_amount' => '55.00',
+            'amount_paid' => '0.00',
+            'fulfill_at' => Carbon::now()->addDay(),
+            'settlement_due_at' => Carbon::now()->addDay(),
         ]);
     }
 }

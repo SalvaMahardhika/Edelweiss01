@@ -6,10 +6,10 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentPlan;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
-use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\Produk;
 use App\Models\User;
+use App\Services\OrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -55,23 +55,23 @@ class OrderSecurityTest extends TestCase
                 'quantity' => 1, // 1 * 50k = 50k
                 'unit_price' => 1.00,
                 'subtotal' => 1.00,
-            ]
+            ],
         ];
 
-        $service = new \App\Services\OrderService();
+        $service = new OrderService;
         $order = $service->createOrder($orderData, $itemsData);
 
         // Assert server-calculated prices are correct (250k subtotal, 27.5k tax, 277.5k total)
         // Client-side inputs for subtotal, tax_amount, total_amount and item prices were successfully ignored!
-        $this->assertEquals(250000.00, (float)$order->subtotal);
-        $this->assertEquals(27500.00, (float)$order->tax_amount);
-        $this->assertEquals(277500.00, (float)$order->total_amount);
+        $this->assertEquals(250000.00, (float) $order->subtotal);
+        $this->assertEquals(27500.00, (float) $order->tax_amount);
+        $this->assertEquals(277500.00, (float) $order->total_amount);
 
         // Verify order items table has the correct snapshot prices
         $order->load('items');
         $this->assertCount(2, $order->items);
-        $this->assertEquals(100000.00, (float)$order->items[0]->unit_price);
-        $this->assertEquals(50000.00, (float)$order->items[1]->unit_price);
+        $this->assertEquals(100000.00, (float) $order->items[0]->unit_price);
+        $this->assertEquals(50000.00, (float) $order->items[1]->unit_price);
     }
 
     /**
@@ -103,7 +103,7 @@ class OrderSecurityTest extends TestCase
         ]);
 
         $order->refresh();
-        $this->assertEquals(55500.00, (float)$order->amount_paid);
+        $this->assertEquals(55500.00, (float) $order->amount_paid);
         $this->assertEquals(PaymentStatus::Partial, $order->payment_status);
 
         // 2. Failed payment of Rp55,500 (should not increase amount_paid)
@@ -115,7 +115,7 @@ class OrderSecurityTest extends TestCase
         ]);
 
         $order->refresh();
-        $this->assertEquals(55500.00, (float)$order->amount_paid);
+        $this->assertEquals(55500.00, (float) $order->amount_paid);
 
         // 3. Success settlement of the remaining Rp55,500
         $payment2 = Payment::create([
@@ -126,7 +126,7 @@ class OrderSecurityTest extends TestCase
         ]);
 
         $order->refresh();
-        $this->assertEquals(111000.00, (float)$order->amount_paid);
+        $this->assertEquals(111000.00, (float) $order->amount_paid);
         $this->assertEquals(PaymentStatus::Paid, $order->payment_status);
         $this->assertTrue($order->isFullyPaid());
     }
@@ -162,9 +162,9 @@ class OrderSecurityTest extends TestCase
         try {
             $order->status = OrderStatus::Completed;
             $order->save();
-            $this->fail("Expected DomainException to be thrown when completing an unpaid order.");
+            $this->fail('Expected DomainException to be thrown when completing an unpaid order.');
         } catch (\DomainException $e) {
-            $this->assertEquals("Order cannot be completed before it is fully paid.", $e->getMessage());
+            $this->assertEquals('Order cannot be completed before it is fully paid.', $e->getMessage());
         }
 
         // Verify order status remains pending in database

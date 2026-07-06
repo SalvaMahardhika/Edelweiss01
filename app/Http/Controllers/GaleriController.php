@@ -21,14 +21,14 @@ class GaleriController extends Controller
     public function store(Request $request)
     {
         // 🔒 ROLE
-        if (!in_array(auth()->user()->role, ['admin', 'super_admin'])) {
+        if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
             abort(403);
         }
 
         $request->validate([
             'judul' => 'required',
             'deskripsi' => 'required',
-            'gambar.*' => 'required|image'
+            'gambar.*' => 'required|image',
         ]);
 
         // ================= BUAT DATA DULU =================
@@ -39,11 +39,11 @@ class GaleriController extends Controller
         ]);
 
         // ================= BUAT FOLDER =================
-        $folderName = 'img' . $galeri->id_galeri;
+        $folderName = 'img'.$galeri->id_galeri;
 
-        $folderPath = public_path('img/galeri/' . $folderName);
+        $folderPath = public_path('img/galeri/'.$folderName);
 
-        if (!File::exists($folderPath)) {
+        if (! File::exists($folderPath)) {
             File::makeDirectory($folderPath, 0755, true);
         }
 
@@ -52,7 +52,7 @@ class GaleriController extends Controller
 
             foreach ($request->file('gambar') as $i => $file) {
 
-                $filename = ($i + 1) . '.' . $file->getClientOriginalExtension();
+                $filename = ($i + 1).'.'.$file->getClientOriginalExtension();
 
                 $file->move($folderPath, $filename);
             }
@@ -69,7 +69,7 @@ class GaleriController extends Controller
     public function update(Request $request, $id)
     {
         // 🔒 ROLE
-        if (!in_array(auth()->user()->role, ['admin', 'super_admin'])) {
+        if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
             abort(403);
         }
 
@@ -79,7 +79,7 @@ class GaleriController extends Controller
         if ($request->field == 'judul') {
 
             $request->validate([
-                'value' => 'required'
+                'value' => 'required',
             ]);
 
             $galeri->judul = $request->value;
@@ -89,7 +89,7 @@ class GaleriController extends Controller
         if ($request->field == 'deskripsi') {
 
             $request->validate([
-                'value' => 'required'
+                'value' => 'required',
             ]);
 
             $galeri->deskripsi = $request->value;
@@ -98,7 +98,7 @@ class GaleriController extends Controller
         // ================= TAMBAH FOTO =================
         if ($request->hasFile('gambar')) {
 
-            $folderPath = public_path('img/galeri/' . $galeri->album);
+            $folderPath = public_path('img/galeri/'.$galeri->album);
 
             // hitung file lama
             $existingFiles = collect(File::files($folderPath));
@@ -107,7 +107,7 @@ class GaleriController extends Controller
 
             foreach ($request->file('gambar') as $i => $file) {
 
-                $filename = ($start + $i) . '.' . $file->getClientOriginalExtension();
+                $filename = ($start + $i).'.'.$file->getClientOriginalExtension();
 
                 $file->move($folderPath, $filename);
             }
@@ -117,8 +117,8 @@ class GaleriController extends Controller
         if ($request->delete_image) {
 
             $imagePath = public_path(
-                'img/galeri/' .
-                $galeri->album . '/' .
+                'img/galeri/'.
+                $galeri->album.'/'.
                 $request->delete_image
             );
 
@@ -136,14 +136,14 @@ class GaleriController extends Controller
     public function destroy($id)
     {
         // 🔒 ROLE
-        if (!in_array(auth()->user()->role, ['admin', 'super_admin'])) {
+        if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
             abort(403);
         }
 
         $galeri = Galeri::findOrFail($id);
 
         // ================= HAPUS FOLDER =================
-        $folderPath = public_path('img/galeri/' . $galeri->album);
+        $folderPath = public_path('img/galeri/'.$galeri->album);
 
         if (File::exists($folderPath)) {
             File::deleteDirectory($folderPath);

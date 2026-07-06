@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentType;
 use App\Models\Order;
 use App\Models\Payment;
-use App\Enums\PaymentType;
 use Illuminate\Support\Facades\DB;
 
 class PaymentService
@@ -13,9 +13,7 @@ class PaymentService
      * Mencatat transaksi pembayaran baru atau memproses callback pembayaran.
      * Menggunakan transaksi database dan pengecekan reference unik untuk mencegah double callback.
      *
-     * @param Order $order
-     * @param array $paymentData Array berisi [amount, type, reference, status, method, provider, dsb.]
-     * @return Payment
+     * @param  array  $paymentData  Array berisi [amount, type, reference, status, method, provider, dsb.]
      */
     public function processPayment(Order $order, array $paymentData): Payment
     {

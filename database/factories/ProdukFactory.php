@@ -15,12 +15,13 @@ class ProdukFactory extends Factory
     public function definition(): array
     {
         $nama = fake()->words(2, true);
+
         return [
             'category_id' => Category::factory(),
             'user_id' => User::factory(),
             'nama_produk' => ucfirst($nama),
             'slug' => Str::slug($nama),
-            'gambar' => 'produk/' . fake()->image(null, 640, 480, 'food', false),
+            'gambar' => 'produk/'.fake()->image(null, 640, 480, 'food', false),
             'harga' => fake()->randomFloat(2, 10000, 250000),
             'deskripsi' => fake()->paragraph(),
             'status' => true,

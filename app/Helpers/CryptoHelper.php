@@ -16,10 +16,10 @@ class CryptoHelper
     public static function encryptId($id): string
     {
         $key = self::getKey();
-        $iv  = random_bytes(16); // IV acak 128-bit tiap enkripsi
+        $iv = random_bytes(16); // IV acak 128-bit tiap enkripsi
 
         $encrypted = openssl_encrypt(
-            (string)$id,
+            (string) $id,
             'AES-256-CBC',
             $key,
             OPENSSL_RAW_DATA,
@@ -27,7 +27,8 @@ class CryptoHelper
         );
 
         // Gabung IV + ciphertext, lalu encode ke base64url
-        $combined = $iv . $encrypted;
+        $combined = $iv.$encrypted;
+
         return rtrim(strtr(base64_encode($combined), '+/', '-_'), '=');
     }
 
@@ -37,12 +38,12 @@ class CryptoHelper
     public static function decryptId(string $cipherText): int
     {
         try {
-            $key      = self::getKey();
-            $combined = base64_decode(strtr($cipherText, '-_', '+/') . '==');
+            $key = self::getKey();
+            $combined = base64_decode(strtr($cipherText, '-_', '+/').'==');
 
             // Pisahkan IV (16 byte pertama) dan ciphertext
-            $iv         = substr($combined, 0, 16);
-            $encrypted  = substr($combined, 16);
+            $iv = substr($combined, 0, 16);
+            $encrypted = substr($combined, 16);
 
             $decrypted = openssl_decrypt(
                 $encrypted,
@@ -52,9 +53,11 @@ class CryptoHelper
                 $iv
             );
 
-            $realId = (int)$decrypted;
+            $realId = (int) $decrypted;
 
-            if ($realId <= 0) abort(404);
+            if ($realId <= 0) {
+                abort(404);
+            }
 
             return $realId;
 

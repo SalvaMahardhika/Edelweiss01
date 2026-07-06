@@ -29,6 +29,7 @@ class MenuController extends Controller
     public function dashboard()
     {
         $produk = Produk::aktif()->latest()->take(3)->get();
+
         return view('dashboard.dashboard', compact('produk'));
     }
 
@@ -39,13 +40,13 @@ class MenuController extends Controller
     public function show(Produk $produk)
     {
         // Proteksi tambahan: Jika produk statusnya NONAKTIF (0)
-        if (!$produk->status) {
-            
+        if (! $produk->status) {
+
             // Cek apakah user yang login adalah admin atau super_admin
             $isAdmin = auth()->check() && in_array(auth()->user()->role, ['admin', 'super_admin']);
-            
+
             // Jika BUKAN admin, lempar 404 agar halaman dikira tidak ada
-            if (!$isAdmin) {
+            if (! $isAdmin) {
                 abort(404);
             }
         }
@@ -59,7 +60,7 @@ class MenuController extends Controller
 
     public function store(Request $request)
     {
-        if (!in_array(auth()->user()->role, ['admin','super_admin'])) {
+        if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
             abort(403);
         }
 
@@ -67,7 +68,7 @@ class MenuController extends Controller
             'nama_produk' => 'required',
             'harga' => 'required|numeric',
             'deskripsi' => 'required',
-            'gambar.*' => 'image'
+            'gambar.*' => 'image',
         ]);
 
         // 1. Simpan produk terlebih dahulu
@@ -76,21 +77,21 @@ class MenuController extends Controller
             'harga' => $request->harga,
             'deskripsi' => $request->deskripsi,
             'status' => 1,
-            'user_id' => Auth::id()
+            'user_id' => Auth::id(),
         ]);
 
         // 2. Buat folder penyimpanan gambar
-        $folderName = 'menu_' . $produk->id;
-        $folderPath = public_path('img/menu/' . $folderName);
+        $folderName = 'menu_'.$produk->id;
+        $folderPath = public_path('img/menu/'.$folderName);
 
-        if (!File::exists($folderPath)) {
+        if (! File::exists($folderPath)) {
             File::makeDirectory($folderPath, 0755, true);
         }
 
         // 3. Pindahkan file gambar ke folder
         if ($request->hasFile('gambar')) {
             foreach ($request->file('gambar') as $i => $file) {
-                $filename = ($i + 1) . '.' . $file->getClientOriginalExtension();
+                $filename = ($i + 1).'.'.$file->getClientOriginalExtension();
                 $file->move($folderPath, $filename);
             }
         }
@@ -104,7 +105,7 @@ class MenuController extends Controller
 
     public function update(Request $request, $id)
     {
-        if (!in_array(auth()->user()->role, ['admin','super_admin'])) {
+        if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
             abort(403);
         }
 
@@ -114,12 +115,12 @@ class MenuController extends Controller
         }
 
         $produk = Produk::findOrFail($id);
-        $folderName = 'menu_' . $produk->id_produk;
-        $folderPath = public_path('img/menu/' . $folderName);
+        $folderName = 'menu_'.$produk->id_produk;
+        $folderPath = public_path('img/menu/'.$folderName);
 
         // Hapus Gambar Tertentu
         if ($request->has('delete_image')) {
-            $filePath = $folderPath . '/' . $request->delete_image;
+            $filePath = $folderPath.'/'.$request->delete_image;
 
             if (File::exists($filePath)) {
                 File::delete($filePath);
@@ -132,7 +133,7 @@ class MenuController extends Controller
         if ($request->has('field')) {
             $field = $request->field;
 
-            if (in_array($field, ['nama_produk','harga','deskripsi'])) {
+            if (in_array($field, ['nama_produk', 'harga', 'deskripsi'])) {
                 $produk->$field = $request->value;
                 $produk->save();
 
@@ -142,7 +143,7 @@ class MenuController extends Controller
 
         // Tambah Gambar Baru
         if ($request->hasFile('gambar')) {
-            if (!File::exists($folderPath)) {
+            if (! File::exists($folderPath)) {
                 File::makeDirectory($folderPath, 0755, true);
             }
 
@@ -150,7 +151,7 @@ class MenuController extends Controller
             $count = count($existingFiles);
 
             foreach ($request->file('gambar') as $i => $file) {
-                $filename = ($count + $i + 1) . '.' . $file->getClientOriginalExtension();
+                $filename = ($count + $i + 1).'.'.$file->getClientOriginalExtension();
                 $file->move($folderPath, $filename);
             }
 
@@ -175,14 +176,14 @@ class MenuController extends Controller
 
     public function toggleStatus($id)
     {
-        if (!in_array(auth()->user()->role, ['admin','super_admin'])) {
+        if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
             abort(403);
         }
 
         $produk = Produk::findOrFail($id);
 
         // Mengubah status (0 jadi 1, atau 1 jadi 0)
-        $produk->status = !$produk->status;
+        $produk->status = ! $produk->status;
         $produk->save();
 
         return back()->with(
@@ -193,12 +194,12 @@ class MenuController extends Controller
 
     public function destroy($id)
     {
-        if (!in_array(auth()->user()->role, ['admin','super_admin'])) {
+        if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
             abort(403);
         }
 
         $produk = Produk::findOrFail($id);
-        $folderPath = public_path('img/menu/' . $produk->gambar);
+        $folderPath = public_path('img/menu/'.$produk->gambar);
 
         // Hapus folder beserta seluruh isinya
         if (File::exists($folderPath)) {

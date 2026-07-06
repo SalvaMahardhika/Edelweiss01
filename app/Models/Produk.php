@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Helpers\CryptoHelper;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Helpers\CryptoHelper; // Pastikan Helper yang kita buat kemarin sudah ada
+use Illuminate\Database\Eloquent\Model; // Pastikan Helper yang kita buat kemarin sudah ada
 
 class Produk extends Model
 {
     use HasFactory;
+
     // ================= TABLE =================
     protected $table = 'produk';
 
@@ -23,7 +24,7 @@ class Produk extends Model
         'deskripsi',
         'status',
         'is_available',
-        'is_featured'
+        'is_featured',
     ];
 
     // ================= CAST =================
@@ -48,7 +49,7 @@ class Produk extends Model
     // ================= ACCESSOR =================
     public function getGambarUrlAttribute()
     {
-        return asset('storage/' . $this->gambar);
+        return asset('storage/'.$this->gambar);
     }
 
     /**

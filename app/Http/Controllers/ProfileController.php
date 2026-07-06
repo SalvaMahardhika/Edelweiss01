@@ -29,7 +29,7 @@ class ProfileController extends Controller
         if ($request->password_lama) {
 
             // cek password lama
-            if (!Hash::check($request->password_lama, $user->password)) {
+            if (! Hash::check($request->password_lama, $user->password)) {
                 return back()->with('error', 'Password lama salah');
             }
 
