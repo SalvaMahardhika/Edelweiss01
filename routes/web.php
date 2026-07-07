@@ -88,6 +88,18 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{id}', [AdminController::class, 'update'])->name('admin.update');
         Route::delete('/{id}', [AdminController::class, 'destroy'])->name('admin.destroy');
     });
+
+    // Produk / Menu Management
+    Route::prefix('admin/menu')->controller(MenuController::class)->group(function () {
+        Route::post('/', 'store')->name('produk.store');
+        // ... rute lainnya
+    });
+
+    // Order Management
+    Route::prefix('admin/orders')->controller(\App\Http\Controllers\OrderController::class)->group(function () {
+        Route::post('/', 'store')->name('orders.store');
+    });
+    // ======================================================
 });
 
 // ==========================================
