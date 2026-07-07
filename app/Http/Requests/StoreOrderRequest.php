@@ -14,18 +14,18 @@ class StoreOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'customer_name'  => ['required', 'string', 'max:255'],
+            'customer_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['required', 'string', 'max:20'],
             'customer_email' => ['nullable', 'email'],
-            'order_type'     => ['nullable', 'string', 'in:pickup,delivery'],
-            'payment_plan'   => ['required', 'string', 'in:dp,full'],
-            
+            'order_type' => ['nullable', 'string', 'in:pickup,delivery'],
+            'payment_plan' => ['required', 'string', 'in:dp,full'],
+
             // 🔒 Perintah Utama: Validasi fulfill_at harus di masa depan (HTTP Level)
-            'fulfill_at'     => ['required', 'date', 'after:now'],
-            
+            'fulfill_at' => ['required', 'date', 'after:now'],
+
             // Validasi kondisional untuk nominal DP jika menggunakan skema DP (10% - 90%)
-            'total_amount'   => ['required_if:payment_plan,dp', 'numeric', 'min:0'],
-            'dp_amount'      => [
+            'total_amount' => ['required_if:payment_plan,dp', 'numeric', 'min:0'],
+            'dp_amount' => [
                 'required_if:payment_plan,dp',
                 'numeric',
                 function ($attribute, $value, $fail) {
@@ -38,7 +38,7 @@ class StoreOrderRequest extends FormRequest
                             $fail('Nominal down-payment (DP) harus berada di antara 10% hingga 90% dari total transaksi.');
                         }
                     }
-                }
+                },
             ],
         ];
     }
@@ -47,7 +47,7 @@ class StoreOrderRequest extends FormRequest
     {
         return [
             'fulfill_at.after' => 'Tanggal pengambilan (fulfillment date) harus di masa depan.',
-            'payment_plan.in'  => 'Skema pembayaran harus berupa dp atau full.',
+            'payment_plan.in' => 'Skema pembayaran harus berupa dp atau full.',
         ];
     }
 }

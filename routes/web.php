@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\GaleriController;
 use App\Http\Controllers\MenuController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -96,7 +97,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Order Management
-    Route::prefix('admin/orders')->controller(\App\Http\Controllers\OrderController::class)->group(function () {
+    Route::prefix('admin/orders')->controller(OrderController::class)->group(function () {
         Route::post('/', 'store')->name('orders.store');
     });
     // ======================================================
