@@ -23,7 +23,9 @@ jobs:
 
     - name: Prepare Environment
       run: |
-        cp .env.example .env || true
+        touch .env
+        echo "APP_ENV=testing" >> .env
+        echo "APP_KEY=" >> .env
         php artisan key:generate --env=testing
 
     - name: Run Tests
