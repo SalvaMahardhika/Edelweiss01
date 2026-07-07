@@ -31,5 +31,11 @@ jobs:
         php artisan key:generate --env=testing
         php artisan migrate --env=testing
 
-    - name: Run Tests
+    - name: Run Tests (PHPUnit)
       run: php artisan test --env=testing
+
+    - name: Run Laravel Pint (Code Style Check)
+      run: ./vendor/bin/pint --test
+
+    - name: Run PHPStan (Static Analysis)
+      run: ./vendor/bin/phpstan analyse app
