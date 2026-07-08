@@ -41,6 +41,7 @@ class OrderValidationTest extends TestCase
                 'customer_name' => 'Pelanggan Edelweiss',
                 'customer_phone' => '08123456789',
                 'payment_plan' => 'full',
+                'order_type' => 'pickup',
                 'fulfill_at' => Carbon::now()->subDay()->format('Y-m-d H:i:s'), // ❌ Mengisi tanggal kemarin (masa lalu)
             ]);
 
@@ -57,6 +58,7 @@ class OrderValidationTest extends TestCase
                 'customer_name' => 'Pelanggan Edelweiss 2',
                 'customer_phone' => '08123456789',
                 'payment_plan' => 'dp',
+                'order_type' => 'pickup',
                 'total_amount' => 100000, // Total Rp 100.000
                 'dp_amount' => 5000,   // ❌ Hanya Rp 5.000 (5%), harusnya minimal Rp 10.000 (10%)
                 'fulfill_at' => Carbon::now()->addDays(5)->format('Y-m-d H:i:s'), // Tanggal aman di masa depan
@@ -75,6 +77,7 @@ class OrderValidationTest extends TestCase
                 'customer_name' => 'Pelanggan Sukses',
                 'customer_phone' => '08123456789',
                 'payment_plan' => 'full',
+                'order_type' => 'pickup',
                 'fulfill_at' => Carbon::now()->addDays(3)->format('Y-m-d H:i:s'), // ✅ 3 hari ke depan
             ]);
 

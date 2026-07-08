@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Produk;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,22 +14,34 @@ class MenuController extends Controller
     // PUBLIC METHODS
     // ==========================================
 
-    public function index()
+    public function index(Request $request)
     {
-        // Admin & super admin bisa melihat semua menu (termasuk yang OFF)
-        if (auth()->check() && in_array(auth()->user()->role, ['admin', 'super_admin'])) {
-            $produk = Produk::latest()->get();
-        } else {
-            // Pengunjung biasa hanya melihat menu yang aktif
-            $produk = Produk::aktif()->latest()->get();
-        }
+        $categories = Category::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
 
-        return view('menu', compact('produk'));
+        $produk = Produk::query()
+            ->with('category')
+            ->where('status', true)
+            ->where('is_available', true)
+            ->when($request->category, fn ($q, $slug) => $q->whereHas('category', fn ($c) => $c->where('slug', $slug)))
+            ->orderByDesc('is_featured')
+            ->orderBy('nama_produk')
+            ->paginate(12);
+
+        return view('menu.index', compact('categories', 'produk'));
     }
 
     public function dashboard()
     {
-        $produk = Produk::aktif()->latest()->take(3)->get();
+        $produk = Produk::query()
+            ->where('status', true)
+            ->where('is_available', true)
+            ->where('is_featured', true)
+            ->latest()
+            ->take(3)
+            ->get();
 
         return view('dashboard.dashboard', compact('produk'));
     }

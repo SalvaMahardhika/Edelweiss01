@@ -15,13 +15,15 @@ class StoreOrderRequest extends FormRequest
     {
         return [
             'customer_name' => ['required', 'string', 'max:255'],
-            'customer_phone' => ['required', 'string', 'max:20'],
-            'customer_email' => ['nullable', 'email'],
-            'order_type' => ['nullable', 'string', 'in:pickup,delivery'],
-            'payment_plan' => ['required', 'string', 'in:dp,full'],
+            'customer_phone' => ['required', 'string', 'max:30'],
+            'customer_email' => ['nullable', 'email', 'max:255'],
+            'order_type' => ['required', 'in:pickup,dine_in,delivery'],
 
-            // 🔒 Perintah Utama: Validasi fulfill_at harus di masa depan (HTTP Level)
-            'fulfill_at' => ['required', 'date', 'after:now'],
+            // 🔑 PERBAIKAN: Menggunakan ekspresi "+2 hours" secara dinamis agar Carbon/Laravel mengevaluasinya realtime saat request diproses
+            'fulfill_at' => ['required', 'date', 'after:+2 hours'],
+
+            'payment_plan' => ['required', 'in:dp,full'],
+            'notes' => ['nullable', 'string', 'max:1000'],
 
             // Validasi kondisional untuk nominal DP jika menggunakan skema DP (10% - 90%)
             'total_amount' => ['required_if:payment_plan,dp', 'numeric', 'min:0'],
@@ -46,7 +48,7 @@ class StoreOrderRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'fulfill_at.after' => 'Tanggal pengambilan (fulfillment date) harus di masa depan.',
+            'fulfill_at.after' => 'Tanggal pengambilan (fulfillment date) harus di masa depan dengan jeda minimal 2 jam dari sekarang.',
             'payment_plan.in' => 'Skema pembayaran harus berupa dp atau full.',
         ];
     }

@@ -18,7 +18,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RoleMiddleware::class,
         ]);
 
+        // 🔑 PERBAIKAN: Kecualikan rute webhook Midtrans dari pemeriksaan token CSRF
+        $middleware->validateCsrfTokens(except: [
+            'api/midtrans/webhook',
+        ]);
+
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
-    })->create();
+        // Tempat konfigurasi exception penanganan error global jika diperlukan
+    })
+    ->create();

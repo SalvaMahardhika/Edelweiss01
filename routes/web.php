@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\GaleriController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\PaymentNotificationController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,44 +22,49 @@ use Illuminate\Support\Facades\Route;
 */
 
 // ==========================================
-// PUBLIC ROUTES
+// PUBLIC ROUTES (Bisa Diakses Siapa Saja)
 // ==========================================
 Route::controller(MenuController::class)->group(function () {
     Route::get('/', 'dashboard')->name('home');
     Route::get('/menu', 'index')->name('menu');
-
-    // Menggunakan {produk} untuk mendukung Custom Route Model Binding (AES-256)
-    Route::get('/menu/{produk}', 'show')->name('menu.show');
+    Route::get('/menu/{produk}', 'show')->name('menu.show'); // Custom Route Model Binding
 });
 
 Route::get('/galeri', [GaleriController::class, 'index'])->name('galeri');
 Route::view('/about', 'about')->name('about');
 Route::view('/kontak', 'kontak')->name('kontak');
 
+// 🔑 PERBAIKAN UTAMA SUB-TASK 6: Diarahkan ke method track publik, bukan pay!
+Route::get('/pesanan/{order_number}', [CheckoutController::class, 'track'])->name('orders.track');
+
+// 🔔 Endpoint Webhook Midtrans (Publik tanpa login untuk server-to-server Midtrans)
+Route::post('/api/midtrans/webhook', [PaymentNotificationController::class, 'handle'])->name('midtrans.webhook');
+
 // ==========================================
-// AUTHENTICATION ROUTES
+// AUTHENTICATION ROUTES (GUEST)
 // ==========================================
 Route::middleware('guest')->controller(AuthController::class)->group(function () {
     Route::get('/edelweiss-admin', 'loginForm')->name('login');
     Route::post('/edelweiss-admin', 'login')->name('login.process');
 });
 
-Route::post('/logout', [AuthController::class, 'logout'])
-    ->middleware('auth')
-    ->name('logout');
+Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
 // ==========================================
-// USER ROUTES (AUTHENTICATED)
+// USER ROUTES (AUTHENTICATED CUSTOMERS)
 // ==========================================
 Route::middleware('auth')->group(function () {
     Route::controller(ProfileController::class)->group(function () {
         Route::get('/profile', 'index')->name('profile');
         Route::post('/profile', 'update')->name('profile.update');
     });
+
+    Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+    Route::get('/checkout/pay/{order_number}', [CheckoutController::class, 'pay'])->name('checkout.pay');
 });
 
 // ==========================================
-// ADMIN ROUTES
+// ADMIN ROUTES (MANAJEMEN & HAK AKSES)
 // ==========================================
 Route::middleware(['auth'])->group(function () {
 
@@ -84,38 +91,13 @@ Route::middleware(['auth'])->group(function () {
     // ADMIN USERS – only super_admin
     Route::prefix('admin/users')->middleware(['role:super_admin'])->group(function () {
         Route::get('/', [AdminController::class, 'index'])->name('admin.users');
-        // CRUD routes
         Route::post('/', [AdminController::class, 'store'])->name('admin.store');
         Route::put('/{id}', [AdminController::class, 'update'])->name('admin.update');
         Route::delete('/{id}', [AdminController::class, 'destroy'])->name('admin.destroy');
-    });
-
-    // Produk / Menu Management
-    Route::prefix('admin/menu')->controller(MenuController::class)->group(function () {
-        Route::post('/', 'store')->name('produk.store');
-        // ... rute lainnya
     });
 
     // Order Management
     Route::prefix('admin/orders')->controller(OrderController::class)->group(function () {
         Route::post('/', 'store')->name('orders.store');
     });
-    // ======================================================
 });
-
-// ==========================================
-// SUPER ADMIN ROUTES
-// ==========================================
-// Super‑admin specific admin management routes removed to avoid conflict with custom admin middleware routes.
-// You can re‑add them under a different prefix (e.g., /super-admin) if needed.
-
-/*
-|--------------------------------------------------------------------------
-| Akhir dari File Rute Web (web.php)
-|--------------------------------------------------------------------------
-|
-| Semua rute aplikasi Edelweiss Bakery didefinisikan di atas. Pastikan untuk
-| selalu memperhatikan hak akses (middleware) seperti 'auth' dan 'role:super_admin'
-| saat menambahkan rute baru demi menjaga keamanan sistem.
-|
-*/
