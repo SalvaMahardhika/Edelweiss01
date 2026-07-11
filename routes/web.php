@@ -14,34 +14,31 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 | Edelweiss Bakery - Dokumen Rute Web (web.php)
 |--------------------------------------------------------------------------
-|
-| File ini mendefinisikan seluruh rute web untuk aplikasi Edelweiss Bakery.
-| Rute-rute di sini dimuat oleh RouteServiceProvider dan menggunakan grup
-| middleware "web" serta middleware keamanan/autentikasi tambahan.
-|
 */
 
 // ==========================================
-// PUBLIC ROUTES (Bisa Diakses Siapa Saja)
+// PUBLIC ROUTES (Bisa Diakses Siapa Saja & Guest Checkout)
 // ==========================================
 Route::controller(MenuController::class)->group(function () {
     Route::get('/', 'dashboard')->name('home');
     Route::get('/menu', 'index')->name('menu');
-    Route::get('/menu/{produk}', 'show')->name('menu.show'); // Custom Route Model Binding
+    Route::get('/menu/{produk}', 'show')->name('menu.show'); 
 });
 
 Route::get('/galeri', [GaleriController::class, 'index'])->name('galeri');
 Route::view('/about', 'about')->name('about');
 Route::view('/kontak', 'kontak')->name('kontak');
 
-// 🔑 PERBAIKAN UTAMA SUB-TASK 6: Diarahkan ke method track publik, bukan pay!
+// 🔑 RUTE PEMBAYARAN & PEMELIHARAAN PUBLIK
 Route::get('/pesanan/{order_number}', [CheckoutController::class, 'track'])->name('orders.track');
-
-// 🔔 Endpoint Webhook Midtrans (Publik tanpa login untuk server-to-server Midtrans)
 Route::post('/api/midtrans/webhook', [PaymentNotificationController::class, 'handle'])->name('midtrans.webhook');
 
+// 🔑 SOLUSI GUEST CHECKOUT: Dikeluarkan dari middleware auth agar pelanggan non-login bisa checkout!
+Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+
+
 // ==========================================
-// AUTHENTICATION ROUTES (GUEST)
+// AUTHENTICATION ROUTES (GUEST ONLY)
 // ==========================================
 Route::middleware('guest')->controller(AuthController::class)->group(function () {
     Route::get('/edelweiss-admin', 'loginForm')->name('login');
@@ -50,8 +47,9 @@ Route::middleware('guest')->controller(AuthController::class)->group(function ()
 
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
+
 // ==========================================
-// USER ROUTES (AUTHENTICATED CUSTOMERS)
+// USER ROUTES (AUTHENTICATED CUSTOMERS ONLY)
 // ==========================================
 Route::middleware('auth')->group(function () {
     Route::controller(ProfileController::class)->group(function () {
@@ -59,9 +57,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/profile', 'update')->name('profile.update');
     });
 
-    Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
     Route::get('/checkout/pay/{order_number}', [CheckoutController::class, 'pay'])->name('checkout.pay');
 });
+
 
 // ==========================================
 // ADMIN ROUTES (MANAJEMEN & HAK AKSES)
@@ -83,12 +81,12 @@ Route::middleware(['auth'])->group(function () {
         Route::patch('/{id}/toggle-status', 'toggleStatus')->name('produk.toggleStatus');
     });
 
-    // ADMIN AREA – accessible by admin & super_admin
+    // ADMIN AREA – admin & super_admin
     Route::prefix('admin')->middleware(['role:admin,super_admin'])->group(function () {
         Route::get('/', fn () => response('admin home'))->name('admin.index');
     });
 
-    // ADMIN USERS – only super_admin
+    // ADMIN USERS – super_admin only
     Route::prefix('admin/users')->middleware(['role:super_admin'])->group(function () {
         Route::get('/', [AdminController::class, 'index'])->name('admin.users');
         Route::post('/', [AdminController::class, 'store'])->name('admin.store');
