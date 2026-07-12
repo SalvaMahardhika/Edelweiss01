@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Route;
 Route::controller(MenuController::class)->group(function () {
     Route::get('/', 'dashboard')->name('home');
     Route::get('/menu', 'index')->name('menu');
-    Route::get('/menu/{produk}', 'show')->name('menu.show'); 
+    Route::get('/menu/{produk}', 'show')->name('menu.show');
 });
 
 Route::get('/galeri', [GaleriController::class, 'index'])->name('galeri');
@@ -36,7 +36,6 @@ Route::post('/api/midtrans/webhook', [PaymentNotificationController::class, 'han
 // 🔑 SOLUSI GUEST CHECKOUT: Dikeluarkan dari middleware auth agar pelanggan non-login bisa checkout!
 Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
 
-
 // ==========================================
 // AUTHENTICATION ROUTES (GUEST ONLY)
 // ==========================================
@@ -46,7 +45,6 @@ Route::middleware('guest')->controller(AuthController::class)->group(function ()
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
-
 
 // ==========================================
 // USER ROUTES (AUTHENTICATED CUSTOMERS ONLY)
@@ -59,7 +57,6 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/checkout/pay/{order_number}', [CheckoutController::class, 'pay'])->name('checkout.pay');
 });
-
 
 // ==========================================
 // ADMIN ROUTES (MANAJEMEN & HAK AKSES)

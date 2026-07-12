@@ -26,7 +26,7 @@ class PaymentNotificationController extends Controller
         $statusCode = $payload['status_code'] ?? '';
         $grossAmount = $payload['gross_amount'] ?? '';
         $signatureKey = $payload['signature_key'] ?? '';
-        
+
         // Sesuaikan key parameter transaction_id untuk kebutuhan testing & midtrans asli
         $midtransTxId = $payload['transaction_id'] ?? ($payload['reference'] ?? $orderIdParam);
 
@@ -37,6 +37,7 @@ class PaymentNotificationController extends Controller
 
         if ($signatureKey !== $localSignature) {
             Log::warning('⚠️ Webhook Ilegal Terdeteksi! Signature salah.', ['payload' => $payload]);
+
             return response()->json(['message' => 'Invalid Signature'], 403);
         }
 
@@ -47,7 +48,7 @@ class PaymentNotificationController extends Controller
 
         // 3. Cari data order terkait
         $order = Order::where('order_number', $orderNumber)->first();
-        if (!$order) {
+        if (! $order) {
             return response()->json(['message' => 'Order Not Found'], 404);
         }
 
@@ -57,7 +58,8 @@ class PaymentNotificationController extends Controller
             ->exists();
 
         if ($alreadyProcessed) {
-            Log::info('🛑 Webhook duplikat diabaikan (Idempotent Safe): ' . $midtransTxId);
+            Log::info('🛑 Webhook duplikat diabaikan (Idempotent Safe): '.$midtransTxId);
+
             return response()->json(['message' => 'Webhook Handled Successfully (Duplicate Ignored)'], 200);
         }
 
@@ -68,7 +70,7 @@ class PaymentNotificationController extends Controller
                 'transaction_status' => $payload['transaction_status'] ?? 'settlement',
                 'payment_type' => $payload['payment_type'] ?? 'qris',
                 'reference' => $midtransTxId,
-                'raw_payload' => $payload
+                'raw_payload' => $payload,
             ]);
 
             // ⚡ PENGUAT TESTING: Paksa kalkulasi akumulasi langsung ke DB agar nilai 'amount_paid' di test tidak 0.00
@@ -81,7 +83,8 @@ class PaymentNotificationController extends Controller
             return response()->json(['message' => 'Webhook Handled Successfully'], 200);
 
         } catch (\Exception $e) {
-            Log::error('🛑 Webhook Engine Error: ' . $e->getMessage());
+            Log::error('🛑 Webhook Engine Error: '.$e->getMessage());
+
             return response()->json(['message' => 'Error processing transaction', 'error' => $e->getMessage()], 500);
         }
     }
