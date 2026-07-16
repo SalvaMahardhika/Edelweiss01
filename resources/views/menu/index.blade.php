@@ -7,6 +7,7 @@
     <link rel="icon" href="{{ asset('img/logo/logo2.png') }}">
 
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <!-- FONT -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -56,7 +57,7 @@
     </style>
 </head>
 
-<body class="bg-gradient-to-br from-[#f5f0ea] via-[#ede3d6] to-[#e6d8c7] text-[#3e2723]">
+<body class="bg-gradient-to-br from-[#f5f0ea] via-[#ede3d6] to-[#e6d8c7] text-[#3e2723] min-h-screen relative pb-20">
 
 @include('layouts.navbar')
 
@@ -69,379 +70,290 @@
     </div>
 
     {{-- TITLE --}}
-    <section class="max-w-6xl mx-auto px-6 text-center mb-14">
+    <section class="max-w-6xl mx-auto px-6 text-center mb-10">
         <h1 class="text-4xl md:text-5xl font-semibold tracking-wide glow-hover">
             Pilihan Menu Kami
         </h1>
         <p class="text-[#6b4f4f] mt-2">
-            Fresh & handmade dengan kualitas terbaik
+            Fresh & handmade dengan kualitas terbaik untuk Pre-Order Anda
         </p>
     </section>
 
-    {{-- BUTTON TAMBAH --}}
-    @auth
-    @if(in_array(auth()->user()->role, ['admin','super_admin']))
-    <div class="text-center mb-12">
-        <button onclick="openModal()" 
-            class="px-8 py-3 rounded-2xl bg-[#3e2723] text-white shadow-xl hover:scale-105 transition">
-            + Tambah Produk
-        </button>
-    </div>
-    @endif
-    @endauth
-
-    {{-- GRID --}}
-<section class="max-w-7xl mx-auto px-4 sm:px-6 pb-20 sm:pb-24">
-
-    <div class="grid 
-                grid-cols-2 
-                md:grid-cols-2 
-                xl:grid-cols-4 
-                gap-4 sm:gap-6 lg:gap-8">
-
-        @foreach($produk as $item)
-
-        @php
-            $folder = public_path('img/menu/' . $item->gambar);
-
-            $files = file_exists($folder) ? scandir($folder) : [];
-
-            $images = array_values(array_diff($files, ['.', '..']));
-        @endphp
-
-        {{-- CARD --}}
-        <div class="relative group glass-shine
-                    {{ !$item->status ? 'opacity-60 grayscale-[20%]' : '' }}
-                    backdrop-blur-2xl
-                    bg-white/30
-                    border border-white/40
-                    rounded-2xl sm:rounded-3xl
-                    overflow-hidden
-                    shadow-[0_10px_40px_rgba(0,0,0,0.15)]
-                    transition duration-500
-                    hover:scale-[1.03]">
-
-            {{-- DELETE & TOGGLE STATUS --}}
-            @auth
-            @if(in_array(auth()->user()->role, ['admin','super_admin']))
-
-            {{-- DELETE BUTTON --}}
-            <form method="POST"
-                  action="{{ route('produk.destroy', $item->id) }}"
-                  class="absolute top-2 right-2 sm:top-4 sm:right-4 z-30">
-                @csrf
-                @method('DELETE')
-
-                <button
-                    class="w-7 h-7 sm:w-8 sm:h-8
-                           rounded-full
-                           bg-red-500/90
-                           text-white
-                           text-xs sm:text-sm
-                           shadow-lg
-                           hover:scale-110
-                           transition">
-                    ✕
-                </button>
-            </form>
-
-            {{-- TOGGLE STATUS --}}
-            <form method="POST"
-                  action="{{ route('produk.update', $item->id) }}"
-                  class="absolute top-2 left-2 sm:top-4 sm:left-4 z-30">
-
-                @csrf
-                @method('PUT')
-
-                <input type="hidden" name="toggle_status" value="1">
-
-                <button type="submit"
-                    class="relative w-14 h-8 rounded-full
-                           transition duration-300
-                           shadow-[0_8px_24px_rgba(0,0,0,0.25)]
-                           border border-white/30
-                           backdrop-blur-xl
-                           {{ $item->status ? 'bg-green-500/90' : 'bg-red-500/80' }}">
-
-                    {{-- BULATAN TOGGLE --}}
-                    <div class="absolute top-1 w-6 h-6
-                                rounded-full
-                                bg-white
-                                shadow-lg
-                                transition-all duration-300
-                                flex items-center justify-center
-                                text-[10px] font-bold
-                                text-[#3e2723]
-                                {{ $item->status ? 'left-7' : 'left-1' }}">
-                        {{ $item->status ? 'ON' : 'OFF' }}
-                    </div>
-                </button>
-            </form>
-
-            @endif
-            @endauth
-
-            {{-- IMAGE --}}
-            <div class="relative overflow-hidden
-                        h-40 sm:h-52 md:h-56">
-
-                @if(count($images) > 0)
-                <img
-                    src="{{ asset('img/menu/' . $item->gambar . '/' . $images[0]) }}"
-                    class="w-full h-full object-cover
-                           transition duration-500
-                           group-hover:scale-110"
-                >
-                @endif
-
-                {{-- OVERLAY --}}
-                <div class="absolute inset-0
-                            bg-gradient-to-t
-                            from-black/50
-                            to-transparent">
-                </div>
-
-                {{-- DETAIL --}}
-                <div class="absolute inset-0
-                            flex items-center justify-center
-                            opacity-0 group-hover:opacity-100
-                            transition">
-
-                    <a href="{{ route('menu.show', $item->encrypted_id) }}"
-                       class="px-3 py-2 sm:px-5
-                              rounded-xl
-                              bg-white/80
-                              backdrop-blur
-                              text-[#3e2723]
-                              text-xs sm:text-sm
-                              font-medium
-                              shadow
-                              hover:scale-105
-                              transition">
-                        Detail →
-                    </a>
-                </div>
+    {{-- ================= SEARCH & CATEGORY FILTER CONTROL ================= --}}
+    <section class="max-w-4xl mx-auto px-4 mb-12 space-y-6">
+        {{-- SEARCH BAR --}}
+        <div class="relative max-w-xl mx-auto">
+            <input type="text" id="menuSearchInput" onkeyup="filterMenu()"
+                   placeholder="Cari kue favorit Anda... (misal: 'apel')"
+                   class="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-white/40 backdrop-blur-xl border border-white/50 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] shadow-inner text-[#3e2723] placeholder-[#3e2723]/50 transition duration-300">
+            <div class="absolute left-4 top-1/2 -translate-y-1/2 text-[#3e2723]/60">
+                <i class="fa-solid fa-magnifying-glass text-lg"></i>
             </div>
+        </div>
 
-            {{-- CONTENT --}}
-            <div class="p-3 sm:p-5 md:p-6
-                        bg-white/30
-                        backdrop-blur-xl">
+        {{-- DYNAMIC CATEGORY FILTER TABS --}}
+        <div class="flex flex-wrap justify-center gap-2 sm:gap-3">
+            <button onclick="filterCategory('all', this)" 
+                    class="category-btn px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition duration-300 bg-[#3e2723] text-white">
+                Semua Menu
+            </button>
+            @foreach($categories as $cat)
+            <button onclick="filterCategory('{{ $cat->id }}', this)" 
+                    class="category-btn px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition duration-300 bg-white/40 backdrop-blur-xl border border-white/50 text-[#3e2723] hover:bg-white/70">
+                {{ $cat->name }}
+            </button>
+            @endforeach
+        </div>
+    </section>
 
-                {{-- STATUS BADGE --}}
-                @auth
-                @if(in_array(auth()->user()->role, ['admin','super_admin']))
-                <div class="mb-3">
-                    @if($item->status)
-                    <span class="inline-flex items-center gap-1
-                                 px-3 py-1 rounded-full
-                                 text-[11px] sm:text-xs
-                                 font-semibold
-                                 bg-green-500/15
-                                 text-green-700
-                                 border border-green-500/20
-                                 backdrop-blur-xl">
-                        ● Produk Aktif
-                    </span>
+    {{-- GRID KATALOG PRODUK --}}
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 pb-20 sm:pb-24">
+        {{-- EMPTY STATE NOTICE --}}
+        <div id="emptySearchNotice" class="hidden text-center py-16">
+            <div class="text-4xl text-gray-400 mb-3"><i class="fa-solid fa-cookie-bite"></i></div>
+            <p class="text-sm text-gray-500">Menu yang Anda cari tidak ditemukan.</p>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
+            @foreach($produk->where('status', true) as $item)
+
+            @php
+                $folder = public_path('img/menu/' . $item->gambar);
+                $files = file_exists($folder) ? scandir($folder) : [];
+                $images = array_values(array_diff($files, ['.', '..']));
+            @endphp
+
+            {{-- CARD PRODUK DENGAN METADATA FILTER --}}
+            <div class="product-card relative group glass-shine backdrop-blur-2xl bg-white/30 border border-white/40 rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.15)] transition duration-500 hover:scale-[1.03]"
+                 data-name="{{ strtolower($item->nama_produk) }}"
+                 data-category="{{ $item->category_id }}">
+
+                {{-- IMAGE --}}
+                <div class="relative overflow-hidden h-40 sm:h-52 md:h-56">
+                    @if(count($images) > 0)
+                    <img src="{{ asset('img/menu/' . $item->gambar . '/' . $images[0]) }}"
+                         class="w-full h-full object-cover transition duration-500 group-hover:scale-110">
                     @else
-                    <span class="inline-flex items-center gap-1
-                                 px-3 py-1 rounded-full
-                                 text-[11px] sm:text-xs
-                                 font-semibold
-                                 bg-red-500/15
-                                 text-red-700
-                                 border border-red-500/20
-                                 backdrop-blur-xl">
-                        ● Produk Disembunyikan
-                    </span>
+                    <div class="w-full h-full bg-[#3e2723]/10 flex items-center justify-center text-xs text-gray-400">Tidak ada gambar</div>
                     @endif
-                </div>
-                @endif
-                @endauth
 
-                <div class="flex flex-col sm:flex-row
-                            sm:justify-between
-                            sm:items-center
-                            gap-1 sm:gap-2
-                            mb-2">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
 
-                    {{-- NAMA --}}
-                    <h3 class="font-semibold
-                               text-sm sm:text-base lg:text-lg
-                               text-[#2d1f1b]
-                               glow-hover
-                               line-clamp-1">
-                        {{ $item->nama_produk }}
-                    </h3>
-
-                    {{-- HARGA --}}
-                    <span class="text-xs sm:text-sm
-                                 font-semibold
-                                 gold-text">
-                        Rp {{ number_format($item->harga, 0, ',', '.') }}
-                    </span>
+                    {{-- HOVER ACTION DETAIL --}}
+                    <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                        <a href="{{ route('menu.show', $item->encrypted_id) }}"
+                           class="px-4 py-2 rounded-xl bg-white/80 backdrop-blur text-[#3e2723] text-xs sm:text-sm font-semibold shadow hover:scale-105 transition">
+                            Detail →
+                        </a>
+                    </div>
                 </div>
 
-                {{-- DESKRIPSI --}}
-                <p class="text-[#5c4033]
-                          text-xs sm:text-sm
-                          leading-relaxed
-                          line-clamp-2">
-                    {{ $item->deskripsi }}
-                </p>
-            </div>
-        </div>
+                {{-- CONTENT DATA --}}
+                <div class="p-3 sm:p-5 bg-white/30 backdrop-blur-xl flex flex-col justify-between min-h-[140px]">
+                    <div>
+                        <div class="flex flex-col mb-2">
+                            <h3 class="product-title font-bold text-sm sm:text-base text-[#2d1f1b] line-clamp-1">
+                                {{ $item->nama_produk }}
+                            </h3>
+                            <span class="text-xs sm:text-sm font-semibold gold-text mt-0.5">
+                                Rp {{ number_format($item->harga, 0, ',', '.') }}
+                            </span>
+                        </div>
+                        <p class="text-[#5c4033] text-xs line-clamp-2 leading-relaxed">
+                            {{ $item->deskripsi }}
+                        </p>
+                    </div>
 
-        @endforeach
-
-    </div>
-
-</section>
-
-
-    {{-- ================= MODAL TAMBAH PRODUK ================= --}}
-    <div id="modal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center">
-
-        <div class="w-full max-w-lg p-6 rounded-3xl bg-white/30 backdrop-blur-2xl border border-white/40 shadow-[0_20px_60px_rgba(0,0,0,0.25)] relative overflow-hidden">
-
-            {{-- SHINE --}}
-            <div class="absolute inset-0 pointer-events-none">
-                <div class="absolute -top-20 -left-20 w-96 h-96 bg-white/20 blur-3xl rounded-full"></div>
+                    {{-- ADD TO CART BUTTON --}}
+                    <button onclick="addToCart({{ $item->id }}, '{{ $item->nama_produk }}', {{ $item->harga }}, '{{ count($images) > 0 ? asset('img/menu/' . $item->gambar . '/' . $images[0]) : '' }}')"
+                            class="w-full mt-3 py-2 text-xs sm:text-sm font-bold text-white bg-[#3e2723] hover:bg-[#2c1b18] rounded-xl shadow-md transition duration-300 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-basket-shopping"></i> + Keranjang
+                    </button>
+                </div>
             </div>
 
-            <h2 class="text-xl font-semibold mb-6 text-center glow-hover">
-                Tambah Produk
-            </h2>
-
-            <form method="POST" id="formProduk" enctype="multipart/form-data">
-                @csrf
-
-                {{-- INPUT --}}
-                <input type="text" name="nama_produk" placeholder="Nama Produk"
-                    class="w-full mb-4 px-4 py-3 rounded-xl bg-white/60 backdrop-blur border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e]/40 transition">
-
-                <input type="number" name="harga" placeholder="Harga"
-                    class="w-full mb-4 px-4 py-3 rounded-xl bg-white/60 backdrop-blur border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e]/40 transition">
-
-                <textarea name="deskripsi" placeholder="Deskripsi"
-                    class="w-full mb-4 px-4 py-3 rounded-xl bg-white/60 backdrop-blur border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e]/40 transition"></textarea>
-
-                {{-- DROPZONE UPGRADE --}}
-                <div id="dropzone"
-                    class="border-2 border-dashed border-[#c8a97e]/40 rounded-2xl p-6 text-center cursor-pointer bg-white/30 backdrop-blur hover:bg-white/50 transition">
-
-                    <p class="text-sm text-[#6b4f4f]">
-                        Drag & Drop gambar atau klik
-                    </p>
-
-                    <p class="text-xs mt-2 text-[#8b6f63]">
-                        (bisa upload multiple)
-                    </p>
-
-                </div>
-
-                <input type="file" name="gambar[]" multiple hidden id="fileInput">
-
-                {{-- PREVIEW --}}
-                <div id="preview" class="flex gap-2 flex-wrap mt-4"></div>
-
-                {{-- ACTION --}}
-                <div class="flex gap-3 mt-6">
-
-                    <button type="button" onclick="closeModal()" 
-                        class="flex-1 py-3 rounded-xl bg-white/60 backdrop-blur border border-white/40 hover:bg-white/80 transition">
-                        Batal
-                    </button>
-
-                    <button type="submit"
-                        class="flex-1 py-3 rounded-xl bg-[#3e2723] text-white shadow-lg hover:scale-105 transition">
-                        Simpan
-                    </button>
-
-                </div>
-
-            </form>
-
+            @endforeach
         </div>
+    </section>
+</main>
 
+{{-- ================= FLOATING BASKET BUTTON ================= --}}
+<div class="fixed bottom-6 right-6 z-40">
+    <button onclick="toggleCartDrawer()" class="relative w-16 h-16 rounded-full bg-[#3e2723] text-white flex items-center justify-center shadow-2xl hover:scale-105 transition duration-300">
+        <i class="fa-solid fa-cart-shopping text-xl"></i>
+        <span id="cartCountBadge" class="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-r from-[#c8a97e] to-[#b8860b] text-white text-xs font-bold rounded-full flex items-center justify-center hidden shadow-md">0</span>
+    </button>
+</div>
+
+{{-- ================= SIDE DRAWER BASKET LAYER ================= --}}
+<div id="cartDrawer" class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white/40 backdrop-blur-3xl border-l border-white/40 shadow-[0_0_60px_rgba(0,0,0,0.2)] p-6 flex flex-col justify-between transform translate-x-full transition-transform duration-500">
+    <div>
+        <div class="flex justify-between items-center pb-4 border-b border-[#3e2723]/20">
+            <h3 class="text-lg font-bold text-[#3e2723]"><i class="fa-solid fa-basket-shopping mr-2"></i> Keranjang Pre-Order</h3>
+            <button onclick="toggleCartDrawer()" class="w-8 h-8 rounded-full bg-white/40 flex items-center justify-center font-bold text-[#3e2723] hover:bg-white/70">✕</button>
+        </div>
+        
+        <div id="cartItemsList" class="overflow-y-auto max-h-[60vh] mt-4 space-y-3 pr-1">
+            <p class="text-sm text-gray-500 text-center py-8">Keranjang belanja Anda kosong.</p>
+        </div>
     </div>
 
-
-    {{-- ================= SCRIPT ================= --}}
-    <script>
-
-    function openModal(){
-        const modal = document.getElementById('modal');
-        const form = document.getElementById('formProduk');
-
-        modal.classList.remove('hidden');
-        form.reset();
-
-        form.action = "{{ route('produk.store') }}";
-
-        let methodInput = form.querySelector('input[name="_method"]');
-        if(methodInput) methodInput.remove();
-
-        document.getElementById('preview').innerHTML = '';
-    }
-
-    function closeModal(){
-        document.getElementById('modal').classList.add('hidden');
-    }
-
-    document.getElementById('modal').addEventListener('click', function(e){
-        if(e.target.id === 'modal'){
-            closeModal();
-        }
-    });
-
-
-    // ================= DRAG DROP + PREVIEW =================
-    const dropzone = document.getElementById('dropzone');
-    const fileInput = document.getElementById('fileInput');
-    const preview = document.getElementById('preview');
-
-    dropzone.onclick = () => fileInput.click();
-
-    fileInput.addEventListener('change', showPreview);
-
-    dropzone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropzone.classList.add('bg-white/60');
-    });
-
-    dropzone.addEventListener('dragleave', () => {
-        dropzone.classList.remove('bg-white/60');
-    });
-
-    dropzone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        fileInput.files = e.dataTransfer.files;
-        dropzone.classList.remove('bg-white/60');
-        showPreview();
-    });
-
-    function showPreview(){
-        preview.innerHTML = '';
-
-        Array.from(fileInput.files).forEach(file => {
-            const reader = new FileReader();
-
-            reader.onload = function(e){
-                const img = document.createElement('img');
-                img.src = e.target.result;
-                img.className = "w-20 h-20 object-cover rounded-lg shadow";
-                preview.appendChild(img);
-            }
-
-            reader.readAsDataURL(file);
-        });
-    }
-
-    </script>
-
+    <div class="pt-4 border-t border-[#3e2723]/20 space-y-4">
+        <div class="flex justify-between items-center font-bold text-lg text-[#3e2723]">
+            <span>Total Tagihan:</span>
+            <span id="cartTotalPrice">Rp 0</span>
+        </div>
+        
+        <form action="{{ route('checkout.store') }}" method="POST" id="checkoutForm">
+            @csrf
+            <input type="hidden" name="cart_data" id="cartDataHiddenInput">
+            <button type="submit" id="checkoutBtn" disabled class="w-full py-3.5 bg-[#3e2723] text-white font-semibold rounded-2xl shadow-xl hover:bg-[#2c1b18] disabled:bg-gray-400 disabled:scale-100 disabled:shadow-none transition duration-300 text-center block">
+                <i class="fa-solid fa-credit-card mr-2"></i> Lanjutkan Ke Pre-Order
+            </button>
+        </form>
+    </div>
+</div>
 
 @include('layouts.footer')
+
+<script>
+    // State Global Filter
+    let activeCategory = 'all';
+    let cart = [];
+
+    // ================= SCRIPT LOGIK LIVE FILTER (SEARCH & CATEGORY) =================
+    function filterCategory(catId, btnElement) {
+        activeCategory = catId;
+        
+        // Ubah Style Active Button Tab Kategori
+        document.querySelectorAll('.category-btn').forEach(btn => {
+            btn.className = "category-btn px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition duration-300 bg-white/40 backdrop-blur-xl border border-white/50 text-[#3e2723] hover:bg-white/70";
+        });
+        
+        if (catId === 'all') {
+            btnElement.className = "category-btn px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition duration-300 bg-[#3e2723] text-white";
+        } else {
+            btnElement.className = "category-btn px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition duration-300 bg-[#3e2723] text-white";
+        }
+
+        filterMenu();
+    }
+
+    function filterMenu() {
+        const query = document.getElementById('menuSearchInput').value.toLowerCase();
+        const cards = document.querySelectorAll('.product-card');
+        let visibleCount = 0;
+
+        cards.forEach(card => {
+            const name = card.getAttribute('data-name');
+            const category = card.getAttribute('data-category');
+
+            // Cek kecocokan Substring nama kue DAN filter kategori aktif
+            const matchesSearch = name.includes(query);
+            const matchesCategory = (activeCategory === 'all' || category === activeCategory);
+
+            if (matchesSearch && matchesCategory) {
+                card.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                card.classList.add('hidden');
+            }
+        });
+
+        // Tampilkan notice jika pencarian kosong
+        const notice = document.getElementById('emptySearchNotice');
+        if (visibleCount === 0) {
+            notice.classList.remove('hidden');
+        } else {
+            notice.classList.add('hidden');
+        }
+    }
+
+    // ================= SCRIPT LOGIK KERANJANG STORAGE =================
+    if (sessionStorage.getItem('bakery_cart')) {
+        cart = JSON.parse(sessionStorage.getItem('bakery_cart'));
+        setTimeout(() => { updateCartUI(); }, 100);
+    }
+
+    function toggleCartDrawer() {
+        const drawer = document.getElementById('cartDrawer');
+        drawer.classList.toggle('translate-x-full');
+    }
+
+    function addToCart(id, name, price, image) {
+        const existingItem = cart.find(item => item.id === id);
+        if (existingItem) {
+            existingItem.quantity += 1;
+        } else {
+            cart.push({ id, name, price, image, quantity: 1 });
+        }
+        updateCartUI();
+        const drawer = document.getElementById('cartDrawer');
+        if(drawer.classList.contains('translate-x-full')) toggleCartDrawer();
+    }
+
+    function updateQuantity(id, amount) {
+        const item = cart.find(item => item.id === id);
+        if (item) {
+            item.quantity += amount;
+            if (item.quantity <= 0) {
+                cart = cart.filter(c => c.id !== id);
+            }
+        }
+        updateCartUI();
+    }
+
+    function updateCartUI() {
+        const listContainer = document.getElementById('cartItemsList');
+        const badge = document.getElementById('cartCountBadge');
+        const totalContainer = document.getElementById('cartTotalPrice');
+        const hiddenInput = document.getElementById('cartDataHiddenInput');
+        const checkoutBtn = document.getElementById('checkoutBtn');
+
+        listContainer.innerHTML = '';
+        sessionStorage.setItem('bakery_cart', JSON.stringify(cart));
+        
+        if (cart.length === 0) {
+            listContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-8">Keranjang belanja Anda kosong.</p>';
+            badge.classList.add('hidden');
+            totalContainer.innerText = 'Rp 0';
+            hiddenInput.value = '';
+            checkoutBtn.disabled = true;
+            return;
+        }
+
+        let totalItems = 0;
+        let totalPrice = 0;
+
+        cart.forEach(item => {
+            totalItems += item.quantity;
+            totalPrice += item.price * item.quantity;
+
+            const row = document.createElement('div');
+            row.className = "flex items-center gap-3 p-3 bg-white/40 border border-white/50 rounded-2xl shadow-sm";
+            row.innerHTML = `
+                <img src="${item.image ? item.image : '/img/logo/logo2.png'}" class="w-12 h-12 object-cover rounded-xl bg-gray-100">
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-bold text-[#3e2723] truncate">${item.name}</p>
+                    <p class="text-xs gold-text font-semibold">Rp ${new Intl.NumberFormat('id-ID').format(item.price)}</p>
+                </div>
+                <div class="flex items-center gap-2 bg-white/60 border rounded-xl px-2 py-1">
+                    <button onclick="updateQuantity(${item.id}, -1)" class="font-bold text-[#3e2723] hover:text-red-600">-</button>
+                    <span class="text-xs font-bold px-1">${item.quantity}</span>
+                    <button onclick="updateQuantity(${item.id}, 1)" class="font-bold text-[#3e2723] hover:text-green-600">+</button>
+                </div>
+            `;
+            listContainer.appendChild(row);
+        });
+
+        badge.innerText = totalItems;
+        badge.classList.remove('hidden');
+        totalContainer.innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(totalPrice);
+        
+        hiddenInput.value = JSON.stringify(cart);
+        checkoutBtn.disabled = false;
+    }
+</script>
 
 </body>
 </html>

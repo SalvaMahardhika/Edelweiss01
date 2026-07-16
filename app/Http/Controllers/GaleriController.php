@@ -2,156 +2,183 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\ImageHelper;
 use App\Models\Galeri;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 class GaleriController extends Controller
 {
-    // ================= INDEX =================
+    // ==========================================
+    // PUBLIC METHODS (DISPLAY CUSTOMER)
+    // ==========================================
+
     public function index()
     {
         $galeri = Galeri::latest()->get();
 
+        // Mengarah ke resources/views/galeri.blade.php (Halaman Publik Bersih)
         return view('galeri', compact('galeri'));
     }
 
-    // ================= CREATE ALBUM =================
-    public function store(Request $request)
+    // ==========================================
+    // CMS ADMIN CRUD METHODS (ALBUM ORIENTED)
+    // ==========================================
+
+    /**
+     * Menampilkan daftar utama data galeri di CMS Admin
+     */
+    public function adminIndex()
     {
-        // 🔒 ROLE
         if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
             abort(403);
         }
 
+        $galeri = Galeri::latest()->get();
+
+        return view('admin.galeri.index', compact('galeri'));
+    }
+
+    /**
+     * Membuka panel edit data deskripsi & kelola gambar dalam album
+     */
+    public function edit($id)
+    {
+        if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
+            abort(403);
+        }
+
+        $galeri = Galeri::findOrFail($id);
+
+        return view('admin.galeri.edit', compact('galeri'));
+    }
+
+    public function store(Request $request)
+    {
+        if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
+            abort(403);
+        }
+
+        // 🔧 PEMBATASAN: Batas maksimal upload ditingkatkan ke 10MB (10240 KB)
         $request->validate([
-            'judul' => 'required',
+            'judul' => 'required|max:255',
             'deskripsi' => 'required',
-            'gambar.*' => 'required|image',
+            'gambar.*' => 'required|image|mimes:jpeg,png,jpg,webp|max:10240',
         ]);
 
-        // ================= BUAT DATA DULU =================
-        $galeri = Galeri::create([
-            'judul' => $request->judul,
-            'deskripsi' => $request->deskripsi,
-            'id_user' => Auth::id(),
-        ]);
-
-        // ================= BUAT FOLDER =================
-        $folderName = 'img'.$galeri->id_galeri;
-
+        // Generate nama folder unik berbasis timestamp dan slug judul
+        $folderName = time().'_'.Str::slug($request->judul);
         $folderPath = public_path('img/galeri/'.$folderName);
 
         if (! File::exists($folderPath)) {
             File::makeDirectory($folderPath, 0755, true);
         }
 
-        // ================= UPLOAD GAMBAR =================
+        // 1. Simpan Rekam Data Awal Portofolio ke Database
+        $galeri = Galeri::create([
+            'judul' => $request->judul,
+            'deskripsi' => $request->deskripsi,
+            'album' => $folderName, // Simpan nama folder unik di field album
+            'user_id' => Auth::id(),  // Disesuaikan ke standarisasi user_id
+        ]);
+
+        // 2. Konversi & Simpan Foto Multiple via ImageHelper WebP
         if ($request->hasFile('gambar')) {
-
             foreach ($request->file('gambar') as $i => $file) {
+                $fileName = 'photo_'.($i + 1).'.webp';
+                $destinationPath = $folderPath.'/'.$fileName;
 
-                $filename = ($i + 1).'.'.$file->getClientOriginalExtension();
-
-                $file->move($folderPath, $filename);
+                try {
+                    // Compress otomatis ke WebP dengan max width 1000px agar layout masonry tetap tajam
+                    ImageHelper::convertToWebp($file->getRealPath(), $destinationPath, 80, 1000);
+                } catch (\Exception $e) {
+                    return back()->with('error', 'Gagal memproses WebP: '.$e->getMessage());
+                }
             }
         }
 
-        // ================= UPDATE ALBUM =================
-        $galeri->album = $folderName;
-        $galeri->save();
-
-        return back()->with('success', 'Album berhasil dibuat');
+        return back()->with('success', 'Album portofolio baru berhasil diterbitkan.');
     }
 
-    // ================= UPDATE =================
     public function update(Request $request, $id)
     {
-        // 🔒 ROLE
         if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
             abort(403);
         }
 
         $galeri = Galeri::findOrFail($id);
+        $folderName = $galeri->album;
+        $folderPath = public_path('img/galeri/'.$folderName);
 
-        // ================= UPDATE JUDUL =================
-        if ($request->field == 'judul') {
+        // Aksi 1: Hapus File Gambar Spesifik
+        if ($request->has('delete_image')) {
+            $filePath = $folderPath.'/'.$request->delete_image;
+            if (File::exists($filePath)) {
+                File::delete($filePath);
+            }
 
-            $request->validate([
-                'value' => 'required',
-            ]);
-
-            $galeri->judul = $request->value;
+            return back()->with('success', 'Foto berhasil dihapus dari album.');
         }
 
-        // ================= UPDATE DESKRIPSI =================
-        if ($request->field == 'deskripsi') {
-
-            $request->validate([
-                'value' => 'required',
-            ]);
-
-            $galeri->deskripsi = $request->value;
-        }
-
-        // ================= TAMBAH FOTO =================
+        // Aksi 2: Tambah File Gambar Baru (Gunakan ImageHelper WebP + Limit 10MB)
         if ($request->hasFile('gambar')) {
+            $request->validate([
+                'gambar.*' => 'image|mimes:jpeg,png,jpg,webp|max:10240',
+            ]);
 
-            $folderPath = public_path('img/galeri/'.$galeri->album);
+            if (! File::exists($folderPath)) {
+                File::makeDirectory($folderPath, 0755, true);
+            }
 
-            // hitung file lama
-            $existingFiles = collect(File::files($folderPath));
-
-            $start = $existingFiles->count() + 1;
+            $existingFiles = file_exists($folderPath) ? array_values(array_diff(scandir($folderPath), ['.', '..'])) : [];
+            $count = count($existingFiles);
 
             foreach ($request->file('gambar') as $i => $file) {
+                $fileName = 'photo_'.($count + $i + 1).'.webp';
+                $destinationPath = $folderPath.'/'.$fileName;
 
-                $filename = ($start + $i).'.'.$file->getClientOriginalExtension();
-
-                $file->move($folderPath, $filename);
+                try {
+                    ImageHelper::convertToWebp($file->getRealPath(), $destinationPath, 80, 1000);
+                } catch (\Exception $e) {
+                    return back()->with('error', 'Gagal memproses gambar tambahan: '.$e->getMessage());
+                }
             }
+
+            return back()->with('success', 'Foto baru berhasil ditambahkan ke dalam album.');
         }
 
-        // ================= HAPUS FOTO =================
-        if ($request->delete_image) {
+        // Aksi 3: Perubahan Data Teks dari Form Edit Penuh
+        $request->validate([
+            'judul' => 'required|max:255',
+            'deskripsi' => 'required',
+        ]);
 
-            $imagePath = public_path(
-                'img/galeri/'.
-                $galeri->album.'/'.
-                $request->delete_image
-            );
+        $galeri->update([
+            'judul' => $request->judul,
+            'deskripsi' => $request->deskripsi,
+        ]);
 
-            if (File::exists($imagePath)) {
-                File::delete($imagePath);
-            }
-        }
-
-        $galeri->save();
-
-        return back()->with('success', 'Galeri berhasil diupdate');
+        return redirect()->route('galeri.index')->with('success', 'Album galeri berhasil diperbarui.');
     }
 
-    // ================= DELETE ALBUM =================
     public function destroy($id)
     {
-        // 🔒 ROLE
         if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
             abort(403);
         }
 
         $galeri = Galeri::findOrFail($id);
-
-        // ================= HAPUS FOLDER =================
         $folderPath = public_path('img/galeri/'.$galeri->album);
 
-        if (File::exists($folderPath)) {
+        // 💥 Bersihkan folder penyimpanan berkas fisik secara total agar storage hemat
+        if ($galeri->album && File::exists($folderPath)) {
             File::deleteDirectory($folderPath);
         }
 
-        // ================= HAPUS DB =================
         $galeri->delete();
 
-        return back()->with('success', 'Album berhasil dihapus');
+        return back()->with('success', 'Album portofolio beserta seluruh foto di dalamnya berhasil dihapus.');
     }
 }
