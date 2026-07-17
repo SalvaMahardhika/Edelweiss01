@@ -3,18 +3,19 @@
 namespace App\Services;
 
 use App\Models\Order;
-use Midtrans\Config;
-use Midtrans\Snap;
+use Illuminate\Support\Facades\Http;
 
 class MidtransService
 {
+    protected $serverKey;
+
+    protected $isProduction;
+
     public function __construct()
     {
-        // Konfigurasi dasar Midtrans menggunakan nilai dari .env
-        Config::$serverKey = config('services.midtrans.server_key', env('MIDTRANS_SERVER_KEY'));
-        Config::$isProduction = (bool) config('services.midtrans.is_production', env('MIDTRANS_IS_PRODUCTION', false));
-        Config::$isSanitized = (bool) config('services.midtrans.is_sanitized', env('MIDTRANS_IS_SANITIZED', true));
-        Config::$is3ds = (bool) config('services.midtrans.is_3ds', env('MIDTRANS_IS_3DS', true));
+        // Ambil konfigurasi dari .env
+        $this->serverKey = config('services.midtrans.server_key', env('MIDTRANS_SERVER_KEY'));
+        $this->isProduction = (bool) config('services.midtrans.is_production', env('MIDTRANS_IS_PRODUCTION', false));
     }
 
     /**
@@ -26,24 +27,18 @@ class MidtransService
         $grossAmount = $order->total_amount;
 
         if ($paymentType === 'initial' && $order->payment_plan === 'dp') {
-            // Jika pembayaran awal dan memilih skema DP
             $grossAmount = $order->dp_amount;
-        } elseif ($paymentType === 'settlement') {
-            // Jika transaksi adalah pelunasan sisa tagihan (remaining)
-            // Asumsi model Order memiliki method remaining() atau hitung manual total_amount - amount_paid
+        } elseif ($paymentType === 'settlement' || $paymentType === 'repayment') {
             $grossAmount = method_exists($order, 'remaining') ? $order->remaining() : ($order->total_amount - $order->amount_paid);
         }
 
-        // 🔑 GERBANG MUTU: Pastikan gross_amount mutlak integer bulat tanpa desimal
         $grossAmountRounded = intval(round($grossAmount));
 
-        // 2. Buat reference_id yang unik untuk dikirim ke Midtrans
-        // Jika pelunasan, tambahkan suffix agar tidak dianggap order duplikat oleh Midtrans
-        $orderIdParam = $paymentType === 'settlement'
+        $orderIdParam = ($paymentType === 'settlement' || $paymentType === 'repayment')
             ? $order->order_number.'-LUNAS-'.time()
             : $order->order_number;
 
-        // 3. Susun payload standar Midtrans API
+        // 2. Susun payload standar Midtrans API
         $params = [
             'transaction_details' => [
                 'order_id' => $orderIdParam,
@@ -61,7 +56,35 @@ class MidtransService
             ],
         ];
 
-        // 4. Minta token ke server Midtrans Snap Sandbox
-        return Snap::getSnapToken($params);
+        // 3. Tentukan Endpoint API Midtrans (Sandbox vs Production)
+        $baseUrl = $this->isProduction
+            ? 'https://app.midtrans.com/snap/v1/transactions'
+            : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
+
+        // 4. Kirim Request dengan pemetaan DNS manual via cURL option (Mencegah DNS Resolving Timeout)
+        $response = Http::withoutVerifying()
+            ->connectTimeout(10)
+            ->timeout(30)
+            ->withOptions([
+                'curl' => [
+                    // 🆕 Memaksa cURL langsung tahu IP sandbox Midtrans tanpa nanya DNS lokal lagi
+                    CURLOPT_RESOLVE => [
+                        'app.sandbox.midtrans.com:443:103.127.16.5',
+                    ],
+                ],
+            ])
+            ->withHeaders([
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ])
+            ->withBasicAuth($this->serverKey, '')
+            ->post($baseUrl, $params);
+
+        if ($response->failed()) {
+            throw new \Exception('Midtrans API Error: '.$response->body());
+        }
+
+        // 5. Kembalikan token string yang didapat dari response body
+        return $response->json()['token'];
     }
 }

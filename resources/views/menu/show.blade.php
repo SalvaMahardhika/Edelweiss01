@@ -62,8 +62,9 @@
 
                 {{-- THUMBNAIL TRACKS --}}
                 <div class="flex gap-3 overflow-x-auto mt-4 py-1">
-                    @foreach($images as $img)
-                    <div class="min-w-[80px] w-20 h-20 rounded-2xl overflow-hidden border-2 border-white shadow-md cursor-pointer hover:border-[#c8a97e] transition">
+                    @foreach($images as $index => $img)
+                    <div class="thumbnail-item min-w-[80px] w-20 h-20 rounded-2xl overflow-hidden border-2 border-white shadow-md cursor-pointer hover:border-[#c8a97e] transition"
+                         data-index="{{ $index }}">
                         <img src="{{ asset('img/menu/' . $produk->gambar . '/' . $img) }}" class="w-full h-full object-cover">
                     </div>
                     @endforeach
@@ -146,9 +147,8 @@
             <span id="cartTotalPrice">Rp 0</span>
         </div>
         
-        <form action="{{ route('checkout.store') }}" method="POST" id="checkoutForm">
-            @csrf
-            <input type="hidden" name="cart_data" id="cartDataHiddenInput">
+        {{-- MODIFIKASI FORM CHECKOUT MENJADI GET KE CHECKOUT.INDEX --}}
+        <form action="{{ route('checkout.index') }}" method="GET" id="checkoutForm">
             <button type="submit" id="checkoutBtn" disabled class="w-full py-3.5 bg-[#3e2723] text-white font-semibold rounded-2xl shadow-xl hover:bg-[#2c1b18] disabled:bg-gray-400 disabled:scale-100 disabled:shadow-none transition duration-300 text-center block">
                 <i class="fa-solid fa-credit-card mr-2"></i> Lanjutkan Ke Pre-Order
             </button>
@@ -161,8 +161,8 @@
 <script src="https://cdn.jsdelivr.net/npm/swiper/swiper-bundle.min.js"></script>
 
 <script>
-    // Inisialisasi Swiper Slider Gambar
-    new Swiper(".mySwiper", {
+    // Inisialisasi Swiper Slider Gambar Utama
+    const swiper = new Swiper(".mySwiper", {
         loop: true,
         spaceBetween: 20,
         pagination: {
@@ -171,8 +171,22 @@
         }
     });
 
+    // Menangani sinkronisasi ketika item thumbnail diklik
+    document.querySelectorAll('.thumbnail-item').forEach((thumb) => {
+        thumb.addEventListener('click', function() {
+            const index = parseInt(this.getAttribute('data-index'));
+            // Karena menggunakan loop:true, indeks asli bergeser +1 pada slide kontainer internal Swiper
+            swiper.slideTo(index + 1);
+            this.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        });
+    });
+
     // ================= SCRIPT INTERAKTIF KERANJANG STORAGE ENGINE =================
     let cart = [];
+
+    // Mengambil state autentikasi dari Laravel Blade ke variabel JavaScript global
+    const isAuthenticated = @json(auth()->check());
+    const loginUrl = "{{ route('login') }}";
 
     // Mengambil state data dari SessionStorage browser agar sinkron antar halaman
     if (sessionStorage.getItem('bakery_cart')) {
@@ -213,11 +227,21 @@
         updateCartUI();
     }
 
+    // ================= INTERSEPSI TOMBOL PRE-ORDER JIKA USER BELUM LOGIN =================
+    function handleCheckoutGuard(event) {
+        if (!isAuthenticated) {
+            event.preventDefault(); // Mencegah form disubmit secara default
+            window.location.href = loginUrl; // Paksa arahkan ke rute login /edelweiss-admin
+            return false;
+        }
+        return true; // Jika sudah login, izinkan form submit menuju halaman checkout backend
+    }
+
     function updateCartUI() {
         const listContainer = document.getElementById('cartItemsList');
         const badge = document.getElementById('cartCountBadge');
         const totalContainer = document.getElementById('cartTotalPrice');
-        const hiddenInput = document.getElementById('cartDataHiddenInput');
+        // const hiddenInput = document.getElementById('cartDataHiddenInput'); // Tidak lagi digunakan karena method GET
         const checkoutBtn = document.getElementById('checkoutBtn');
 
         listContainer.innerHTML = '';
@@ -227,7 +251,7 @@
             listContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-8">Keranjang belanja Anda kosong.</p>';
             badge.classList.add('hidden');
             totalContainer.innerText = 'Rp 0';
-            hiddenInput.value = '';
+            // hiddenInput.value = ''; // Tidak lagi digunakan
             checkoutBtn.disabled = true;
             return;
         }
@@ -260,7 +284,7 @@
         badge.classList.remove('hidden');
         totalContainer.innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(totalPrice);
         
-        hiddenInput.value = JSON.stringify(cart);
+        // hiddenInput.value = JSON.stringify(cart); // Tidak lagi digunakan
         checkoutBtn.disabled = false;
     }
 </script>

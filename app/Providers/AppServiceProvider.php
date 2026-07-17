@@ -22,6 +22,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // 🆕 JALAN KELUAR SSL: Bypass SSL cURL secara global khusus di lingkungan local (development)
+        if (config('app.env') === 'local') {
+            $cacertPath = "C:\xampp\php\extras\ssl\cacert.pem";
+            if (file_exists($cacertPath)) {
+                ini_set('curl.cainfo', $cacertPath);
+                ini_set('openssl.cafile', $cacertPath);
+            }
+        }
+
         Route::bind('produk', function ($value) {
             // 1. Dekripsi string acak dari URL untuk mendapatkan ID asli
             $realId = CryptoHelper::decryptId($value);

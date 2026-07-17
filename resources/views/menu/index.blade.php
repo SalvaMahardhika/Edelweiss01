@@ -204,9 +204,8 @@
             <span id="cartTotalPrice">Rp 0</span>
         </div>
         
-        <form action="{{ route('checkout.store') }}" method="POST" id="checkoutForm">
-            @csrf
-            <input type="hidden" name="cart_data" id="cartDataHiddenInput">
+        {{-- MODIFIKASI FORM CHECKOUT MENJADI GET KE CHECKOUT.INDEX --}}
+        <form action="{{ route('checkout.index') }}" method="GET" id="checkoutForm">
             <button type="submit" id="checkoutBtn" disabled class="w-full py-3.5 bg-[#3e2723] text-white font-semibold rounded-2xl shadow-xl hover:bg-[#2c1b18] disabled:bg-gray-400 disabled:scale-100 disabled:shadow-none transition duration-300 text-center block">
                 <i class="fa-solid fa-credit-card mr-2"></i> Lanjutkan Ke Pre-Order
             </button>
@@ -220,6 +219,10 @@
     // State Global Filter
     let activeCategory = 'all';
     let cart = [];
+
+    // Inject state login dari Laravel Blade ke variabel JavaScript global
+    const isAuthenticated = @json(auth()->check());
+    const loginUrl = "{{ route('login') }}";
 
     // ================= SCRIPT LOGIK LIVE FILTER (SEARCH & CATEGORY) =================
     function filterCategory(catId, btnElement) {
@@ -303,11 +306,21 @@
         updateCartUI();
     }
 
+    // ================= INTERSEPSI TOMBOL PRE-ORDER JIKA USER BELUM LOGIN =================
+    function handleCheckoutGuard(event) {
+        if (!isAuthenticated) {
+            event.preventDefault(); // Mencegah submit form
+            window.location.href = loginUrl; // Paksa redirect ke halaman login /edelweiss-admin
+            return false;
+        }
+        return true;
+    }
+
     function updateCartUI() {
         const listContainer = document.getElementById('cartItemsList');
         const badge = document.getElementById('cartCountBadge');
         const totalContainer = document.getElementById('cartTotalPrice');
-        const hiddenInput = document.getElementById('cartDataHiddenInput');
+        // const hiddenInput = document.getElementById('cartDataHiddenInput'); // Tidak lagi digunakan karena method GET
         const checkoutBtn = document.getElementById('checkoutBtn');
 
         listContainer.innerHTML = '';
@@ -317,7 +330,7 @@
             listContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-8">Keranjang belanja Anda kosong.</p>';
             badge.classList.add('hidden');
             totalContainer.innerText = 'Rp 0';
-            hiddenInput.value = '';
+            // hiddenInput.value = ''; // Tidak lagi digunakan
             checkoutBtn.disabled = true;
             return;
         }
@@ -350,7 +363,7 @@
         badge.classList.remove('hidden');
         totalContainer.innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(totalPrice);
         
-        hiddenInput.value = JSON.stringify(cart);
+        // hiddenInput.value = JSON.stringify(cart); // Tidak lagi digunakan
         checkoutBtn.disabled = false;
     }
 </script>

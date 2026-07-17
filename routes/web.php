@@ -59,6 +59,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/profile', 'update')->name('profile.update');
     });
 
+    // Tampilan Formulir & Proses Simpan Checkout Pre-Order
+    Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
+
     Route::get('/checkout/pay/{order_number}', [CheckoutController::class, 'pay'])->name('checkout.pay');
 });
 
