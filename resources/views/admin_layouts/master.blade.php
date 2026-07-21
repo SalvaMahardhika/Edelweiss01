@@ -70,9 +70,9 @@
                         <i class="fa-regular fa-images w-5 text-center text-lg"></i> Galeri Foto
                     </a>
                     
-                    {{-- Jadwal PO (Placeholder Link) --}}
-                    <a href="#" 
-                       class="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition duration-300 hover:bg-white/50 text-[#3e2723]/80 font-medium">
+                    {{-- 📅 JADWAL PO (Dapat Diakses Admin & Super Admin) --}}
+                    <a href="{{ route('admin.po.index') }}" 
+                    class="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition duration-300 {{ Route::is('admin.po.*') ? 'bg-[#3e2723] text-white font-semibold shadow-lg' : 'hover:bg-white/50 text-[#3e2723]/80 font-medium' }}">
                         <i class="fa-solid fa-calendar-days w-5 text-center text-lg"></i> Jadwal PO
                     </a>
 
@@ -80,7 +80,7 @@
                     @if(auth()->user()->role === 'super_admin')
                     <a href="{{ route('admin.users') }}" 
                        class="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition duration-300 {{ Route::is('admin.users') ? 'bg-[#3e2723] text-white font-semibold shadow-lg' : 'hover:bg-white/50 text-[#3e2723]/80 font-medium' }}">
-                        <i class="fa-solid fa-users-gear w-5 text-center text-lg"></i> Manajemen Karyawan
+                        <i class="fa-solid fa-users-gear w-5 text-center text-lg"></i> Manajemen Akun
                     </a>
                     @endif
                 </nav>

@@ -42,6 +42,13 @@ class="fixed top-0 w-full z-50 backdrop-blur-3xl bg-white/60 border-b border-whi
                     Contact
                 </a>
 
+                {{-- 🛒 🆕 TOMBOL PESANAN SAYA (DESKTOP) — HANYA TAMPIL KETIKA USER LOGIN --}}
+                @auth
+                    <a href="{{ route('orders.track') }}" class="px-3.5 py-2 rounded-xl bg-[#3e2723]/10 text-[#3e2723] hover:bg-[#3e2723] hover:text-white transition flex items-center gap-1.5 border border-[#3e2723]/20 shadow-sm">
+                        <i class="fa-solid fa-receipt text-xs"></i> Pesanan Saya
+                    </a>
+                @endauth
+
                 {{-- MANAGEMENT ACCESS (ADMIN & SUPER ADMIN ONLY) --}}
                 @auth
                     @if(auth()->user()->role === 'admin' || auth()->user()->role === 'super_admin')
@@ -59,7 +66,7 @@ class="fixed top-0 w-full z-50 backdrop-blur-3xl bg-white/60 border-b border-whi
 
                 {{-- AUTHENTICATION INTERFACE DEKSTOP --}}
                 @guest
-                    {{-- Belon Login: Tampilkan Login & Register --}}
+                    {{-- Belum Login: Tampilkan Login & Register --}}
                     <div class="flex items-center gap-2 ml-2">
                         <a href="{{ route('login') }}" class="px-4 py-2 rounded-xl border border-[#3e2723]/20 hover:bg-[#3e2723]/10 transition text-sm">
                             Masuk
@@ -182,6 +189,13 @@ class="fixed top-0 w-full z-50 backdrop-blur-3xl bg-white/60 border-b border-whi
                     Contact
                 </a>
 
+                {{-- 🛒 🆕 TOMBOL PESANAN SAYA (MOBILE) — HANYA TAMPIL KETIKA USER LOGIN --}}
+                @auth
+                    <a href="{{ route('orders.track') }}" class="block px-4 py-3 rounded-2xl bg-[#c8a97e] text-white font-semibold tracking-wide shadow-md hover:bg-[#b8860b] transition" style="-webkit-text-stroke: 0.3px rgba(0,0,0,0.45);">
+                        <i class="fa-solid fa-receipt mr-1.5"></i> Pesanan Saya
+                    </a>
+                @endauth
+
                 {{-- MANAGEMENT ACCESS MOBILE --}}
                 @auth
                     @if(auth()->user()->role === 'admin' || auth()->user()->role === 'super_admin')
@@ -205,7 +219,7 @@ class="fixed top-0 w-full z-50 backdrop-blur-3xl bg-white/60 border-b border-whi
                         <a href="{{ route('login') }}" class="px-4 py-3 rounded-2xl text-center border border-[#3e2723]/30 font-semibold text-[#3e2723] bg-white/40 transition">
                             Masuk
                         </a>
-                        <a href="#" class="px-4 py-3 rounded-2xl text-center bg-[#3e2723] text-white font-semibold shadow-md transition">
+                        <a href="{{ route('register') }}" class="px-4 py-3 rounded-2xl text-center bg-[#3e2723] text-white font-semibold shadow-md transition">
                             Daftar
                         </a>
                     </div>
@@ -257,7 +271,9 @@ class="fixed top-0 w-full z-50 backdrop-blur-3xl bg-white/60 border-b border-whi
     const mobileBtn = document.getElementById('mobileMenuBtn');
     const mobileMenu = document.getElementById('mobileMenu');
 
-    mobileBtn.addEventListener('click', () => {
-        mobileMenu.classList.toggle('hidden');
-    });
+    if(mobileBtn){
+        mobileBtn.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+    }
 </script>

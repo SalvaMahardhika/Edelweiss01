@@ -52,7 +52,13 @@
             <div class="border-t border-dashed my-2 pt-2 flex justify-between font-bold text-base text-[#3e2723]">
                 <span>Jumlah yang Harus Dibayar</span>
                 <span class="gold-text">
-                    Rp {{ number_format(($order->payment_plan == 'dp') ? $order->dp_amount : $order->total_amount, 0, ',', '.') }}
+                    @php
+                        $amountToPay = ($order->payment_plan == 'dp' && $order->amount_paid == 0) 
+                            ? $order->dp_amount 
+                            : ($order->total_amount - $order->amount_paid);
+                    @endphp
+
+                    Rp {{ number_format($amountToPay, 0, ',', '.') }}
                 </span>
             </div>
         </div>

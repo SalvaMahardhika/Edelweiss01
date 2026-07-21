@@ -1,127 +1,187 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('page_title') | Edelweiss Admin</title>
-    <link rel="icon" href="{{ asset('img/logo/logo2.png') }}">
-    
-    {{-- Tailwind & FontAwesome --}}
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        /* Custom Scrollbar for sleek look */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
-    </style>
-</head>
-<body class="bg-[#fafafa] text-[#3e2723] min-h-screen relative overflow-x-hidden">
+@extends('admin_layouts.master')
 
-    {{-- BACKGROUND ART & BLUR GLOW --}}
-    <div class="fixed inset-0 z-0">
-        {{-- Menggunakan aset background dari layout lama agar tetap branded --}}
-        <img src="{{ asset('img/dashboard/assets/3.png') }}" class="w-full h-full object-cover opacity-15 filter grayscale">
-        <div class="absolute inset-0 bg-gradient-to-br from-[#fafafa] via-[#f5efe8] to-[#ede5dc]/90"></div>
-        
-        <!-- Ambient Liquid Glow Tokens -->
-        <div class="absolute top-10 left-10 w-96 h-96 bg-[#d4af37] rounded-full blur-[120px] opacity-15"></div>
-        <div class="absolute bottom-10 right-10 w-96 h-96 bg-[#3e2723] rounded-full blur-[120px] opacity-10"></div>
-    </div>
+@section('page_title', 'Ringkasan Dashboard Utama')
 
-    {{-- MAIN WRAPPER INTERFACE --}}
-    <div class="relative z-10 flex min-h-screen p-4 gap-4">
-        
-        {{-- SIDEBAR CONTAINER (Liquid Glass Card) --}}
-        <aside class="w-72 backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-2xl p-6 flex flex-col justify-between hidden lg:flex">
+@section('content')
+<div class="max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 space-y-6">
+
+    {{-- BARIS TOMBOL AKSES PENJUNJUNG / VISITOR WEB --}}
+    <div class="flex items-center justify-between backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-4 shadow-xl">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-[#3e2723] text-white flex items-center justify-center text-base shadow-md">
+                <i class="fa-solid fa-[#3e2723] fa-store"></i>
+            </div>
             <div>
-                <!-- Branding -->
-                <div class="flex items-center gap-3 px-2 mb-8">
-                    <img src="{{ asset('img/logo/logo2.png') }}" class="h-10 w-auto drop-shadow-md">
-                    <span class="font-black text-lg tracking-wider bg-gradient-to-r from-[#3e2723] to-[#b8860b] bg-clip-text text-transparent">ADMIN DASHBOARD</span>
-                </div>
-                
-                <!-- Navigation Links -->
-                <nav class="space-y-2">
-                    {{-- Dashboard Summary Link --}}
-                    <a href="{{ route('admin.index') }}" 
-                       class="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition duration-300 {{ Route::is('admin.index') ? 'bg-[#3e2723] text-white font-semibold shadow-lg' : 'hover:bg-white/50 text-[#3e2723]/80 font-medium' }}">
-                        <i class="fa-solid fa-chart-pie w-5 text-center text-lg"></i> Dashboard
-                    </a>
-                    
-                    {{-- 🆕 KATEGORI MENU --}}
-                    <a href="{{ route('kategori.index') }}" 
-                       class="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition duration-300 {{ Route::is('kategori.*') ? 'bg-[#3e2723] text-white font-semibold shadow-lg' : 'hover:bg-white/50 text-[#3e2723]/80 font-medium' }}">
-                        <i class="fa-solid fa-tags w-5 text-center text-lg"></i> Kategori Menu
-                    </a>
-
-                    {{-- 📦 PRODUK / MANAJEMEN MENU --}}
-                    <a href="{{ route('produk.index') }}" 
-                       class="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition duration-300 {{ Route::is('produk.*') || Request::is('admin/menu*') ? 'bg-[#3e2723] text-white font-semibold shadow-lg' : 'hover:bg-white/50 text-[#3e2723]/80 font-medium' }}">
-                        <i class="fa-solid fa-layer-group w-5 text-center text-lg"></i> Manajemen Menu
-                    </a>
-
-                    {{-- 🖼️ GALERI FOTO --}}
-                    <a href="{{ route('galeri.index') }}" 
-                       class="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition duration-300 {{ Route::is('galeri.*') || Request::is('admin/galeri*') ? 'bg-[#3e2723] text-white font-semibold shadow-lg' : 'hover:bg-white/50 text-[#3e2723]/80 font-medium' }}">
-                        <i class="fa-regular fa-images w-5 text-center text-lg"></i> Galeri Foto
-                    </a>
-                    
-                    {{-- Jadwal PO (Placeholder Link) --}}
-                    <a href="#" 
-                       class="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition duration-300 hover:bg-white/50 text-[#3e2723]/80 font-medium">
-                        <i class="fa-solid fa-calendar-days w-5 text-center text-lg"></i> Jadwal PO
-                    </a>
-
-                    {{-- Super Admin Restricted Account Access --}}
-                    @if(auth()->user()->role === 'super_admin')
-                    <a href="{{ route('admin.users') }}" 
-                       class="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition duration-300 {{ Route::is('admin.users') ? 'bg-[#3e2723] text-white font-semibold shadow-lg' : 'hover:bg-white/50 text-[#3e2723]/80 font-medium' }}">
-                        <i class="fa-solid fa-users-gear w-5 text-center text-lg"></i> Manajemen Karyawan
-                    </a>
-                    @endif
-                </nav>
+                <h4 class="text-sm font-bold text-[#3e2723]">Layanan Depan Toko (Visitor Web)</h4>
+                <p class="text-xs text-gray-500">Lihat tampilan katalog menu dan halaman pemesanan pelanggan secara langsung.</p>
             </div>
-
-            <!-- Footer Sidebar / User Info & Logout -->
-            <div class="backdrop-blur-xl bg-white/30 border border-white/40 rounded-2xl p-4 flex items-center justify-between shadow-sm mt-4">
-                <div class="flex items-center gap-3 min-w-0 flex-1 mr-2">
-                    <div class="w-10 h-10 rounded-xl bg-[#3e2723] text-white flex items-center justify-center font-bold shrink-0 shadow-md">
-                        {{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 1)) }}
-                    </div>
-                    <div class="min-w-0">
-                        <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wider truncate">{{ auth()->user()->role ?? 'Admin' }}</p>
-                        <p class="text-sm font-bold truncate text-[#3e2723]" title="{{ auth()->user()->name }}">{{ auth()->user()->name ?? 'Administrator' }}</p>
-                    </div>
-                </div>
-                <form action="{{ route('logout') }}" method="POST" class="shrink-0">
-                    @csrf
-                    <button type="submit" class="text-red-600 hover:scale-110 transition p-1" title="Log Keluar Sistem">
-                        <i class="fa-solid fa-right-from-bracket text-lg"></i>
-                    </button>
-                </form>
-            </div>
-        </aside>
-
-        {{-- CONTENT AREA --}}
-        <main class="flex-1 flex flex-col gap-4">
-            {{-- TOPBAR NAVBAR --}}
-            <header class="w-full h-20 backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] shadow-xl px-6 flex items-center justify-between">
-                <h2 class="text-xl font-black tracking-tight text-[#3e2723]">@yield('page_title', 'Ringkasan Utama')</h2>
-                <div class="text-sm font-semibold bg-white/60 border border-white/40 px-4 py-2 rounded-xl shadow-sm flex items-center gap-2">
-                    <i class="fa-regular fa-calendar-days mr-1"></i> {{ date('d M Y') }}
-                </div>
-            </header>
-
-            {{-- INDIVIDUAL PANEL CONTENT --}}
-            <div class="flex-1 pb-10">
-                @yield('content')
-            </div>
-        </main>
+        </div>
+        
+        {{-- 🔗 TOMBOL PINTAS KE HALAMAN UTAMA PELANGGAN --}}
+        <a href="{{ url('/') }}" target="_blank" class="px-4 py-2.5 bg-[#3e2723] hover:bg-[#2c1b18] text-white text-xs font-bold rounded-xl shadow-lg transition duration-300 flex items-center gap-2 shrink-0">
+            <i class="fa-solid fa-globe"></i> Buka Website Visitor
+            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+        </a>
     </div>
 
-</body>
-</html>
+    {{-- 1. KARTU STATISTIK KINERJA UTAMA (KPI CARDS) --}}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        {{-- Total Omzet Bulan Ini --}}
+        <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold text-[#3e2723]/60 uppercase tracking-wider">Omzet Bulan Ini</p>
+                <h3 class="text-xl font-black text-[#3e2723] mt-1">
+                    Rp {{ number_format($omzetBulanIni ?? 0, 0, ',', '.') }}
+                </h3>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-800 flex items-center justify-center text-xl shadow-sm">
+                <i class="fa-solid fa-wallet"></i>
+            </div>
+        </div>
+
+        {{-- Pesanan Masuk Hari Ini --}}
+        <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold text-blue-800/60 uppercase tracking-wider">Order Masuk Hari Ini</p>
+                <h3 class="text-2xl font-black text-blue-900 mt-1">{{ $orderHariIniCount ?? 0 }}</h3>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-800 flex items-center justify-center text-xl shadow-sm">
+                <i class="fa-solid fa-cart-shopping"></i>
+            </div>
+        </div>
+
+        {{-- Target Produksi Hari Ini --}}
+        <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold text-amber-800/60 uppercase tracking-wider">Jadwal PO Hari Ini</p>
+                <h3 class="text-2xl font-black text-amber-900 mt-1">{{ $targetPOHariIniCount ?? 0 }}</h3>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-800 flex items-center justify-center text-xl shadow-sm">
+                <i class="fa-solid fa-cake-candles"></i>
+            </div>
+        </div>
+
+        {{-- Belum Lunas / Sisa DP --}}
+        <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold text-rose-800/60 uppercase tracking-wider">Tagihan DP Belum Lunas</p>
+                <h3 class="text-2xl font-black text-rose-900 mt-1">{{ $pendingDPCount ?? 0 }}</h3>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-800 flex items-center justify-center text-xl shadow-sm">
+                <i class="fa-solid fa-receipt"></i>
+            </div>
+        </div>
+    </div>
+
+    {{-- 2. TAMPILAN UTAMA (DUA KOLOM) --}}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {{-- KOLOM KIRI (2 SPAN): TABEL PESANAN PERLU TINDAKAN CEPAT --}}
+        <div class="lg:col-span-2 backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-white/40">
+                <div>
+                    <h3 class="text-lg font-bold text-[#3e2723]">Pesanan Terbaru Membutuhkan Konfirmasi</h3>
+                    <p class="text-xs text-gray-500">Pesanan PO yang belum dikonfirmasi atau perlu diperbarui.</p>
+                </div>
+                <a href="{{ route('admin.po.index') }}" class="text-xs font-bold text-[#3e2723] hover:underline flex items-center gap-1">
+                    Lihat Semua <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </a>
+            </div>
+
+            <div class="overflow-x-auto rounded-2xl border border-white/40 bg-white/20 shadow-inner">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-white/40 text-[11px] font-bold uppercase tracking-wider text-[#3e2723]/70">
+                            <th class="px-4 py-3">No. Order & Nama</th>
+                            <th class="px-4 py-3 text-center">Tipe & Siap</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-center">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/30 text-xs font-medium">
+                        @forelse($recentOrders ?? [] as $order)
+                        <tr class="hover:bg-white/30 transition">
+                            <td class="px-4 py-3">
+                                <p class="font-bold text-[#3e2723]">{{ $order->order_number }}</p>
+                                <p class="text-[11px] text-gray-600">{{ $order->customer_name }} ({{ $order->customer_phone }})</p>
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ $order->order_type === 'pickup' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800' }}">
+                                    {{ strtoupper($order->order_type) }}
+                                </span>
+                                <p class="text-[10px] text-gray-500 mt-1">
+                                    {{ $order->fulfill_at ? \Carbon\Carbon::parse($order->fulfill_at)->format('d M, H:i') : '-' }}
+                                </p>
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="px-2 py-1 rounded-xl text-[10px] font-bold shadow-sm {{ $order->status === 'completed' ? 'bg-emerald-600 text-white' : ($order->status === 'preparing' ? 'bg-blue-600 text-white' : 'bg-amber-500 text-white') }}">
+                                    {{ ucfirst($order->status) }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-center font-bold text-[#3e2723]">
+                                Rp {{ number_format($order->total_amount, 0, ',', '.') }}
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="4" class="px-4 py-6 text-center text-gray-400">
+                                Belum ada pesanan terbaru hari ini.
+                            </td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {{-- KOLOM KANAN (1 SPAN): REKAP DAPUR HARI INI & AKSES CEPAT --}}
+        <div class="space-y-6">
+            
+            {{-- Rekap Kebutuhan Dapur (Baking Sheet Summary) --}}
+            <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 space-y-3">
+                <h3 class="text-base font-bold text-[#3e2723] flex items-center gap-2">
+                    <i class="fa-solid fa-fire-burner text-amber-700"></i> Target Pembuatan Kue Hari Ini
+                </h3>
+                <p class="text-xs text-gray-500">Agregasi total kue dari pesanan PO yang harus selesai hari ini.</p>
+
+                <div class="space-y-2 pt-1">
+                    @forelse($bakingItemsHariIni ?? [] as $item)
+                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-white/40 border border-white/50 text-xs shadow-sm">
+                        <span class="font-bold text-[#2d1f1b]">{{ $item->product_name }}</span>
+                        <span class="px-2.5 py-1 rounded-lg bg-[#3e2723] text-white font-black">{{ $item->total_qty }} Pcs</span>
+                    </div>
+                    @empty
+                    <div class="p-4 text-center text-xs text-gray-400 italic bg-white/20 rounded-xl border border-white/30">
+                        Tidak ada target produksi kue untuk hari ini.
+                    </div>
+                    @endforelse
+                </div>
+            </div>
+
+            {{-- Pintasan Akses Cepat (Quick Actions) --}}
+            <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 space-y-3">
+                <h3 class="text-base font-bold text-[#3e2723]">Aksi Cepat</h3>
+                <div class="grid grid-cols-3 gap-2">
+                    <a href="{{ route('produk.index') }}" class="p-3 rounded-xl bg-white/60 hover:bg-white border border-white/50 shadow-sm flex flex-col items-center justify-center text-center transition">
+                        <i class="fa-solid fa-plus text-base text-[#3e2723] mb-1"></i>
+                        <span class="text-[10px] font-bold text-[#3e2723]">Tambah Menu</span>
+                    </a>
+                    <a href="{{ route('admin.po.index') }}" class="p-3 rounded-xl bg-white/60 hover:bg-white border border-white/50 shadow-sm flex flex-col items-center justify-center text-center transition">
+                        <i class="fa-solid fa-calendar-days text-base text-[#3e2723] mb-1"></i>
+                        <span class="text-[10px] font-bold text-[#3e2723]">Jadwal PO</span>
+                    </a>
+                    {{-- 🌐 TOMBOL AKSES VISITOR PADA AKSI CEPAT --}}
+                    <a href="{{ url('/') }}" target="_blank" class="p-3 rounded-xl bg-[#3e2723]/10 hover:bg-[#3e2723]/20 border border-[#3e2723]/20 shadow-sm flex flex-col items-center justify-center text-center transition">
+                        <i class="fa-solid fa-globe text-base text-[#3e2723] mb-1"></i>
+                        <span class="text-[10px] font-bold text-[#3e2723]">Lihat Web</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+@endsection

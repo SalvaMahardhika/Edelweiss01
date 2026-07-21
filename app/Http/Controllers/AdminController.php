@@ -8,33 +8,37 @@ use Illuminate\Support\Facades\Hash;
 
 class AdminController extends Controller
 {
-    // ================= LIST ADMIN =================
+    // ================= LIST USERS =================
     public function index()
     {
-        $users = User::where('id', '!=', 1)->get();
+        // Tetap menyembunyikan Super Admin utama (ID 1) dari daftar
+        $users = User::where('id', '!=', 1)->latest()->get();
 
-        return view('admin.index', compact('users'));
+        // Diarahkan ke view manajemen akun kita
+        return view('admin.users.index', compact('users'));
     }
 
     // ================= CREATE =================
     public function store(Request $request)
     {
         $request->validate([
-            'nama' => 'required',
+            'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6',
-            'role' => 'required|in:admin,customer',
+            'password' => 'required|string|min:6',
+            'role' => 'required|in:customer,admin,super_admin',
+            'phone' => 'nullable|string|max:20',
         ]);
 
         User::create([
-            'nama' => $request->nama,
+            'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => 'admin',
-            'status' => 1,
+            'role' => $request->role,
+            'phone' => $request->phone,
+            'status' => 1, // Aktif default
         ]);
 
-        return back()->with('success', 'Admin berhasil ditambahkan');
+        return back()->with('success', 'Pengguna berhasil ditambahkan');
     }
 
     // ================= UPDATE =================
@@ -42,12 +46,12 @@ class AdminController extends Controller
     {
         $user = User::findOrFail($id);
 
-        // 🔒 proteksi super admin utama
+        // 🔒 Proteksi super admin utama
         if ($user->id == 1) {
             return back()->with('error', 'Super admin utama tidak bisa diubah');
         }
 
-        // ================= TOGGLE STATUS (FIX AMAN) =================
+        // ================= TOGGLE STATUS (LOGIKA AMAN ANDA) =================
         $onlyFields = array_keys($request->except('_token', '_method'));
 
         if (count($onlyFields) === 1 && in_array('status', $onlyFields)) {
@@ -60,22 +64,26 @@ class AdminController extends Controller
 
         // ================= UPDATE DATA =================
         $request->validate([
-            'nama' => 'required',
+            'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,'.$id.',id',
             'password' => 'nullable|min:6',
+            'role' => 'required|in:customer,admin,super_admin',
+            'phone' => 'nullable|string|max:20',
         ]);
 
-        $user->nama = $request->nama;
+        $user->name = $request->name;
         $user->email = $request->email;
+        $user->role = $request->role;
+        $user->phone = $request->phone;
 
-        // update password kalau diisi
+        // Update password kalau diisi
         if ($request->filled('password')) {
             $user->password = Hash::make($request->password);
         }
 
         $user->save();
 
-        return back()->with('success', 'Admin berhasil diupdate');
+        return back()->with('success', 'Data pengguna berhasil diupdate');
     }
 
     // ================= DELETE =================
@@ -83,13 +91,13 @@ class AdminController extends Controller
     {
         $user = User::findOrFail($id);
 
-        // 🔒 super admin tidak bisa dihapus
+        // 🔒 Super admin tidak bisa dihapus
         if ($user->role === 'super_admin' || $user->id == 1) {
             return back()->with('error', 'Super admin tidak bisa dihapus');
         }
 
         $user->delete();
 
-        return back()->with('success', 'Admin berhasil dihapus');
+        return back()->with('success', 'Pengguna berhasil dihapus');
     }
 }

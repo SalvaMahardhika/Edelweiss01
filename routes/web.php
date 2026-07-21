@@ -31,7 +31,7 @@ Route::view('/about', 'about')->name('about');
 Route::view('/kontak', 'kontak')->name('kontak');
 
 // 🔑 RUTE PEMBAYARAN & LAZIM PRE-ORDER PUBLIK
-Route::get('/pesanan/{order_number}', [CheckoutController::class, 'track'])->name('orders.track');
+Route::get('/pesanan/{order_number?}', [CheckoutController::class, 'track'])->name('orders.track');
 Route::post('/api/midtrans/webhook', [PaymentNotificationController::class, 'handle'])->name('midtrans.webhook');
 
 // 🔑 SOLUSI GUEST CHECKOUT
@@ -81,6 +81,14 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
             Route::post('/', 'store')->name('orders.store');
         });
 
+        // 📅 MANAJEMEN JADWAL PO / ORDERS
+        Route::controller(OrderController::class)->prefix('jadwal-po')->group(function () {
+            Route::get('/', 'index')->name('admin.po.index');
+            Route::get('/{id}', 'show')->name('admin.po.show');
+            Route::patch('/{id}/update-status', 'updateStatus')->name('admin.po.updateStatus');
+            Route::patch('/{id}/update-payment', 'updatePaymentStatus')->name('admin.po.updatePayment');
+        });
+
         // 📝 Produk / Menu Management (CRUD Lengkap)
         Route::controller(MenuController::class)->prefix('menu')->group(function () {
             Route::get('/', 'adminIndex')->name('produk.index');
@@ -112,11 +120,14 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
         });
     });
 
-    // 🛑 HAK AKSES EKSKLUSIF: SUPER_ADMIN ONLY
-    Route::middleware(['role:super_admin'])->prefix('users')->group(function () {
-        Route::get('/', [AdminController::class, 'index'])->name('admin.users');
-        Route::post('/', [AdminController::class, 'store'])->name('admin.store');
-        Route::put('/{id}', [AdminController::class, 'update'])->name('admin.update');
-        Route::delete('/{id}', [AdminController::class, 'destroy'])->name('admin.destroy');
+    // 🛑 HAK AKSES EKSKLUSIF: SUPER_ADMIN ONLY (Manajemen Akun / Pengguna)
+    Route::middleware(['role:super_admin'])->controller(AdminController::class)->prefix('users')->group(function () {
+        Route::get('/', 'index')->name('admin.users');
+        Route::post('/', 'store')->name('admin.store');
+        Route::put('/{id}', 'update')->name('admin.update');
+        Route::delete('/{id}', 'destroy')->name('admin.destroy');
+
+        // 🆕 Rute Khusus Sakelar/Toggle Status Aktif/Nonaktif Akun
+        Route::patch('/{id}/toggle-status', 'toggleStatus')->name('admin.toggleStatus');
     });
 });

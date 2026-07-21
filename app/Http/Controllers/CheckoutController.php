@@ -39,7 +39,7 @@ class CheckoutController extends Controller
             'customer_phone' => 'required|string|max:20',
             'customer_email' => 'nullable|email|max:255',
             'order_type' => 'required|in:pickup,delivery',
-            'delivery_address' => 'required_if:order_type,delivery|nullable|string', // 🆕 Tambahkan validasi alamat
+            'delivery_address' => 'required_if:order_type,delivery|nullable|string',
             'payment_plan' => 'required|in:full,dp',
             'fulfill_at' => 'required|date|after:now',
             'notes' => 'nullable|string',
@@ -75,10 +75,10 @@ class CheckoutController extends Controller
                 ];
             }
 
-            $taxAmount = 0; // Sesuaikan jika ada pajak, misal: $subtotal * 0.1
+            $taxAmount = 0; // Sesuaikan jika ada pajak
             $totalAmount = $subtotal + $taxAmount;
 
-            // Atur skema uang muka (DP 50% atau sesuai kebijakan Anda)
+            // Atur skema uang muka (DP 50%)
             $dpAmount = ($request->payment_plan === 'dp') ? ($totalAmount * 0.5) : 0;
 
             // 2. Generate Nomor Order Unik (cth: EDL-20260717-0001)
@@ -95,7 +95,7 @@ class CheckoutController extends Controller
                 'customer_phone' => $request->customer_phone,
                 'customer_email' => $request->customer_email,
                 'order_type' => $request->order_type,
-                'delivery_address' => $request->delivery_address, // 🆕 Pastikan kolom ini disimpan
+                'delivery_address' => $request->delivery_address,
                 'status' => 'pending',
                 'payment_plan' => $request->payment_plan,
                 'payment_status' => 'unpaid',
@@ -133,43 +133,50 @@ class CheckoutController extends Controller
      */
     public function pay($order_number, MidtransService $midtransService)
     {
-        // 1. Cari data order berdasarkan order_number secara aman di server
+        // 1. Cari data order
         $order = Order::where('order_number', $order_number)->firstOrFail();
 
-        // 2. Minta token transaksi ke server Midtrans Sandbox (Otoritas Backend)
-        $snapToken = $midtransService->getSnapToken($order, 'initial');
+        // 2. Jika order SUDAH MEMILIKI snap_token, pakai token tersebut (TIDAK minta baru ke Midtrans)
+        if ($order->snap_token) {
+            $snapToken = $order->snap_token;
+        } else {
+            // Jika BELUM PUNYA (transaksi baru), minta ke Midtrans lalu simpan ke DB
+            $snapToken = $midtransService->getSnapToken($order, 'initial');
 
-        // 3. Lempar data ke halaman blade view pembayaran awal
+            $order->update([
+                'snap_token' => $snapToken,
+            ]);
+        }
+
+        // 3. Tampilkan halaman pembayaran
         return view('checkout.pay', compact('order', 'snapToken'));
     }
 
     /**
-     * 🔔 BARU: Halaman Publik Lacak Pesanan & Pelunasan Sisa Tagihan (DP)
-     * Rute: /pesanan/{order_number}
+     * 🔔 Halaman Publik Lacak Pesanan & Riwayat Pre-Order
+     * Rute: /pesanan/{order_number?}
      */
-    public function track($order_number, MidtransService $midtransService)
+    public function track(Request $request, $order_number = null)
     {
-        // 1. Ambil data order beserta relasi items-nya jika ingin menampilkan detail produk
-        $order = Order::with('items')->where('order_number', $order_number)->firstOrFail();
+        // Ambil input pencarian dari form query string ?search=... ATAU dari parameter URL {order_number}
+        $search = trim($request->get('search', $order_number ?? ''));
 
-        // 2. Hitung sisa tagihan secara matematis
-        $remainingAmount = $order->total_amount - $order->amount_paid;
-
-        $snapToken = null;
-        $statusStr = strtolower($order->status instanceof \BackedEnum ? $order->status->value : $order->status);
-
-        // 3. Jika status pesanan masih "partial" atau "pending" dan sisa tagihan > 0, generate token pelunasan
-        if (in_array($statusStr, ['partial', 'pending']) && $remainingAmount > 0) {
-
-            // Buat logic parameter khusus pelunasan sisa tagihan
-            $snapToken = $midtransService->getSnapToken($order, 'repayment');
-
-            // 💡 Catatan Kreatif: Jika di dalam MidtransService-mu belum dipetakan parameter tipe 'repayment',
-            // pastikan di dalam method getSnapToken() milik MidtransService ditambahkan logic kondisional gross_amount
-            // untuk mengambil sisa tagihan ini ($order->total_amount - $order->amount_paid).
+        // Jika bernilai dummy 'search', bersihkan stringnya
+        if ($search === 'search') {
+            $search = '';
         }
 
-        // 4. Kirim data ke file view track.blade.php
-        return view('orders.track', compact('order', 'remainingAmount', 'snapToken'));
+        $orders = collect();
+
+        // 🔒 HANYA TAMPILKAN PESANAN JIKA USER SUDAH MEMASUKKAN NOMOR HP / ORDER LENGKAP
+        if (! empty($search)) {
+            $orders = Order::with(['items', 'payments'])
+                ->where('customer_phone', $search) // Exact match nomor HP
+                ->orWhere('order_number', $search)  // Exact match nomor order
+                ->latest()
+                ->get();
+        }
+
+        return view('orders.track', compact('orders', 'search'));
     }
 }

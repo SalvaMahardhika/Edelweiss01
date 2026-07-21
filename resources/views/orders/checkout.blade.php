@@ -8,6 +8,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    {{-- 🔒 GOOGLE RECAPTCHA V2 API --}}
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
     <style>
         body { font-family: 'Poppins', sans-serif; }
         .glass { backdrop-filter: blur(20px); background: rgba(255, 255, 255, 0.4); }
@@ -30,16 +34,15 @@
         </div>
     @endif
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    {{-- TAG FORM UTAMA MEMBUNGKUS KEDUA KOLOM AGAR SEMUA INPUT TERTANGKAP DENGAN AMAN --}}
+    <form action="{{ route('checkout.store') }}" method="POST" id="mainCheckoutForm" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        @csrf
+        <input type="hidden" name="cart_items" id="cartItemsHiddenField">
+        <input type="hidden" name="fulfill_at" id="fulfillAtHiddenField">
+
         {{-- LEFT COLUMN: DETAIL FORM --}}
         <div class="lg:col-span-2 space-y-6">
-            <form action="{{ route('checkout.store') }}" method="POST" id="mainCheckoutForm" onsubmit="combineDateTime(event)" class="glass border border-white/50 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
-                @csrf
-                <input type="hidden" name="cart_items" id="cartItemsHiddenField">
-                
-                {{-- Input tersembunyi untuk backend agar format datetime tetap valid --}}
-                <input type="hidden" name="fulfill_at" id="fulfillAtHiddenField">
-
+            <div class="glass border border-white/50 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
                 <h3 class="text-lg font-bold border-b border-[#3e2723]/10 pb-2"><i class="fa-regular fa-address-card mr-2"></i>Informasi Kontak Pelanggan</h3>
                 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -58,7 +61,7 @@
                     <input type="email" name="customer_email" value="{{ $user->email ?? '' }}" class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
                 </div>
 
-                <h3 class="text-lg font-bold border-b border-[#3e2723]/10 pt-4 pb-2"><i class="fa-solid fa-truck-ramp-box mr-2"></i>Metode & Waktu Pemenuhan</h3>
+                <h3 class="text-lg font-bold border-b border-[#3e2723]/10 pt-4 pb-2"><i class="fa-solid fa-truck-ramp-box mr-2"></i>Metode & Waktu Pengiriman/Pengambilan</h3>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div class="sm:col-span-1">
@@ -85,7 +88,7 @@
 
                 {{-- FIELD ALAMAT PENGIRIMAN DINAMIS --}}
                 <div id="deliveryAddressContainer" class="hidden transition-all duration-300">
-                    <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Alamat Lengkap Pengiriman</label>
+                    <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Alamat Lengkap Pengiriman <span class="text-red-500">*</span></label>
                     <textarea name="delivery_address" id="deliveryAddressInput" rows="3" placeholder="Tulis alamat lengkap pengiriman (Nama jalan, nomor rumah, RT/RW, kecamatan, dan kode pos)..." class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition"></textarea>
                 </div>
 
@@ -111,7 +114,7 @@
                     <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Catatan Tambahan / Kustomisasi Kue</label>
                     <textarea name="notes" rows="3" placeholder="Tulis instruksi khusus (tulisan di kue, lilin, varian rasa cadangan dll)..." class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition"></textarea>
                 </div>
-            </form>
+            </div>
         </div>
 
         {{-- RIGHT COLUMN: BASKET ITEMS SUMMARY --}}
@@ -142,12 +145,18 @@
                     </div>
                 </div>
 
+                {{-- 🔒 RECAPTCHA V2 DI BAWAH TOTAL HARGA --}}
+                <div class="pt-2 flex flex-col items-center justify-center space-y-1">
+                    <div class="g-recaptcha" data-sitekey="{{ env('NOCAPTCHA_SITEKEY', '6Ld_dummy_site_key_here') }}" data-callback="recaptchaSuccessCallback"></div>
+                    <p id="captchaErrorText" class="text-xs text-red-600 font-semibold hidden">Silakan centang reCAPTCHA terlebih dahulu!</p>
+                </div>
+
                 <button type="button" onclick="triggerFormSubmit()" class="w-full py-4 bg-[#3e2723] text-white font-bold rounded-2xl shadow-xl hover:bg-[#2c1b18] transition duration-300 flex items-center justify-center gap-2">
                     <i class="fa-solid fa-shield-heart"></i> Proses Pre-Order Sekarang
                 </button>
             </div>
         </div>
-    </div>
+    </form>
 </main>
 
 @include('layouts.footer')
@@ -163,7 +172,12 @@
         window.location.href = "{{ route('menu') }}";
     }
 
-    // Fungsi Pengendali Muncul/Sembunyi Alamat Delivery
+    // Callback saat reCAPTCHA dicentang
+    function recaptchaSuccessCallback() {
+        document.getElementById('captchaErrorText').classList.add('hidden');
+    }
+
+    // PERBAIKAN: Jangan pernah hapus addressInput.value saat toggle agar data alamat pengiriman aman!
     function toggleDeliveryAddress(orderType) {
         const addressContainer = document.getElementById('deliveryAddressContainer');
         const addressInput = document.getElementById('deliveryAddressInput');
@@ -171,39 +185,35 @@
         if (orderType === 'delivery') {
             addressContainer.classList.remove('hidden');
             addressInput.required = true;
+            addressInput.disabled = false;
         } else {
             addressContainer.classList.add('hidden');
             addressInput.required = false;
-            addressInput.value = ''; 
+            addressInput.disabled = true; // Disabled dipasang hanya saat pickup agar tidak terkirim
         }
     }
 
-    // Menggabungkan elemen Date dan Dropdown Hour ke Format String DateTime sebelum submit
-    function combineDateTime(event) {
-        const dateVal = document.getElementById('fulfill_date').value;
-        const hourVal = document.getElementById('fulfill_hour').value;
-        const hiddenField = document.getElementById('fulfillAtHiddenField');
-
-        if (dateVal && hourVal) {
-            // Menghasilkan format string: YYYY-MM-DD HH:mm:00
-            hiddenField.value = `${dateVal} ${hourVal}:00`;
-        }
-    }
-
-    // Jembatan pemicu trigger click button luar area tag form
     function triggerFormSubmit() {
         const form = document.getElementById('mainCheckoutForm');
-        
-        // 🆕 Jalankan fungsi penggabungan waktu secara manual sebelum form divalidasi/dikirim
         const dateVal = document.getElementById('fulfill_date').value;
         const hourVal = document.getElementById('fulfill_hour').value;
         const hiddenField = document.getElementById('fulfillAtHiddenField');
+        const captchaError = document.getElementById('captchaErrorText');
 
+        // 1. Verifikasi reCAPTCHA
+        const captchaResponse = typeof grecaptcha !== 'undefined' ? grecaptcha.getResponse() : '';
+        if (!captchaResponse) {
+            captchaError.classList.remove('hidden');
+            return;
+        }
+        captchaError.classList.add('hidden');
+
+        // 2. Gabungkan tanggal & jam
         if (dateVal && hourVal) {
             hiddenField.value = `${dateVal} ${hourVal}:00`;
         }
 
-        // Periksa validasi bawaan HTML form (required field dsb)
+        // 3. Submit form jika validasi HTML terpenuhi
         if (form.reportValidity()) {
             form.submit();
         }
@@ -216,7 +226,6 @@
         container.innerHTML = '';
         hiddenField.value = JSON.stringify(checkoutCart);
 
-        // Membatasi tanggal kalender minimal hari ini agar data logis
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('fulfill_date').setAttribute('min', today);
 

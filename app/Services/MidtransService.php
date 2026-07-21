@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Order;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class MidtransService
 {
@@ -23,25 +24,30 @@ class MidtransService
      */
     public function getSnapToken(Order $order, string $paymentType = 'initial'): string
     {
+        // Handling safe string value jika payment_plan berbentuk BackedEnum
+        $paymentPlanVal = is_object($order->payment_plan) ? $order->payment_plan->value : $order->payment_plan;
+
         // 1. Tentukan nominal gross_amount berdasarkan payment_plan atau jenis pembayaran
         $grossAmount = $order->total_amount;
 
-        if ($paymentType === 'initial' && $order->payment_plan === 'dp') {
+        if ($paymentType === 'initial' && $paymentPlanVal === 'dp') {
             $grossAmount = $order->dp_amount;
         } elseif ($paymentType === 'settlement' || $paymentType === 'repayment') {
             $grossAmount = method_exists($order, 'remaining') ? $order->remaining() : ($order->total_amount - $order->amount_paid);
         }
 
-        $grossAmountRounded = intval(round($grossAmount));
+        $grossAmountRounded = intval(round((float) $grossAmount));
 
-        $orderIdParam = ($paymentType === 'settlement' || $paymentType === 'repayment')
+        // 2. BUAT ORDER ID UNIK UNTUK MIDTRANS
+        // Untuk transaksi awal gunakan order_number asli, sedangkan pelunasan gunakan suffix -LUNAS-timestamp
+        $midtransOrderId = ($paymentType === 'settlement' || $paymentType === 'repayment')
             ? $order->order_number.'-LUNAS-'.time()
             : $order->order_number;
 
-        // 2. Susun payload standar Midtrans API
+        // 3. Susun payload standar Midtrans API
         $params = [
             'transaction_details' => [
-                'order_id' => $orderIdParam,
+                'order_id' => $midtransOrderId,
                 'gross_amount' => $grossAmountRounded,
             ],
             'customer_details' => [
@@ -56,22 +62,18 @@ class MidtransService
             ],
         ];
 
-        // 3. Tentukan Endpoint API Midtrans (Sandbox vs Production)
+        // 4. Tentukan Endpoint API Midtrans (Sandbox vs Production)
         $baseUrl = $this->isProduction
             ? 'https://app.midtrans.com/snap/v1/transactions'
             : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
 
-        // 4. Kirim Request dengan pemetaan DNS manual via cURL option (Mencegah DNS Resolving Timeout)
+        // 5. Kirim Request dengan Penanganan Error dan Timeout yang Aman
         $response = Http::withoutVerifying()
-            ->connectTimeout(10)
-            ->timeout(30)
+            ->connectTimeout(30)            // Waktu tunggu inisiasi koneksi socket ke 443
+            ->timeout(60)                   // Waktu total penantian balasan response (60 detik)
+            ->retry(3, 2000)                // Otomatis coba ulang 3x dengan jeda 2 detik
             ->withOptions([
-                'curl' => [
-                    // 🆕 Memaksa cURL langsung tahu IP sandbox Midtrans tanpa nanya DNS lokal lagi
-                    CURLOPT_RESOLVE => [
-                        'app.sandbox.midtrans.com:443:103.127.16.5',
-                    ],
-                ],
+                'http_errors' => false,     // 💡 Mencegah Laravel throw RequestException mentah saat status 400
             ])
             ->withHeaders([
                 'Accept' => 'application/json',
@@ -80,11 +82,23 @@ class MidtransService
             ->withBasicAuth($this->serverKey, '')
             ->post($baseUrl, $params);
 
+        // Jika Midtrans merespon dengan status error (4xx / 5xx)
         if ($response->failed()) {
-            throw new \Exception('Midtrans API Error: '.$response->body());
+            $errorBody = $response->json();
+            $errorMessage = $errorBody['error_messages'][0] ?? $response->body();
+
+            Log::error('Midtrans API Error Response', ['body' => $errorBody]);
+
+            throw new \Exception('Midtrans API Error: '.$errorMessage);
         }
 
-        // 5. Kembalikan token string yang didapat dari response body
-        return $response->json()['token'];
+        $responseData = $response->json();
+
+        if (! isset($responseData['token'])) {
+            throw new \Exception('Gagal mendapatkan Snap Token dari Midtrans.');
+        }
+
+        // 6. Kembalikan token string yang didapat dari response body
+        return $responseData['token'];
     }
 }
