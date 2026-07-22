@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Order;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -68,19 +69,27 @@ class MidtransService
             : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
 
         // 5. Kirim Request dengan Penanganan Error dan Timeout yang Aman
-        $response = Http::withoutVerifying()
-            ->connectTimeout(30)            // Waktu tunggu inisiasi koneksi socket ke 443
-            ->timeout(60)                   // Waktu total penantian balasan response (60 detik)
-            ->retry(3, 2000)                // Otomatis coba ulang 3x dengan jeda 2 detik
-            ->withOptions([
-                'http_errors' => false,     // 💡 Mencegah Laravel throw RequestException mentah saat status 400
-            ])
-            ->withHeaders([
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ])
-            ->withBasicAuth($this->serverKey, '')
-            ->post($baseUrl, $params);
+        try {
+            $response = Http::withoutVerifying()
+                ->connectTimeout(5)            // Batas waktu inisiasi koneksi (5 detik)
+                ->timeout(10)                  // Batas waktu total penantian response (10 detik)
+                ->retry(2, 1000)               // Coba ulang maksimal 2x dengan jeda 1 detik jika bermasalah
+                ->withOptions([
+                    'http_errors' => false,    // Mencegah Laravel throw RequestException mentah saat status 400
+                ])
+                ->withHeaders([
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ])
+                ->withBasicAuth($this->serverKey, '')
+                ->post($baseUrl, $params);
+
+        } catch (ConnectionException $e) {
+            // Tangkap error jika terjadi timeout / gagal koneksi ke server Midtrans
+            Log::error('Midtrans Connection Timeout/Error: '.$e->getMessage());
+
+            throw new \Exception('Gagal terhubung ke gateway pembayaran Midtrans (Timeout). Silakan periksa jaringan Anda.');
+        }
 
         // Jika Midtrans merespon dengan status error (4xx / 5xx)
         if ($response->failed()) {

@@ -23,7 +23,7 @@ class OrderSecurityTest extends TestCase
     {
         parent::setUp();
 
-        // 1. Buat user untuk simulasi login karena rute dilindungi middleware auth
+        // 1. Buat user untuk simulasi login
         $this->user = User::factory()->create();
 
         // 2. Buat kategori dan produk aktif
@@ -36,7 +36,7 @@ class OrderSecurityTest extends TestCase
             'is_available' => true,
         ]);
 
-        // 3. Masukkan item ke dalam keranjang belanja
+        // 3. Masukkan item ke dalam keranjang belanja via CartService
         $cart = $this->app->make(CartService::class);
         $cart->add($this->product->id, 2);
     }
@@ -44,14 +44,21 @@ class OrderSecurityTest extends TestCase
     /** @test */
     public function fulfill_at_must_be_at_least_two_hours_in_future()
     {
-        // Kirim request sebagai user aktif
+        // Kirim request sebagai user aktif dengan waktu di bawah 2 jam
         $response = $this->actingAs($this->user)
             ->post(route('checkout.store'), [
                 'customer_name' => 'Salva Mahardhika',
                 'customer_phone' => '08123456789',
-                'fulfill_at' => Carbon::now()->addHour()->format('Y-m-d H:i:s'), // ❌ Hanya 1 jam ke depan (kurang dari syarat 2 jam)
+                'fulfill_at' => Carbon::now()->addHour()->format('Y-m-d H:i:s'), // ❌ Kurang dari 2 jam
                 'order_type' => 'pickup',
                 'payment_plan' => 'full',
+                'cart_items' => json_encode([
+                    [
+                        'id' => $this->product->id,
+                        'quantity' => 2,
+                        'unit_price' => 10000,
+                    ],
+                ]),
             ]);
 
         $response->assertSessionHasErrors('fulfill_at');
@@ -60,25 +67,33 @@ class OrderSecurityTest extends TestCase
     /** @test */
     public function price_manipulation_is_ignored_by_server()
     {
-        // Kirim request lengkap dengan parameter manipulasi harga ilegal
+        // Kirim request lengkap dengan melengkapi delivery_address & cart_items
         $response = $this->actingAs($this->user)
             ->post(route('checkout.store'), [
                 'customer_name' => 'Salva Mahardhika',
                 'customer_phone' => '08123456789',
-                'fulfill_at' => Carbon::now()->addHours(3)->format('Y-m-d H:i:s'), // ✅ Aman (3 jam ke depan)
+                'fulfill_at' => Carbon::now()->addHours(3)->format('Y-m-d H:i:s'), // ✅ 3 jam ke depan
                 'order_type' => 'delivery',
+                'delivery_address' => 'Jl. Kebon Agung No. 123, Pandaan',
                 'payment_plan' => 'full',
+                'cart_items' => json_encode([
+                    [
+                        'id' => $this->product->id,
+                        'quantity' => 2,
+                        'unit_price' => 10000,
+                    ],
+                ]),
 
                 // ❌ Upaya manipulasi harga dari sisi klien
                 'total_amount' => 999999,
                 'subtotal' => 500,
             ]);
 
-        // Pastikan response mengalihkan rute (Redirected) tanpa error validasi
+        // Pastikan response mengalihkan rute tanpa error validasi
         $response->assertSessionHasNoErrors();
         $response->assertRedirect();
 
-        // 🔑 PERBAIKAN: Ambil order_number langsung dari parameter URL pengalihan (Redirect URL)
+        // Ambil order_number dari URL redirect
         $redirectUrl = $response->headers->get('Location');
         preg_match('/\/checkout\/pay\/([A-Za-z0-9\-]+)/', $redirectUrl, $matches);
 
@@ -88,12 +103,12 @@ class OrderSecurityTest extends TestCase
         // Tarik data order dari database
         $order = Order::where('order_number', $orderNumber)->firstOrFail();
 
-        // Hitung ulang ekspektasi harga otoritatif dari server
-        $expectedSubtotal = 20000; // 2 items × 10000
+        // Hitung ulang ekspektasi harga dari server (2 x 10.000 = 20.000 + PPN 11%)
+        $expectedSubtotal = 20000;
         $expectedTax = bcmul((string) $expectedSubtotal, '0.11', 2);
         $expectedTotal = bcadd((string) $expectedSubtotal, $expectedTax, 2);
 
-        // Buktikan jika nominal manipulasi (999999) diabaikan dan server tetap menggunakan hitungan aslinya
+        // Buktikan manipulasi harga diabaikan
         $this->assertEquals($expectedTotal, $order->total_amount);
     }
 }

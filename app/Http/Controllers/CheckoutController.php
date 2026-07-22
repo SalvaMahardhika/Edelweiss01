@@ -41,9 +41,13 @@ class CheckoutController extends Controller
             'order_type' => 'required|in:pickup,delivery',
             'delivery_address' => 'required_if:order_type,delivery|nullable|string',
             'payment_plan' => 'required|in:full,dp',
-            'fulfill_at' => 'required|date|after:now',
+            // 💡 PERBAIKAN 1: Minimal 2 jam ke depan (now + 2 hours)
+            'fulfill_at' => 'required|date|after_or_equal:'.now()->addHours(2)->format('Y-m-d H:i:s'),
             'notes' => 'nullable|string',
             'cart_items' => 'required|json',
+        ], [
+            // Pesan kustom agar ramah bagi pembeli
+            'fulfill_at.after_or_equal' => 'Waktu kesiapan pesanan minimal 2 jam dari sekarang.',
         ]);
 
         $cartData = json_decode($request->cart_items, true);
@@ -75,8 +79,9 @@ class CheckoutController extends Controller
                 ];
             }
 
-            $taxAmount = 0; // Sesuaikan jika ada pajak
-            $totalAmount = $subtotal + $taxAmount;
+            // 💡 PERBAIKAN 2: Hitung Pajak/PPN 11% secara presisi
+            $taxAmount = bcmul((string) $subtotal, '0.11', 2);
+            $totalAmount = bcadd((string) $subtotal, (string) $taxAmount, 2);
 
             // Atur skema uang muka (DP 50%)
             $dpAmount = ($request->payment_plan === 'dp') ? ($totalAmount * 0.5) : 0;
