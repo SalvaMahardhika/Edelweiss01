@@ -1,234 +1,187 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <title>Kelola Admin - Edelweiss</title>
-        <link rel="icon" href="{{ asset('img/logo/logo2.png') }}">
+@extends('admin_layouts.master')
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+@section('page_title', 'Ringkasan Dashboard Utama')
 
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
+@section('content')
+<div class="max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 space-y-6">
 
-<body class="bg-gradient-to-br from-[#f3ebe3] via-[#e8dac9] to-[#dbc6ae] text-[#3e2723]">
-
-@include('layouts.navbar')
-
-<main class="pt-32 pb-20 relative">
-
-    {{-- ERROR VALIDATION --}}
-    @if ($errors->any())
-        <div class="text-red-500 text-center mb-4">
-            {{ implode(', ', $errors->all()) }}
+    {{-- BARIS TOMBOL AKSES PENJUNJUNG / VISITOR WEB --}}
+    <div class="flex items-center justify-between backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-4 shadow-xl">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-[#3e2723] text-white flex items-center justify-center text-base shadow-md">
+                <i class="fa-solid fa-[#3e2723] fa-store"></i>
+            </div>
+            <div>
+                <h4 class="text-sm font-bold text-[#3e2723]">Layanan Depan Toko (Visitor Web)</h4>
+                <p class="text-xs text-gray-500">Lihat tampilan katalog menu dan halaman pemesanan pelanggan secara langsung.</p>
+            </div>
         </div>
-    @endif
-
-    {{-- SUCCESS --}}
-    @if(session('success'))
-        <div class="text-center text-green-600 mb-4">
-            {{ session('success') }}
-        </div>
-    @endif
-
-    {{-- TITLE --}}
-    <div class="text-center mb-12">
-        <h1 class="text-4xl font-bold">Kelola Admin</h1>
-        <p class="text-[#6b4f4f]">Manajemen akun admin sistem</p>
+        
+        {{-- 🔗 TOMBOL PINTAS KE HALAMAN UTAMA PELANGGAN --}}
+        <a href="{{ url('/') }}" target="_blank" class="px-4 py-2.5 bg-[#3e2723] hover:bg-[#2c1b18] text-white text-xs font-bold rounded-xl shadow-lg transition duration-300 flex items-center gap-2 shrink-0">
+            <i class="fa-solid fa-globe"></i> Buka Website Visitor
+            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+        </a>
     </div>
 
-    {{-- BUTTON --}}
-    <div class="flex justify-center mb-12">
-        <button onclick="openModal('addModal')" 
-            class="px-8 py-3 rounded-xl bg-[#3e2723] text-white shadow-xl hover:scale-105 transition">
-            + Tambah Admin
-        </button>
+    {{-- 1. KARTU STATISTIK KINERJA UTAMA (KPI CARDS) --}}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        {{-- Total Omzet Bulan Ini --}}
+        <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold text-[#3e2723]/60 uppercase tracking-wider">Omzet Bulan Ini</p>
+                <h3 class="text-xl font-black text-[#3e2723] mt-1">
+                    Rp {{ number_format($omzetBulanIni ?? 0, 0, ',', '.') }}
+                </h3>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-800 flex items-center justify-center text-xl shadow-sm">
+                <i class="fa-solid fa-wallet"></i>
+            </div>
+        </div>
+
+        {{-- Pesanan Masuk Hari Ini --}}
+        <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold text-blue-800/60 uppercase tracking-wider">Order Masuk Hari Ini</p>
+                <h3 class="text-2xl font-black text-blue-900 mt-1">{{ $orderHariIniCount ?? 0 }}</h3>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-800 flex items-center justify-center text-xl shadow-sm">
+                <i class="fa-solid fa-cart-shopping"></i>
+            </div>
+        </div>
+
+        {{-- Target Produksi Hari Ini --}}
+        <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold text-amber-800/60 uppercase tracking-wider">Jadwal PO Hari Ini</p>
+                <h3 class="text-2xl font-black text-amber-900 mt-1">{{ $targetPOHariIniCount ?? 0 }}</h3>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-800 flex items-center justify-center text-xl shadow-sm">
+                <i class="fa-solid fa-cake-candles"></i>
+            </div>
+        </div>
+
+        {{-- Belum Lunas / Sisa DP --}}
+        <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold text-rose-800/60 uppercase tracking-wider">Tagihan DP Belum Lunas</p>
+                <h3 class="text-2xl font-black text-rose-900 mt-1">{{ $pendingDPCount ?? 0 }}</h3>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-800 flex items-center justify-center text-xl shadow-sm">
+                <i class="fa-solid fa-receipt"></i>
+            </div>
+        </div>
     </div>
 
-    {{-- GRID --}}
-    <div class="max-w-6xl mx-auto px-6 grid md:grid-cols-2 lg:grid-cols-3 gap-10">
+    {{-- 2. TAMPILAN UTAMA (DUA KOLOM) --}}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        @foreach($admins->where('id_user','!=',1) as $user)
-
-        <div class="backdrop-blur bg-white/40 border rounded-3xl p-6 shadow-xl">
-
-            {{-- AVATAR --}}
-            <div class="w-14 h-14 mx-auto mb-4 rounded-full bg-[#3e2723] text-white flex items-center justify-center font-bold">
-                {{ strtoupper(substr($user->nama,0,1)) }}
+        {{-- KOLOM KIRI (2 SPAN): TABEL PESANAN PERLU TINDAKAN CEPAT --}}
+        <div class="lg:col-span-2 backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-white/40">
+                <div>
+                    <h3 class="text-lg font-bold text-[#3e2723]">Pesanan Terbaru Membutuhkan Konfirmasi</h3>
+                    <p class="text-xs text-gray-500">Pesanan PO yang belum dikonfirmasi atau perlu diperbarui.</p>
+                </div>
+                <a href="{{ route('admin.po.index') }}" class="text-xs font-bold text-[#3e2723] hover:underline flex items-center gap-1">
+                    Lihat Semua <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </a>
             </div>
 
-            {{-- INFO --}}
-            <h3 class="text-center font-semibold">{{ $user->nama }}</h3>
-            <p class="text-center text-sm text-[#6b4f4f]">{{ $user->email }}</p>
+            <div class="overflow-x-auto rounded-2xl border border-white/40 bg-white/20 shadow-inner">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-white/40 text-[11px] font-bold uppercase tracking-wider text-[#3e2723]/70">
+                            <th class="px-4 py-3">No. Order & Nama</th>
+                            <th class="px-4 py-3 text-center">Tipe & Siap</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-center">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/30 text-xs font-medium">
+                        @forelse($recentOrders ?? [] as $order)
+                        <tr class="hover:bg-white/30 transition">
+                            <td class="px-4 py-3">
+                                <p class="font-bold text-[#3e2723]">{{ $order->order_number }}</p>
+                                <p class="text-[11px] text-gray-600">{{ $order->customer_name }} ({{ $order->customer_phone }})</p>
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ $order->order_type === 'pickup' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800' }}">
+                                    {{ strtoupper($order->order_type) }}
+                                </span>
+                                <p class="text-[10px] text-gray-500 mt-1">
+                                    {{ $order->fulfill_at ? \Carbon\Carbon::parse($order->fulfill_at)->format('d M, H:i') : '-' }}
+                                </p>
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="px-2 py-1 rounded-xl text-[10px] font-bold shadow-sm {{ $order->status === 'completed' ? 'bg-emerald-600 text-white' : ($order->status === 'preparing' ? 'bg-blue-600 text-white' : 'bg-amber-500 text-white') }}">
+                                    {{ ucfirst($order->status) }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-center font-bold text-[#3e2723]">
+                                Rp {{ number_format($order->total_amount, 0, ',', '.') }}
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="4" class="px-4 py-6 text-center text-gray-400">
+                                Belum ada pesanan terbaru hari ini.
+                            </td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-            {{-- STATUS --}}
-            <div class="flex justify-center mt-3">
-                <span class="text-xs px-3 py-1 rounded-full
-                    {{ $user->status ? 'bg-green-200 text-green-700' : 'bg-red-200 text-red-700' }}">
-                    {{ $user->status ? 'Aktif' : 'Nonaktif' }}
-                </span>
+        {{-- KOLOM KANAN (1 SPAN): REKAP DAPUR HARI INI & AKSES CEPAT --}}
+        <div class="space-y-6">
+            
+            {{-- Rekap Kebutuhan Dapur (Baking Sheet Summary) --}}
+            <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 space-y-3">
+                <h3 class="text-base font-bold text-[#3e2723] flex items-center gap-2">
+                    <i class="fa-solid fa-fire-burner text-amber-700"></i> Target Pembuatan Kue Hari Ini
+                </h3>
+                <p class="text-xs text-gray-500">Agregasi total kue dari pesanan PO yang harus selesai hari ini.</p>
+
+                <div class="space-y-2 pt-1">
+                    @forelse($bakingItemsHariIni ?? [] as $item)
+                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-white/40 border border-white/50 text-xs shadow-sm">
+                        <span class="font-bold text-[#2d1f1b]">{{ $item->product_name }}</span>
+                        <span class="px-2.5 py-1 rounded-lg bg-[#3e2723] text-white font-black">{{ $item->total_qty }} Pcs</span>
+                    </div>
+                    @empty
+                    <div class="p-4 text-center text-xs text-gray-400 italic bg-white/20 rounded-xl border border-white/30">
+                        Tidak ada target produksi kue untuk hari ini.
+                    </div>
+                    @endforelse
+                </div>
             </div>
 
-            {{-- ACTION --}}
-            <div class="flex justify-center gap-2 mt-5">
-
-                {{-- EDIT --}}
-                <button onclick="openEdit({{ $user->id_user }}, '{{ $user->nama }}', '{{ $user->email }}')" 
-                    class="px-3 py-1 text-xs rounded-lg bg-[#c8a97e] text-white">
-                    Edit
-                </button>
-
-                {{-- TOGGLE STATUS --}}
-                <form method="POST" action="{{ route('admin.update', $user->id_user) }}">
-                    @csrf
-                    @method('PUT')
-
-                    <input type="hidden" name="status" value="{{ $user->status ? 0 : 1 }}">
-
-                    <button type="submit"
-                        class="relative w-12 h-6 rounded-full transition-all
-                        {{ $user->status ? 'bg-[#3e2723]' : 'bg-red-400' }}">
-
-                        <span class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all
-                        {{ $user->status ? 'translate-x-6' : '' }}"></span>
-
-                    </button>
-                </form>
-
-                {{-- DELETE --}}
-                <button onclick="confirmDelete({{ $user->id_user }})"
-                    class="px-3 py-1 text-xs rounded-lg bg-red-500 text-white">
-                    Hapus
-                </button>
-
+            {{-- Pintasan Akses Cepat (Quick Actions) --}}
+            <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 space-y-3">
+                <h3 class="text-base font-bold text-[#3e2723]">Aksi Cepat</h3>
+                <div class="grid grid-cols-3 gap-2">
+                    <a href="{{ route('produk.index') }}" class="p-3 rounded-xl bg-white/60 hover:bg-white border border-white/50 shadow-sm flex flex-col items-center justify-center text-center transition">
+                        <i class="fa-solid fa-plus text-base text-[#3e2723] mb-1"></i>
+                        <span class="text-[10px] font-bold text-[#3e2723]">Tambah Menu</span>
+                    </a>
+                    <a href="{{ route('admin.po.index') }}" class="p-3 rounded-xl bg-white/60 hover:bg-white border border-white/50 shadow-sm flex flex-col items-center justify-center text-center transition">
+                        <i class="fa-solid fa-calendar-days text-base text-[#3e2723] mb-1"></i>
+                        <span class="text-[10px] font-bold text-[#3e2723]">Jadwal PO</span>
+                    </a>
+                    {{-- 🌐 TOMBOL AKSES VISITOR PADA AKSI CEPAT --}}
+                    <a href="{{ url('/') }}" target="_blank" class="p-3 rounded-xl bg-[#3e2723]/10 hover:bg-[#3e2723]/20 border border-[#3e2723]/20 shadow-sm flex flex-col items-center justify-center text-center transition">
+                        <i class="fa-solid fa-globe text-base text-[#3e2723] mb-1"></i>
+                        <span class="text-[10px] font-bold text-[#3e2723]">Lihat Web</span>
+                    </a>
+                </div>
             </div>
 
         </div>
-
-        @endforeach
-
-    </div>
-
-</main>
-
-{{-- MODAL ADD --}}
-<div id="addModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center">
-
-    <div class="bg-white rounded-3xl p-8 w-96">
-
-        <h2 class="text-xl font-semibold mb-4">Tambah Admin</h2>
-
-        <form method="POST" action="{{ route('admin.store') }}">
-            @csrf
-
-            {{-- NAMA --}}
-            <input name="nama" required
-                placeholder="Nama"
-                class="w-full mb-3 px-4 py-2 rounded-xl border">
-
-            {{-- EMAIL --}}
-            <input name="email" type="email" required
-                placeholder="Email"
-                class="w-full mb-3 px-4 py-2 rounded-xl border">
-
-            {{-- PASSWORD --}}
-            <input name="password" type="password" required
-                placeholder="Password"
-                class="w-full mb-4 px-4 py-2 rounded-xl border">
-                            <div class="flex gap-2">
-                <button type="button" onclick="closeModal('addModal')" 
-                    class="flex-1 bg-gray-200 py-2 rounded-lg">
-                    Batal
-                </button>
-
-                <button type="submit"
-                    class="flex-1 bg-[#3e2723] text-white py-2 rounded-lg">
-                    Simpan
-                </button>
-            </div>
-
-        </form>
 
     </div>
 
 </div>
-
-{{-- ================= MODAL EDIT ================= --}}
-<div id="editModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center">
-
-    <div class="bg-white rounded-3xl p-8 w-96">
-
-        <h2 class="text-xl font-semibold mb-4">Edit Admin</h2>
-
-        <form method="POST" id="editForm">
-            @csrf
-            @method('PUT')
-
-            {{-- NAMA --}}
-            <input type="text" name="nama" id="editNama" required
-                class="w-full mb-3 px-4 py-2 rounded-xl border">
-
-            {{-- EMAIL --}}
-            <input type="email" name="email" id="editEmail" required
-                class="w-full mb-3 px-4 py-2 rounded-xl border">
-
-            {{-- PASSWORD (OPSIONAL) --}}
-            <input type="password" name="password"
-                placeholder="Kosongkan jika tidak ingin ganti password"
-                class="w-full mb-4 px-4 py-2 rounded-xl border">
-
-            <div class="flex gap-2">
-                <button type="button" onclick="closeModal('editModal')" 
-                    class="flex-1 bg-gray-200 py-2 rounded-lg">
-                    Batal
-                </button>
-
-                <button type="submit"
-                    class="flex-1 bg-[#3e2723] text-white py-2 rounded-lg">
-                    Update
-                </button>
-            </div>
-
-        </form>
-
-    </div>
-
-</div>
-
-{{-- ================= SCRIPT ================= --}}
-<script>
-function openModal(id){
-    document.getElementById(id).classList.remove('hidden');
-}
-
-function closeModal(id){
-    document.getElementById(id).classList.add('hidden');
-}
-
-function confirmDelete(id){
-    if(confirm('Yakin hapus admin ini?')){
-        let form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/admin/' + id;
-
-        form.innerHTML = `
-            @csrf
-            <input type="hidden" name="_method" value="DELETE">
-        `;
-
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-
-function openEdit(id, nama, email){
-    document.getElementById('editNama').value = nama;
-    document.getElementById('editEmail').value = email;
-
-    document.getElementById('editForm').action = '/admin/' + id;
-
-    openModal('editModal');
-}
-</script>
-
-</body>
-</html>
+@endsection

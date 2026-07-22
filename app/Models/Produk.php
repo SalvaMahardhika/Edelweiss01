@@ -2,52 +2,63 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use App\Helpers\CryptoHelper; // Pastikan Helper yang kita buat kemarin sudah ada
+use App\Helpers\CryptoHelper;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model; // Pastikan Helper yang kita buat kemarin sudah ada
 
 class Produk extends Model
 {
+    use HasFactory;
+
     // ================= TABLE =================
     protected $table = 'produk';
-    protected $primaryKey = 'id_produk';
-
-    public $timestamps = true;
 
     // ================= FILLABLE =================
     protected $fillable = [
+        'category_id',
+        'user_id',
         'nama_produk',
+        'slug',
         'gambar',
         'harga',
         'deskripsi',
         'status',
-        'id_user'
+        'is_available',
+        'is_featured',
     ];
 
     // ================= CAST =================
     protected $casts = [
-        'harga' => 'integer',
-        'status' => 'boolean'
+        'harga' => 'decimal:2',
+        'status' => 'boolean',
+        'is_available' => 'boolean',
+        'is_featured' => 'boolean',
     ];
 
     // ================= RELATION =================
     public function user()
     {
-        return $this->belongsTo(User::class, 'id_user');
+        return $this->belongsTo(User::class);
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
     }
 
     // ================= ACCESSOR =================
     public function getGambarUrlAttribute()
     {
-        return asset('storage/' . $this->gambar);
+        return asset('storage/'.$this->gambar);
     }
 
     /**
-     * ACCESSOR BARU: Mengubah id_produk asli menjadi string terenkripsi AES-256-CBC
+     * ACCESSOR BARU: Mengubah id asli menjadi string terenkripsi AES-256-CBC
      * Panggil di Blade menggunakan: $produk->encrypted_id
      */
     public function getEncryptedIdAttribute()
     {
-        return CryptoHelper::encryptId($this->attributes['id_produk']);
+        return CryptoHelper::encryptId($this->attributes['id']);
     }
 
     // ================= SCOPE =================
