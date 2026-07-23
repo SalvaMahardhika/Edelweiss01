@@ -9,7 +9,7 @@
     <div class="flex items-center justify-between backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-4 shadow-xl">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-xl bg-[#3e2723] text-white flex items-center justify-center text-base shadow-md">
-                <i class="fa-solid fa-[#3e2723] fa-store"></i>
+                <i class="fa-solid fa-store"></i>
             </div>
             <div>
                 <h4 class="text-sm font-bold text-[#3e2723]">Layanan Depan Toko (Visitor Web)</h4>
@@ -101,22 +101,27 @@
                     </thead>
                     <tbody class="divide-y divide-white/30 text-xs font-medium">
                         @forelse($recentOrders ?? [] as $order)
+                        @php
+                            // Safely extract string value from Enum objects if present
+                            $statusVal = is_object($order->status) ? ($order->status->value ?? (string) $order->status) : (string) $order->status;
+                            $orderTypeVal = is_object($order->order_type) ? ($order->order_type->value ?? (string) $order->order_type) : (string) $order->order_type;
+                        @endphp
                         <tr class="hover:bg-white/30 transition">
                             <td class="px-4 py-3">
                                 <p class="font-bold text-[#3e2723]">{{ $order->order_number }}</p>
                                 <p class="text-[11px] text-gray-600">{{ $order->customer_name }} ({{ $order->customer_phone }})</p>
                             </td>
                             <td class="px-4 py-3 text-center">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ $order->order_type === 'pickup' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800' }}">
-                                    {{ strtoupper($order->order_type) }}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ $orderTypeVal === 'pickup' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800' }}">
+                                    {{ strtoupper($orderTypeVal) }}
                                 </span>
                                 <p class="text-[10px] text-gray-500 mt-1">
                                     {{ $order->fulfill_at ? \Carbon\Carbon::parse($order->fulfill_at)->format('d M, H:i') : '-' }}
                                 </p>
                             </td>
                             <td class="px-4 py-3 text-center">
-                                <span class="px-2 py-1 rounded-xl text-[10px] font-bold shadow-sm {{ $order->status === 'completed' ? 'bg-emerald-600 text-white' : ($order->status === 'preparing' ? 'bg-blue-600 text-white' : 'bg-amber-500 text-white') }}">
-                                    {{ ucfirst($order->status) }}
+                                <span class="px-2 py-1 rounded-xl text-[10px] font-bold shadow-sm {{ $statusVal === 'completed' ? 'bg-emerald-600 text-white' : ($statusVal === 'preparing' ? 'bg-blue-600 text-white' : 'bg-amber-500 text-white') }}">
+                                    {{ ucfirst($statusVal) }}
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-center font-bold text-[#3e2723]">
@@ -171,7 +176,6 @@
                         <i class="fa-solid fa-calendar-days text-base text-[#3e2723] mb-1"></i>
                         <span class="text-[10px] font-bold text-[#3e2723]">Jadwal PO</span>
                     </a>
-                    {{-- 🌐 TOMBOL AKSES VISITOR PADA AKSI CEPAT --}}
                     <a href="{{ url('/') }}" target="_blank" class="p-3 rounded-xl bg-[#3e2723]/10 hover:bg-[#3e2723]/20 border border-[#3e2723]/20 shadow-sm flex flex-col items-center justify-center text-center transition">
                         <i class="fa-solid fa-globe text-base text-[#3e2723] mb-1"></i>
                         <span class="text-[10px] font-bold text-[#3e2723]">Lihat Web</span>
