@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Produk;
-use App\Services\MidtransService;
+use App\Services\ScalevService; // 🟢 Menggunakan ScalevService menggantikan MidtransService
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,9 +30,9 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Proses simpan order baru ke database.
+     * Proses simpan order baru ke database & langsung alihkan ke Scalev.
      */
-    public function store(Request $request)
+    public function store(Request $request, ScalevService $scalevService)
     {
         $request->validate([
             'customer_name' => 'required|string|max:255',
@@ -41,12 +41,10 @@ class CheckoutController extends Controller
             'order_type' => 'required|in:pickup,delivery',
             'delivery_address' => 'required_if:order_type,delivery|nullable|string',
             'payment_plan' => 'required|in:full,dp',
-            // 💡 PERBAIKAN 1: Minimal 2 jam ke depan (now + 2 hours)
             'fulfill_at' => 'required|date|after_or_equal:'.now()->addHours(2)->format('Y-m-d H:i:s'),
             'notes' => 'nullable|string',
             'cart_items' => 'required|json',
         ], [
-            // Pesan kustom agar ramah bagi pembeli
             'fulfill_at.after_or_equal' => 'Waktu kesiapan pesanan minimal 2 jam dari sekarang.',
         ]);
 
@@ -58,12 +56,11 @@ class CheckoutController extends Controller
         try {
             DB::beginTransaction();
 
-            // 1. Hitung finansial order berdasarkan data database asli (aman dari manipulasi client-side)
+            // 1. Hitung finansial order berdasarkan data database asli
             $subtotal = 0;
             $itemsToSave = [];
 
             foreach ($cartData as $item) {
-                // Validasi produk ada di database
                 $product = Produk::findOrFail($item['id']);
 
                 $itemSubtotal = $product->harga * $item['quantity'];
@@ -79,20 +76,20 @@ class CheckoutController extends Controller
                 ];
             }
 
-            // 💡 PERBAIKAN 2: Hitung Pajak/PPN 11% secara presisi
+            // 2. Hitung Pajak/PPN 11% secara presisi
             $taxAmount = bcmul((string) $subtotal, '0.11', 2);
             $totalAmount = bcadd((string) $subtotal, (string) $taxAmount, 2);
 
             // Atur skema uang muka (DP 50%)
             $dpAmount = ($request->payment_plan === 'dp') ? ($totalAmount * 0.5) : 0;
 
-            // 2. Generate Nomor Order Unik (cth: EDL-20260717-0001)
+            // 3. Generate Nomor Order Unik (cth: EDL-20260723-0001)
             $dateString = now()->format('Ymd');
             $latestOrder = Order::where('order_number', 'LIKE', "EDL-{$dateString}-%")->latest()->first();
             $nextSequence = $latestOrder ? ((int) Str::afterLast($latestOrder->order_number, '-') + 1) : 1;
             $orderNumber = "EDL-{$dateString}-".str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
 
-            // 3. Simpan ke tabel orders
+            // 4. Simpan ke tabel orders
             $order = Order::create([
                 'order_number' => $orderNumber,
                 'user_id' => auth()->id(),
@@ -115,7 +112,7 @@ class CheckoutController extends Controller
                 'placed_at' => now(),
             ]);
 
-            // 4. Simpan ke tabel order_items
+            // 5. Simpan ke tabel order_items
             foreach ($itemsToSave as $itemData) {
                 $itemData['order_id'] = $order->id;
                 OrderItem::create($itemData);
@@ -123,8 +120,10 @@ class CheckoutController extends Controller
 
             DB::commit();
 
-            // Return ke halaman pembayaran bawaan Midtrans snap
-            return redirect()->route('checkout.pay', $order->order_number);
+            // 🟢 6. Dapatkan URL Pembayaran dari Scalev & Alihkan Pelanggan
+            $paymentUrl = $scalevService->createPaymentUrl($order);
+
+            return redirect()->away($paymentUrl);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -134,27 +133,28 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Tampilkan halaman pembayaran Midtrans Snap (Awal / Pembuatan Pesanan).
+     * 🔄 Mengalihkan ke Halaman Pembayaran Scalev jika pelanggan bayar ulang.
      */
-    public function pay($order_number, MidtransService $midtransService)
+    public function pay($order_number, ScalevService $scalevService)
     {
         // 1. Cari data order
         $order = Order::where('order_number', $order_number)->firstOrFail();
 
-        // 2. Jika order SUDAH MEMILIKI snap_token, pakai token tersebut (TIDAK minta baru ke Midtrans)
-        if ($order->snap_token) {
-            $snapToken = $order->snap_token;
-        } else {
-            // Jika BELUM PUNYA (transaksi baru), minta ke Midtrans lalu simpan ke DB
-            $snapToken = $midtransService->getSnapToken($order, 'initial');
-
-            $order->update([
-                'snap_token' => $snapToken,
-            ]);
+        // 2. Jika transaksi sudah lunas, langsung arahkan ke halaman pelacakan
+        if (in_array($order->payment_status, ['paid', 'settlement'])) {
+            return redirect()->route('orders.track', $order->order_number)
+                ->with('info', 'Pesanan ini sudah lunas.');
         }
 
-        // 3. Tampilkan halaman pembayaran
-        return view('checkout.pay', compact('order', 'snapToken'));
+        try {
+            // 3. Minta URL Checkout Scalev untuk order ini
+            $paymentUrl = $scalevService->createPaymentUrl($order);
+
+            return redirect()->away($paymentUrl);
+        } catch (\Exception $e) {
+            return redirect()->route('orders.track', $order->order_number)
+                ->with('error', 'Gagal memuat halaman pembayaran Scalev: '.$e->getMessage());
+        }
     }
 
     /**
@@ -173,11 +173,11 @@ class CheckoutController extends Controller
 
         $orders = collect();
 
-        // 🔒 HANYA TAMPILKAN PESANAN JIKA USER SUDAH MEMASUKKAN NOMOR HP / ORDER LENGKAP
+        // 🔒 Tampilkan pesanan berdasarkan exact match nomor HP atau order_number
         if (! empty($search)) {
             $orders = Order::with(['items', 'payments'])
-                ->where('customer_phone', $search) // Exact match nomor HP
-                ->orWhere('order_number', $search)  // Exact match nomor order
+                ->where('customer_phone', $search)
+                ->orWhere('order_number', $search)
                 ->latest()
                 ->get();
         }

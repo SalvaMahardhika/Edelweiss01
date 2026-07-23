@@ -14,19 +14,24 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
 
+        // 🔒 PERBAIKAN 1: Percayai Proxy Ngrok agar URL HTTPS terdeteksi sempurna
+        $middleware->trustProxies(at: '*');
+
         // ✅ REGISTER MIDDLEWARE CUSTOM
         $middleware->alias([
             'role' => RoleMiddleware::class,
         ]);
 
-        // 🔑 MASUKKAN CHECK STATUS KE DALAM MIDDLEWARE WEB BERSAMA AUTH
+        // 🔑 MASUKKAN CHECK STATUS KE DALAM MIDDLEWARE WEB
         $middleware->web(append: [
             CheckUserStatus::class,
         ]);
 
-        // 🔑 PERBAIKAN: Kecualikan rute webhook Midtrans dari pemeriksaan token CSRF
+        // 🔑 PERBAIKAN 2: Kecualikan rute Webhook (Midtrans & Scalev) dari pemeriksaan CSRF
         $middleware->validateCsrfTokens(except: [
             'api/midtrans/webhook',
+            'api/webhooks/scalev',
+            'api/*',
         ]);
 
     })

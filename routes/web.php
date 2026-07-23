@@ -74,7 +74,7 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::middleware(['role:admin,super_admin'])->group(function () {
 
         // Halaman Utama CMS Dashboard
-        Route::get('/', fn () => view('admin.index'))->name('admin.index');
+        Route::get('/', [AdminController::class, 'dashboard'])->name('admin.index');
 
         // Order Management
         Route::controller(OrderController::class)->prefix('orders')->group(function () {
