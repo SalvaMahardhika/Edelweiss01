@@ -43,22 +43,53 @@
         {{-- LEFT COLUMN: DETAIL FORM --}}
         <div class="lg:col-span-2 space-y-6">
             <div class="glass border border-white/50 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
-                <h3 class="text-lg font-bold border-b border-[#3e2723]/10 pb-2"><i class="fa-regular fa-address-card mr-2"></i>Informasi Kontak Pelanggan</h3>
+                
+                {{-- HEADER INFORMASI KONTAK & STATUS AUTH/GUEST --}}
+                <div class="flex items-center justify-between border-b border-[#3e2723]/10 pb-2">
+                    <h3 class="text-lg font-bold"><i class="fa-regular fa-address-card mr-2"></i>Informasi Kontak Pelanggan</h3>
+                    @auth
+                        <span class="text-xs bg-emerald-100 text-emerald-800 font-semibold px-3 py-1 rounded-full border border-emerald-300">
+                            <i class="fa-solid fa-user-check mr-1"></i> {{ auth()->user()->name }}
+                        </span>
+                    @else
+                        <a href="{{ route('login') }}" class="text-xs font-semibold text-[#a67c52] hover:underline">
+                            Sudah punya akun? Login di sini <i class="fa-solid fa-arrow-right text-xs"></i>
+                        </a>
+                    @endauth
+                </div>
+
+                {{-- NOTIFIKASI KHUSUS GUEST --}}
+                @guest
+                    <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-info text-amber-600 text-sm"></i>
+                        <span>Anda memesan sebagai <strong>Guest</strong>. Email & Nomor WA aktif wajib diisi untuk bukti pembayaran & tracking pesanan.</span>
+                    </div>
+                @endguest
                 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Nama Penerima</label>
-                        <input type="text" name="customer_name" value="{{ $user->name ?? '' }}" required class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
+                        <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Nama Penerima <span class="text-red-500">*</span></label>
+                        <input type="text" name="customer_name" value="{{ old('customer_name', $user->name ?? '') }}" required placeholder="Nama lengkap penerima" class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Nomor Telepon / WhatsApp</label>
-                        <input type="tel" name="customer_phone" placeholder="Contoh: 08123456789" required class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
+                        <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Nomor Telepon / WhatsApp <span class="text-red-500">*</span></label>
+                        <input type="tel" name="customer_phone" value="{{ old('customer_phone', $user->phone ?? '') }}" placeholder="Contoh: 08123456789" required class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Alamat Email (Opsional)</label>
-                    <input type="email" name="customer_email" value="{{ $user->email ?? '' }}" class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
+                    <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">
+                        Alamat Email <span class="text-red-500">*</span>
+                    </label>
+                    <input type="email" 
+                           name="customer_email" 
+                           value="{{ old('customer_email', $user->email ?? '') }}" 
+                           placeholder="Contoh: nama@email.com"
+                           @auth readonly @else required @endauth 
+                           class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition @auth bg-gray-100/70 cursor-not-allowed @endauth">
+                    @guest
+                        <p class="text-[11px] text-gray-500 mt-1">Email ini akan digunakan jika nanti Anda mendaftar akun untuk melihat riwayat pesanan.</p>
+                    @endguest
                 </div>
 
                 <h3 class="text-lg font-bold border-b border-[#3e2723]/10 pt-4 pb-2"><i class="fa-solid fa-truck-ramp-box mr-2"></i>Metode & Waktu Pengiriman/Pengambilan</h3>
@@ -67,8 +98,8 @@
                     <div class="sm:col-span-1">
                         <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Metode Pengambilan</label>
                         <select name="order_type" id="orderTypeSelect" onchange="toggleDeliveryAddress(this.value)" class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
-                            <option value="pickup">Ambil di Toko (Pickup)</option>
-                            <option value="delivery">Kirim ke Alamat (Delivery)</option>
+                            <option value="pickup" {{ old('order_type') == 'pickup' ? 'selected' : '' }}>Ambil di Toko (Pickup)</option>
+                            <option value="delivery" {{ old('order_type') == 'delivery' ? 'selected' : '' }}>Kirim ke Alamat (Delivery)</option>
                         </select>
                     </div>
                     <div class="sm:col-span-1">
@@ -89,20 +120,20 @@
                 {{-- FIELD ALAMAT PENGIRIMAN DINAMIS --}}
                 <div id="deliveryAddressContainer" class="hidden transition-all duration-300">
                     <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Alamat Lengkap Pengiriman <span class="text-red-500">*</span></label>
-                    <textarea name="delivery_address" id="deliveryAddressInput" rows="3" placeholder="Tulis alamat lengkap pengiriman (Nama jalan, nomor rumah, RT/RW, kecamatan, dan kode pos)..." class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition"></textarea>
+                    <textarea name="delivery_address" id="deliveryAddressInput" rows="3" placeholder="Tulis alamat lengkap pengiriman (Nama jalan, nomor rumah, RT/RW, kecamatan, dan kode pos)..." class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">{{ old('delivery_address') }}</textarea>
                 </div>
 
                 <h3 class="text-lg font-bold border-b border-[#3e2723]/10 pt-4 pb-2"><i class="fa-solid fa-wallet mr-2"></i> Rencana Skema Pembayaran</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <label class="relative flex items-start p-4 bg-white/50 border rounded-2xl cursor-pointer hover:bg-white/80 transition">
-                        <input type="radio" name="payment_plan" value="full" checked onchange="calculateOrderSummary()" class="mt-1 accent-[#3e2723]">
+                        <input type="radio" name="payment_plan" value="full" {{ old('payment_plan', 'full') === 'full' ? 'checked' : '' }} onchange="calculateOrderSummary()" class="mt-1 accent-[#3e2723]">
                         <span class="ml-3">
                             <span class="block text-sm font-bold text-[#3e2723]">Bayar Lunas (Full Payment)</span>
                             <span class="block text-xs text-gray-500 mt-0.5">Membayar total tagihan secara penuh di awal transaksi.</span>
                         </span>
                     </label>
                     <label class="relative flex items-start p-4 bg-white/50 border rounded-2xl cursor-pointer hover:bg-white/80 transition">
-                        <input type="radio" name="payment_plan" value="dp" onchange="calculateOrderSummary()" class="mt-1 accent-[#3e2723]">
+                        <input type="radio" name="payment_plan" value="dp" {{ old('payment_plan') === 'dp' ? 'checked' : '' }} onchange="calculateOrderSummary()" class="mt-1 accent-[#3e2723]">
                         <span class="ml-3">
                             <span class="block text-sm font-bold text-[#3e2723]">Uang Muka (DP 50%)</span>
                             <span class="block text-xs text-gray-500 mt-0.5">Bayar setengah sekarang, sisanya H-1 waktu pengambilan.</span>
@@ -112,7 +143,7 @@
 
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Catatan Tambahan / Kustomisasi Kue</label>
-                    <textarea name="notes" rows="3" placeholder="Tulis instruksi khusus (tulisan di kue, lilin, varian rasa cadangan dll)..." class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition"></textarea>
+                    <textarea name="notes" rows="3" placeholder="Tulis instruksi khusus (tulisan di kue, lilin, varian rasa cadangan dll)..." class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">{{ old('notes') }}</textarea>
                 </div>
             </div>
         </div>

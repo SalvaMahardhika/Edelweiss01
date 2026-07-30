@@ -5,48 +5,48 @@ namespace App\Http\Controllers;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Produk;
+use App\Models\User;
 use App\Services\MidtransService;
+use App\Services\TelegramService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class CheckoutController extends Controller
 {
     /**
-     * Tampilkan halaman formulir checkout untuk user yang sudah login.
+     * Tampilkan halaman formulir checkout.
+     * Bisa diakses oleh User yang sudah login maupun Guest.
      */
     public function index()
     {
-        // Ambil data user yang sedang login untuk auto-fill form
-        $user = auth()->user();
-
-        // Pastikan user terautentikasi
-        if (! $user) {
-            return redirect()->route('login');
-        }
+        // Ambil data user jika terautentikasi (null jika guest)
+        $user = Auth::user();
 
         return view('orders.checkout', compact('user'));
     }
 
     /**
-     * Proses simpan order baru ke database.
+     * Proses simpan order baru ke database (Support User & Guest Checkout).
      */
     public function store(Request $request)
     {
         $request->validate([
             'customer_name' => 'required|string|max:255',
             'customer_phone' => 'required|string|max:20',
-            'customer_email' => 'nullable|email|max:255',
+            'customer_email' => 'required|email|max:255', // Wajib diisi agar data tracing & account linking bekerja
             'order_type' => 'required|in:pickup,delivery',
             'delivery_address' => 'required_if:order_type,delivery|nullable|string',
             'payment_plan' => 'required|in:full,dp',
-            // 💡 PERBAIKAN 1: Minimal 2 jam ke depan (now + 2 hours)
+            // Waktu kesiapan minimal 2 jam ke depan (now + 2 hours)
             'fulfill_at' => 'required|date|after_or_equal:'.now()->addHours(2)->format('Y-m-d H:i:s'),
             'notes' => 'nullable|string',
             'cart_items' => 'required|json',
         ], [
-            // Pesan kustom agar ramah bagi pembeli
+            'customer_email.required' => 'Alamat email wajib diisi untuk pengiriman bukti & tracking pesanan.',
             'fulfill_at.after_or_equal' => 'Waktu kesiapan pesanan minimal 2 jam dari sekarang.',
         ]);
 
@@ -58,7 +58,33 @@ class CheckoutController extends Controller
         try {
             DB::beginTransaction();
 
-            // 1. Hitung finansial order berdasarkan data database asli (aman dari manipulasi client-side)
+            // 1. Dapatkan atau Buat Record User (Guest-to-Account Linking Strategy)
+            if (Auth::check()) {
+                $userId = Auth::id();
+            } else {
+                // Cari user berdasarkan email atau no. hp, jika tidak ada -> buat akun guest baru
+                $user = User::where('email', $request->customer_email)
+                    ->orWhere(function ($query) use ($request) {
+                        $query->whereNotNull('phone')->where('phone', $request->customer_phone);
+                    })
+                    ->first();
+
+                if (! $user) {
+                    $user = User::create([
+                        'name' => $request->customer_name,
+                        'email' => $request->customer_email,
+                        'phone' => $request->customer_phone,
+                        'password' => Hash::make(Str::random(16)), // Password acak sementara
+                        'role' => 'customer',
+                        'status' => true,
+                        'is_guest' => true, // Flag akun guest
+                    ]);
+                }
+
+                $userId = $user->id;
+            }
+
+            // 2. Hitung finansial order berdasarkan data database asli (aman dari manipulasi client-side)
             $subtotal = 0;
             $itemsToSave = [];
 
@@ -79,23 +105,23 @@ class CheckoutController extends Controller
                 ];
             }
 
-            // 💡 PERBAIKAN 2: Hitung Pajak/PPN 11% secara presisi
+            // 3. Hitung Pajak/PPN 11% secara presisi
             $taxAmount = bcmul((string) $subtotal, '0.11', 2);
             $totalAmount = bcadd((string) $subtotal, (string) $taxAmount, 2);
 
             // Atur skema uang muka (DP 50%)
             $dpAmount = ($request->payment_plan === 'dp') ? ($totalAmount * 0.5) : 0;
 
-            // 2. Generate Nomor Order Unik (cth: EDL-20260717-0001)
+            // 4. Generate Nomor Order Unik (cth: EDL-20260717-0001)
             $dateString = now()->format('Ymd');
             $latestOrder = Order::where('order_number', 'LIKE', "EDL-{$dateString}-%")->latest()->first();
             $nextSequence = $latestOrder ? ((int) Str::afterLast($latestOrder->order_number, '-') + 1) : 1;
             $orderNumber = "EDL-{$dateString}-".str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
 
-            // 3. Simpan ke tabel orders
+            // 5. Simpan ke tabel orders (user_id selalu terisi secara konsisten)
             $order = Order::create([
                 'order_number' => $orderNumber,
-                'user_id' => auth()->id(),
+                'user_id' => $userId,
                 'customer_name' => $request->customer_name,
                 'customer_phone' => $request->customer_phone,
                 'customer_email' => $request->customer_email,
@@ -115,7 +141,7 @@ class CheckoutController extends Controller
                 'placed_at' => now(),
             ]);
 
-            // 4. Simpan ke tabel order_items
+            // 6. Simpan ke tabel order_items
             foreach ($itemsToSave as $itemData) {
                 $itemData['order_id'] = $order->id;
                 OrderItem::create($itemData);
@@ -123,7 +149,16 @@ class CheckoutController extends Controller
 
             DB::commit();
 
-            // Return ke halaman pembayaran bawaan Midtrans snap
+            // 🔔 7. KIRIM NOTIFIKASI REAL-TIME KE TELEGRAM GRUP PESANAN
+            try {
+                $telegramService = new TelegramService();
+                $telegramService->sendOrderNotification($order->load('items'));
+            } catch (\Exception $telegramEx) {
+                // Silently log error telegram agar transaksi user tidak terganggu meski bot gagal kirim
+                \Illuminate\Support\Facades\Log::error('Telegram notification error: ' . $telegramEx->getMessage());
+            }
+
+            // Redirect ke halaman pembayaran Midtrans Snap
             return redirect()->route('checkout.pay', $order->order_number);
 
         } catch (\Exception $e) {
@@ -173,11 +208,12 @@ class CheckoutController extends Controller
 
         $orders = collect();
 
-        // 🔒 HANYA TAMPILKAN PESANAN JIKA USER SUDAH MEMASUKKAN NOMOR HP / ORDER LENGKAP
+        // 🔒 HANYA TAMPILKAN PESANAN JIKA USER SUDAH MEMASUKKAN NOMOR HP / EMAIL / ORDER LENGKAP
         if (! empty($search)) {
             $orders = Order::with(['items', 'payments'])
-                ->where('customer_phone', $search) // Exact match nomor HP
-                ->orWhere('order_number', $search)  // Exact match nomor order
+                ->where('customer_phone', $search)  // Match nomor HP
+                ->orWhere('customer_email', $search) // Match email
+                ->orWhere('order_number', $search)   // Match nomor order
                 ->latest()
                 ->get();
         }

@@ -2,7 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\CategoryController; // 🆕 Import CategoryController
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\GaleriController;
 use App\Http\Controllers\MenuController;
@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 // =========================================================================
-// PUBLIC ROUTES (Bisa Diakses Siapa Saja & Guest Pre-Order)
+// PUBLIC ROUTES & GUEST CHECKOUT (Bisa Diakses Siapa Saja)
 // =========================================================================
 Route::controller(MenuController::class)->group(function () {
     Route::get('/', 'dashboard')->name('home');
@@ -30,12 +30,16 @@ Route::get('/galeri', [GaleriController::class, 'index'])->name('galeri');
 Route::view('/about', 'about')->name('about');
 Route::view('/kontak', 'kontak')->name('kontak');
 
-// 🔑 RUTE PEMBAYARAN & LAZIM PRE-ORDER PUBLIK
-Route::get('/pesanan/{order_number?}', [CheckoutController::class, 'track'])->name('orders.track');
-Route::post('/api/midtrans/webhook', [PaymentNotificationController::class, 'handle'])->name('midtrans.webhook');
+// 🔑 RUTE CHECKOUT, PEMBAYARAN, & TRACKING (Support Guest & Authenticated Users)
+Route::controller(CheckoutController::class)->group(function () {
+    Route::get('/checkout', 'index')->name('checkout.index');
+    Route::post('/checkout', 'store')->name('checkout.store');
+    Route::get('/checkout/pay/{order_number}', 'pay')->name('checkout.pay');
+    Route::get('/pesanan/{order_number?}', 'track')->name('orders.track');
+});
 
-// 🔑 SOLUSI GUEST CHECKOUT
-Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+// 🔔 WEBHOOK MIDTRANS
+Route::post('/api/midtrans/webhook', [PaymentNotificationController::class, 'handle'])->name('midtrans.webhook');
 
 // =========================================================================
 // AUTHENTICATION ROUTES (GUEST ONLY)
@@ -58,11 +62,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/profile', 'index')->name('profile');
         Route::post('/profile', 'update')->name('profile.update');
     });
-
-    // Tampilan Formulir & Proses Simpan Checkout Pre-Order
-    Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
-
-    Route::get('/checkout/pay/{order_number}', [CheckoutController::class, 'pay'])->name('checkout.pay');
 });
 
 // =========================================================================
