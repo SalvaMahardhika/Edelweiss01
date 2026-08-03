@@ -220,7 +220,7 @@ class PaymentNotificationController extends Controller
 
                 if (strtolower((string) $paymentPlan) === 'dp' && $order->amount_paid == 0) {
                     $order->update([
-                        'payment_status' => 'dp',
+                        'payment_status' => 'partial',
                         'amount_paid' => $order->dp_amount ?? ($order->total_amount / 2),
                         'status' => 'confirmed', // Lanjut ke dapur
                     ]);

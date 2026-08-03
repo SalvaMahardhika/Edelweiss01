@@ -44,6 +44,7 @@ class OrderValidationTest extends TestCase
             ->post(route('checkout.store'), [
                 'customer_name' => 'Pelanggan Edelweiss',
                 'customer_phone' => '08123456789',
+                'customer_email' => 'guest.fulfill@example.com', // 👈 Ditambahkan untuk mendukung Guest Checkout
                 'payment_plan' => 'full',
                 'order_type' => 'pickup',
                 'fulfill_at' => Carbon::now()->subDay()->format('Y-m-d H:i:s'),
@@ -67,6 +68,7 @@ class OrderValidationTest extends TestCase
             ->post(route('checkout.store'), [
                 'customer_name' => 'Pelanggan DP Test',
                 'customer_phone' => '08123456789',
+                'customer_email' => 'guest.dp@example.com', // 👈 Ditambahkan untuk mendukung Guest Checkout
                 'payment_plan' => 'dp',
                 'order_type' => 'pickup',
                 'fulfill_at' => Carbon::now()->addDays(5)->format('Y-m-d H:i:s'),
@@ -85,6 +87,7 @@ class OrderValidationTest extends TestCase
         // Memastikan order tersimpan ke database dengan skema DP
         $this->assertDatabaseHas('orders', [
             'customer_name' => 'Pelanggan DP Test',
+            'customer_email' => 'guest.dp@example.com',
             'payment_plan' => 'dp',
         ]);
     }
@@ -96,6 +99,7 @@ class OrderValidationTest extends TestCase
             ->post(route('checkout.store'), [
                 'customer_name' => 'Pelanggan Sukses',
                 'customer_phone' => '08123456789',
+                'customer_email' => 'guest.sukses@example.com', // 👈 Ditambahkan untuk mendukung Guest Checkout
                 'payment_plan' => 'full',
                 'order_type' => 'pickup',
                 'fulfill_at' => Carbon::now()->addDays(3)->format('Y-m-d H:i:s'),
@@ -112,6 +116,7 @@ class OrderValidationTest extends TestCase
 
         $this->assertDatabaseHas('orders', [
             'customer_name' => 'Pelanggan Sukses',
+            'customer_email' => 'guest.sukses@example.com',
             'payment_plan' => 'full',
         ]);
     }
@@ -127,6 +132,7 @@ class OrderValidationTest extends TestCase
             'user_id' => $this->admin->id,
             'customer_name' => 'Pelanggan Bayar DP',
             'customer_phone' => '08123456789',
+            'customer_email' => 'pelanggan.dp@example.com', // 👈 Ditambahkan agar insert MySQL tidak memicu error 1364
             'status' => 'pending',
             'payment_plan' => 'dp',
             'payment_status' => 'partial',
