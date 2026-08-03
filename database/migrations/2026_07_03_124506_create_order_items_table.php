@@ -13,8 +13,8 @@ return new class extends Migration
             $table->foreignId('order_id')->constrained('orders')->cascadeOnDelete();
             $table->foreignId('product_id')->nullable()->constrained('produk')->nullOnDelete();
 
-            $table->string('product_name'); // snapshot
-            $table->decimal('unit_price', 12, 2); // snapshot
+            $table->string('product_name'); // snapshot nama saat dibeli
+            $table->decimal('unit_price', 12, 2); // snapshot harga saat dibeli
             $table->unsignedInteger('quantity');
             $table->decimal('subtotal', 12, 2);
             $table->string('notes')->nullable();

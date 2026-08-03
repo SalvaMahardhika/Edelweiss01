@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\CheckUserStatus;
 use App\Http\Middleware\RoleMiddleware;
+use App\Services\TelegramService;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -31,6 +32,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        // Tempat konfigurasi exception penanganan error global jika diperlukan
+        // 🚨 KIRIM NOTIFIKASI ERROR LOG OTOMATIS KE TELEGRAM
+        $exceptions->reportable(function (Throwable $e) {
+            try {
+                $telegram = new TelegramService;
+                $telegram->sendErrorLog($e);
+            } catch (Throwable $telegramEx) {
+                // Mencegah error loop jika Telegram API gagal merespons
+            }
+        });
     })
     ->create();

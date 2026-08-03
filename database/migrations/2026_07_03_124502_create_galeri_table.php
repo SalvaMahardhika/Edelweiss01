@@ -11,8 +11,9 @@ return new class extends Migration
         Schema::create('galeri', function (Blueprint $table) {
             $table->id();
             $table->string('judul', 200);
-            $table->string('album', 45)->nullable();
+            $table->string('album', 100)->nullable();
             $table->text('deskripsi')->nullable();
+            $table->string('gambar', 255)->nullable();
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->timestamps();
         });

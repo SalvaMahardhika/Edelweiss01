@@ -42,12 +42,10 @@ class="fixed top-0 w-full z-50 backdrop-blur-3xl bg-white/60 border-b border-whi
                     Contact
                 </a>
 
-                {{-- 🛒 🆕 TOMBOL PESANAN SAYA (DESKTOP) — HANYA TAMPIL KETIKA USER LOGIN --}}
-                @auth
-                    <a href="{{ route('orders.track') }}" class="px-3.5 py-2 rounded-xl bg-[#3e2723]/10 text-[#3e2723] hover:bg-[#3e2723] hover:text-white transition flex items-center gap-1.5 border border-[#3e2723]/20 shadow-sm">
-                        <i class="fa-solid fa-receipt text-xs"></i> Pesanan Saya
-                    </a>
-                @endauth
+                {{-- 🛒 TOMBOL PESANAN SAYA (DESKTOP) — DAPAT DIAKSES SEMUA PENGUNJUNG (GUEST / AUTH) --}}
+                <a href="{{ route('orders.track') }}" class="px-3.5 py-2 rounded-xl bg-[#3e2723]/10 text-[#3e2723] hover:bg-[#3e2723] hover:text-white transition flex items-center gap-1.5 border border-[#3e2723]/20 shadow-sm">
+                    <i class="fa-solid fa-receipt text-xs"></i> Lacak Pesanan
+                </a>
 
                 {{-- MANAGEMENT ACCESS (ADMIN & SUPER ADMIN ONLY) --}}
                 @auth
@@ -189,12 +187,10 @@ class="fixed top-0 w-full z-50 backdrop-blur-3xl bg-white/60 border-b border-whi
                     Contact
                 </a>
 
-                {{-- 🛒 🆕 TOMBOL PESANAN SAYA (MOBILE) — HANYA TAMPIL KETIKA USER LOGIN --}}
-                @auth
-                    <a href="{{ route('orders.track') }}" class="block px-4 py-3 rounded-2xl bg-[#c8a97e] text-white font-semibold tracking-wide shadow-md hover:bg-[#b8860b] transition" style="-webkit-text-stroke: 0.3px rgba(0,0,0,0.45);">
-                        <i class="fa-solid fa-receipt mr-1.5"></i> Pesanan Saya
-                    </a>
-                @endauth
+                {{-- 🛒 TOMBOL PESANAN SAYA (MOBILE) — DAPAT DIAKSES SEMUA PENGUNJUNG (GUEST / AUTH) --}}
+                <a href="{{ route('orders.track') }}" class="block px-4 py-3 rounded-2xl bg-[#c8a97e] text-white font-semibold tracking-wide shadow-md hover:bg-[#b8860b] transition" style="-webkit-text-stroke: 0.3px rgba(0,0,0,0.45);">
+                    <i class="fa-solid fa-receipt mr-1.5"></i> Lacak Pesanan
+                </a>
 
                 {{-- MANAGEMENT ACCESS MOBILE --}}
                 @auth

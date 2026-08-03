@@ -94,7 +94,7 @@
 
                     <div class="relative overflow-hidden rounded-[1.5rem]">
 
-                        <img src="{{ asset('img/dashboard/assets/3.png') }}"
+                        <img src="{{ asset('img/dashboard/assets/2.webp') }}"
                              class="w-full
                                     h-[250px] sm:h-[350px] md:h-[450px]
                                     object-cover">

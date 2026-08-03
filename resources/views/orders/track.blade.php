@@ -19,7 +19,7 @@
 
 <main class="max-w-3xl mx-auto px-4 space-y-6">
 
-    {{-- 1. BOX PENCARIAN NOMOR HP EXACT MATCH --}}
+    {{-- 1. BOX PENCARIAN NOMOR HP --}}
     <div class="glass border border-white/60 rounded-[2.5rem] p-6 shadow-xl text-center space-y-3">
         <h1 class="text-2xl font-black text-[#3e2723]">Lacak Pesanan Saya</h1>
         <p class="text-xs text-gray-500 max-w-md mx-auto">Masukkan nomor Telepon / WhatsApp Anda yang terdaftar saat melakukan Pre-Order untuk verifikasi data.</p>
@@ -47,16 +47,35 @@
                     $statusVal = is_object($order->status) ? $order->status->value : $order->status;
                     $paymentStatusVal = is_object($order->payment_status) ? $order->payment_status->value : $order->payment_status;
                     $orderTypeVal = is_object($order->order_type) ? $order->order_type->value : $order->order_type;
+                    $paymentMethodVal = is_object($order->payment_method) ? $order->payment_method->value : $order->payment_method;
 
                     $sisaTagihan = $order->total_amount - $order->amount_paid;
+                    $itemNames = $order->items->pluck('product_name')->join(', ');
+
+                    // Menentukan apakah order masih aktif (belum selesai/batal) dan memiliki sisa tagihan
+                    $canPayOrUpload = ($sisaTagihan > 0) && !in_array($statusVal, ['completed', 'cancelled']) && ($paymentStatusVal !== 'paid');
                 @endphp
 
                 <div class="glass border border-white/60 rounded-[2rem] p-5 shadow-xl transition hover:shadow-2xl space-y-4">
                     {{-- Header Card --}}
                     <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-3 border-b border-[#3e2723]/10">
                         <div>
-                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">No. Order: {{ $order->order_number }}</span>
-                            <h3 class="text-base font-black text-[#3e2723]">{{ $order->customer_name }}</h3>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">No. Order: {{ $order->order_number }}</span>
+                                
+                                {{-- BADGE METODE PEMBAYARAN --}}
+                                @if($paymentMethodVal === 'manual_wa')
+                                    <span class="px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        <i class="fa-brands fa-whatsapp mr-1"></i> Manual WA
+                                    </span>
+                                @else
+                                    <span class="px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase bg-purple-100 text-purple-800 border border-purple-300">
+                                        <i class="fa-solid fa-bolt mr-1"></i> PG DOKU
+                                    </span>
+                                @endif
+                            </div>
+                            
+                            <h3 class="text-base font-black text-[#3e2723] mt-0.5">{{ $order->customer_name }}</h3>
                             <p class="text-[11px] text-gray-500"><i class="fa-regular fa-calendar mr-1"></i> Dipesan: {{ \Carbon\Carbon::parse($order->created_at)->translatedFormat('d M Y, H:i') }} WIB</p>
                         </div>
 
@@ -78,7 +97,7 @@
                         <div class="bg-white/40 p-3 rounded-xl border border-white/50">
                             <p class="text-[10px] font-bold text-gray-400 uppercase">Ringkasan Pesanan</p>
                             <p class="font-bold text-[#3e2723] mt-0.5 truncate">
-                                {{ $order->items->pluck('product_name')->join(', ') }}
+                                {{ $itemNames }}
                             </p>
                             <p class="text-[11px] text-gray-500 mt-0.5">Total {{ $order->items->sum('quantity') }} Pcs Kue</p>
                         </div>
@@ -98,23 +117,42 @@
                             <p class="text-[10px] font-bold text-gray-400 uppercase">Total / Sisa Pelunasan</p>
                             <p class="text-sm font-black text-[#3e2723]">
                                 Rp {{ number_format($order->total_amount, 0, ',', '.') }}
-                                @if($sisaTagihan > 0 && $paymentStatusVal !== 'paid')
+                                @if($sisaTagihan > 0 && !in_array($statusVal, ['completed', 'cancelled']) && $paymentStatusVal !== 'paid')
                                     <span class="text-xs text-rose-600 font-bold ml-1">(Sisa: Rp {{ number_format($sisaTagihan, 0, ',', '.') }})</span>
                                 @endif
                             </p>
                         </div>
 
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             {{-- Tombol Buka Modal Detail --}}
-                            <button type="button" onclick="showOrderDetail('{{ $order->id }}')" class="px-4 py-2 bg-white/80 hover:bg-white text-[#3e2723] font-bold text-xs rounded-xl border border-white/80 shadow-sm transition">
-                                <i class="fa-solid fa-eye mr-1"></i> Detail Pesanan
+                            <button type="button" onclick="showOrderDetail('{{ $order->id }}')" class="px-3.5 py-2 bg-white/80 hover:bg-white text-[#3e2723] font-bold text-xs rounded-xl border border-white/80 shadow-sm transition">
+                                <i class="fa-solid fa-eye mr-1"></i> Detail
                             </button>
 
-                            {{-- Tombol Bayar Langsung Jika Belum Lunas --}}
-                            @if($sisaTagihan > 0 && $paymentStatusVal !== 'paid')
-                                <a href="{{ route('checkout.pay', $order->order_number) }}" class="px-4 py-2 bg-[#3e2723] hover:bg-[#2c1b18] text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1">
-                                    <i class="fa-solid fa-credit-card"></i> Bayar Pelunasan
-                                </a>
+                            {{-- LOGIKA DUA PILIHAN TOMBOL PEMBAYARAN TERGANTUNG METODE --}}
+                            @if($canPayOrUpload)
+                                @if($paymentMethodVal === 'manual_wa')
+                                    {{-- Tombol Unggah / Bukti Transfer Manual --}}
+                                    <button type="button" 
+                                            onclick="openUploadProofModal('{{ $order->id }}', '{{ $order->order_number }}', '{{ number_format($sisaTagihan, 0, ',', '.') }}')" 
+                                            class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1">
+                                        <i class="fa-solid fa-file-invoice-dollar"></i> Input Bukti Transfer
+                                    </button>
+                                @else
+                                    {{-- Tombol Bayar Sisa Payment Gateway DOKU --}}
+                                    <a href="{{ route('checkout.pay', $order->order_number) }}" class="px-3.5 py-2 bg-[#3e2723] hover:bg-[#2c1b18] text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1">
+                                        <i class="fa-solid fa-credit-card"></i> Bayar Sisa
+                                    </a>
+                                @endif
+                            @endif
+
+                            {{-- TOMBOL BATALKAN PESANAN --}}
+                            @if(!in_array($statusVal, ['completed', 'cancelled']))
+                                <button type="button" 
+                                        onclick="openCancelModal('{{ $order->order_number }}', '{{ addslashes($order->customer_name) }}', '{{ $order->customer_phone }}', '{{ number_format($order->total_amount, 0, ',', '.') }}', '{{ number_format($order->amount_paid, 0, ',', '.') }}', '{{ addslashes($itemNames) }}')" 
+                                        class="px-3.5 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 shadow-sm transition flex items-center gap-1">
+                                    <i class="fa-solid fa-ban"></i> Batalkan
+                                </button>
                             @endif
                         </div>
                     </div>
@@ -174,11 +212,21 @@
                             </div>
                         </div>
 
-                        {{-- INFORMASI ALAMAT / CATATAN --}}
+                        {{-- INFORMASI ALAMAT --}}
                         @if($orderTypeVal === 'delivery')
                             <div class="p-3 bg-white/60 rounded-xl border border-white text-xs space-y-1">
                                 <p class="text-[10px] font-bold uppercase text-gray-400">Alamat Pengiriman</p>
                                 <p class="font-semibold text-[#3e2723]">{{ $order->delivery_address ?? 'Belum diisi' }}</p>
+                            </div>
+                        @endif
+
+                        {{-- TAMPILAN FILE BUKTI TRANSFER JIKA SUDAH ADA --}}
+                        @if(!empty($order->payment_proof))
+                            <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs space-y-1">
+                                <p class="text-[10px] font-bold uppercase text-emerald-800">Bukti Transfer Terunggah</p>
+                                <a href="{{ asset('img/buktitf/' . $order->payment_proof) }}" target="_blank" class="text-emerald-700 font-bold underline flex items-center gap-1">
+                                    <i class="fa-solid fa-image"></i> Lihat Foto Bukti Pembayaran
+                                </a>
                             </div>
                         @endif
 
@@ -199,11 +247,17 @@
                                 </span>
                             </div>
 
-                            @if($sisaTagihan > 0 && $paymentStatusVal !== 'paid')
+                            @if($canPayOrUpload)
                                 <div class="pt-2">
-                                    <a href="{{ route('checkout.pay', $order->order_number) }}" class="block w-full py-3 bg-[#c8a97e] hover:bg-[#b8860b] text-white font-bold text-center rounded-xl transition shadow-md">
-                                        <i class="fa-solid fa-credit-card mr-1"></i> Bayar Sisa Pelunasan Sekarang
-                                    </a>
+                                    @if($paymentMethodVal === 'manual_wa')
+                                        <button type="button" onclick="openUploadProofModal('{{ $order->id }}', '{{ $order->order_number }}', '{{ number_format($sisaTagihan, 0, ',', '.') }}')" class="block w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-center rounded-xl transition shadow-md">
+                                            <i class="fa-solid fa-file-invoice-dollar mr-1"></i> Upload Bukti Transfer Sisa
+                                        </button>
+                                    @else
+                                        <a href="{{ route('checkout.pay', $order->order_number) }}" class="block w-full py-3 bg-[#c8a97e] hover:bg-[#b8860b] text-white font-bold text-center rounded-xl transition shadow-md">
+                                            <i class="fa-solid fa-credit-card mr-1"></i> Bayar Sisa Pelunasan Sekarang
+                                        </a>
+                                    @endif
                                 </div>
                             @endif
                         </div>
@@ -221,7 +275,7 @@
             <p class="text-xs text-gray-500 max-w-sm mx-auto">Tidak ditemukan pesanan yang cocok persis dengan kata kunci "<span class="font-bold text-[#3e2723]">{{ request('search') }}</span>". Pastikan nomor telepon ditulis lengkap dan sesuai saat checkout.</p>
         </div>
     @else
-        {{-- 🔒 TAMPILAN STATE KOSONG DEFAULT SEBELUM USER MENGINPUT NOMOR --}}
+        {{-- STATE KOSONG DEFAULT --}}
         <div class="glass border border-white/60 rounded-[2.5rem] p-12 shadow-xl text-center space-y-3">
             <div class="w-16 h-16 rounded-full bg-[#3e2723]/10 text-[#3e2723] flex items-center justify-center text-2xl mx-auto">
                 <i class="fa-solid fa-shield-halved"></i>
@@ -233,15 +287,145 @@
 
 </main>
 
+{{-- 💳 MODAL UNGGAH BUKTI TRANSFER MANUAL --}}
+<div id="uploadProofModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white/95 backdrop-blur-2xl border border-white/80 rounded-[2.5rem] shadow-2xl p-6 md:p-8 space-y-5 text-center my-auto">
+        <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl mx-auto shadow-inner">
+            <i class="fa-solid fa-file-arrow-up"></i>
+        </div>
+
+        <div>
+            <h3 class="text-lg font-black text-[#3e2723]">Upload Bukti Transfer</h3>
+            <p class="text-xs text-gray-500 mt-1">No. Order: <span id="proofModalOrderNo" class="font-bold text-[#3e2723]"></span></p>
+            <p class="text-xs font-bold text-rose-600 mt-0.5">Sisa Tagihan: Rp <span id="proofModalSisa"></span></p>
+        </div>
+
+        {{-- FORM INPUT FILE --}}
+        <form id="uploadProofForm" action="{{ route('orders.uploadProof') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+            @csrf
+            <input type="hidden" name="order_id" id="proofOrderIdInput">
+
+            <div class="text-left space-y-1">
+                <label class="block text-xs font-bold text-gray-600 uppercase">Pilih Foto Bukti Transfer <span class="text-red-500">*</span></label>
+                <input type="file" name="payment_proof" accept="image/jpeg,image/png,image/jpg" required class="w-full text-xs text-gray-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#3e2723] file:text-white hover:file:bg-[#2c1b18] border border-gray-200 rounded-xl bg-white p-1">
+                <p class="text-[10px] text-gray-400">Format: JPG, JPEG, PNG (Maksimal 2MB)</p>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeUploadProofModal()" class="w-1/2 py-3 text-xs font-bold text-gray-600 bg-gray-200 hover:bg-gray-300 rounded-2xl transition">
+                    Batal
+                </button>
+                <button type="submit" class="w-1/2 py-3 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-2xl shadow-lg transition">
+                    Simpan Bukti
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- 🛑 MODAL KONFIRMASI BATAL PESANAN --}}
+<div id="cancelOrderModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white/95 backdrop-blur-2xl border border-white/80 rounded-[2.5rem] shadow-2xl p-6 md:p-8 space-y-5 text-center my-auto">
+        <div class="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-2xl mx-auto shadow-inner">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+
+        <div>
+            <h3 class="text-lg font-black text-[#3e2723]">Pengajuan Pembatalan Pesanan</h3>
+            <p class="text-xs text-gray-500 mt-1">Nomor Pesanan: <span id="cancelModalOrderNo" class="font-bold text-[#3e2723]"></span></p>
+        </div>
+
+        <div class="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 text-left text-xs text-amber-900 space-y-2 leading-relaxed">
+            <p class="font-bold border-b border-amber-200/60 pb-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-circle-info text-amber-600"></i> Ketentuan Refund & Pembatalan:
+            </p>
+            <ul class="list-disc pl-4 space-y-1 text-[11px]">
+                <li>Pengajuan pembatalan akan terhubung secara langsung ke WhatsApp Admin Edelweiss Bakery.</li>
+                <li><strong>Pengembalian Dana (Refund):</strong> Hanya dapat diproses apabila bahan baku pesanan Anda <u>belum dibeli/diproduksi</u>.</li>
+                <li>Jika pesanan sudah memasuki tahap belanja bahan atau produksi, pembayaran <u>tidak dapat di-refund</u>.</li>
+            </ul>
+        </div>
+
+        <div class="text-left pt-1">
+            <label class="flex items-start gap-2.5 cursor-pointer text-xs text-gray-700 select-none">
+                <input type="checkbox" id="cancelTermsCheckbox" onchange="toggleCancelButton()" class="mt-0.5 w-4 h-4 accent-[#3e2723] rounded">
+                <span class="text-[11px] text-gray-600">
+                    Saya memahami dan menyetujui seluruh ketentuan refund & pembatalan Pre-Order di atas.
+                </span>
+            </label>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+            <button type="button" onclick="closeCancelModal()" class="w-1/2 py-3 text-xs font-bold text-gray-600 bg-gray-200 hover:bg-gray-300 rounded-2xl transition">
+                Batal
+            </button>
+            <button type="button" id="confirmCancelBtn" disabled onclick="submitCancelToWhatsApp()" class="w-1/2 py-3 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-2xl shadow-lg transition flex items-center justify-center gap-1.5">
+                <i class="fa-brands fa-whatsapp text-sm"></i> Ajukan ke WA
+            </button>
+        </div>
+    </div>
+</div>
+
 @include('layouts.footer')
 
 <script>
+    const ADMIN_WA = '6287794082895';
+    let selectedCancelData = {};
+
     function showOrderDetail(id) {
         document.getElementById('modal-order-' + id).classList.remove('hidden');
     }
 
     function closeOrderDetail(id) {
         document.getElementById('modal-order-' + id).classList.add('hidden');
+    }
+
+    // LOGIKA MODAL UNGGAH BUKTI TRANSFER
+    function openUploadProofModal(orderId, orderNo, sisaTagihan) {
+        document.getElementById('proofOrderIdInput').value = orderId;
+        document.getElementById('proofModalOrderNo').innerText = orderNo;
+        document.getElementById('proofModalSisa').innerText = sisaTagihan;
+        document.getElementById('uploadProofModal').classList.remove('hidden');
+    }
+
+    function closeUploadProofModal() {
+        document.getElementById('uploadProofModal').classList.add('hidden');
+    }
+
+    // LOGIKA MODAL BATALKAN PESANAN
+    function openCancelModal(orderNo, custName, custPhone, totalAmt, paidAmt, items) {
+        selectedCancelData = { orderNo, custName, custPhone, totalAmt, paidAmt, items };
+        document.getElementById('cancelModalOrderNo').innerText = orderNo;
+        document.getElementById('cancelTermsCheckbox').checked = false;
+        document.getElementById('confirmCancelBtn').disabled = true;
+        document.getElementById('cancelOrderModal').classList.remove('hidden');
+    }
+
+    function closeCancelModal() {
+        document.getElementById('cancelOrderModal').classList.add('hidden');
+    }
+
+    function toggleCancelButton() {
+        const checkbox = document.getElementById('cancelTermsCheckbox');
+        document.getElementById('confirmCancelBtn').disabled = !checkbox.checked;
+    }
+
+    function submitCancelToWhatsApp() {
+        if (!selectedCancelData.orderNo) return;
+
+        let waMessage = `Halo Admin Edelweiss Bakery,\n`;
+        waMessage += `Saya ingin mengajukan PEMBATALAN & PENGEMBALIAN DANA (REFUND) untuk pesanan berikut:\n\n`;
+        waMessage += `DETAIL PESANAN:\n`;
+        waMessage += `- No. Order: *${selectedCancelData.orderNo}*\n`;
+        waMessage += `- Nama Pemesan: *${selectedCancelData.custName}*\n`;
+        waMessage += `- No. WA Pemesan: ${selectedCancelData.custPhone}\n`;
+        waMessage += `- Item Pesanan: ${selectedCancelData.items}\n`;
+        waMessage += `- Total Biaya: Rp ${selectedCancelData.totalAmt}\n`;
+        waMessage += `- Jumlah Sudah Dibayar: Rp ${selectedCancelData.paidAmt}\n\n`;
+        waMessage += `KETERANGAN:\nSaya memahami ketentuan bahwa refund hanya dapat diproses apabila bahan baku belum diproduksi.\n\nMohon bantuan Admin untuk mengecek pesanan saya. Terima kasih!`;
+
+        window.open(`https://wa.me/${ADMIN_WA}?text=${encodeURIComponent(waMessage)}`, '_blank');
+        closeCancelModal();
     }
 </script>
 

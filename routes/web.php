@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\CategoryController; // 🆕 Import CategoryController
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\DisabledDateController;
 use App\Http\Controllers\GaleriController;
+use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentNotificationController;
@@ -18,7 +20,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 // =========================================================================
-// PUBLIC ROUTES (Bisa Diakses Siapa Saja & Guest Pre-Order)
+// PUBLIC ROUTES & GUEST CHECKOUT (Bisa Diakses Siapa Saja)
 // =========================================================================
 Route::controller(MenuController::class)->group(function () {
     Route::get('/', 'dashboard')->name('home');
@@ -30,12 +32,24 @@ Route::get('/galeri', [GaleriController::class, 'index'])->name('galeri');
 Route::view('/about', 'about')->name('about');
 Route::view('/kontak', 'kontak')->name('kontak');
 
-// 🔑 RUTE PEMBAYARAN & LAZIM PRE-ORDER PUBLIK
-Route::get('/pesanan/{order_number?}', [CheckoutController::class, 'track'])->name('orders.track');
-Route::post('/api/midtrans/webhook', [PaymentNotificationController::class, 'handle'])->name('midtrans.webhook');
+// 🔑 RUTE CHECKOUT, PEMBAYARAN, & TRACKING (Support Guest & Authenticated Users)
+Route::controller(CheckoutController::class)->group(function () {
+    Route::get('/checkout', 'index')->name('checkout.index');
+    Route::post('/checkout', 'store')->name('checkout.store');
+    Route::get('/checkout/pay/{order_number}', 'pay')->name('checkout.pay');
 
-// 🔑 SOLUSI GUEST CHECKOUT
-Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+    // 🆕 RUTE REDIRECT SUKSES PEMBAYARAN DOKU
+    Route::get('/checkout/success/{order?}', 'success')->name('checkout.success');
+
+    Route::get('/pesanan/{order_number?}', 'track')->name('orders.track');
+});
+
+// 📸 🆕 RUTE UPLOAD BUKTI TRANSFER DARI FRONTEND (Support Guest / Public)
+Route::post('/pesanan/upload-proof', [OrderController::class, 'uploadProof'])->name('orders.uploadProof');
+
+// 🔔 WEBHOOK NOTIFIKASI PEMBAYARAN (DOKU & MIDTRANS)
+Route::post('/api/midtrans/webhook', [PaymentNotificationController::class, 'handle'])->name('midtrans.webhook');
+Route::post('/api/doku/webhook', [PaymentNotificationController::class, 'handleDoku'])->name('doku.webhook');
 
 // =========================================================================
 // AUTHENTICATION ROUTES (GUEST ONLY)
@@ -58,11 +72,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/profile', 'index')->name('profile');
         Route::post('/profile', 'update')->name('profile.update');
     });
-
-    // Tampilan Formulir & Proses Simpan Checkout Pre-Order
-    Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
-
-    Route::get('/checkout/pay/{order_number}', [CheckoutController::class, 'pay'])->name('checkout.pay');
 });
 
 // =========================================================================
@@ -74,19 +83,40 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::middleware(['role:admin,super_admin'])->group(function () {
 
         // Halaman Utama CMS Dashboard
-        Route::get('/', fn () => view('admin.index'))->name('admin.index');
+        Route::get('/', [AdminController::class, 'dashboard'])->name('admin.index');
 
-        // Order Management
-        Route::controller(OrderController::class)->prefix('orders')->group(function () {
-            Route::post('/', 'store')->name('orders.store');
+        // 🔒 🆕 MANAJEMEN LOCK TANGGAL / KUOTA LIBUR TOKO
+        Route::controller(DisabledDateController::class)->prefix('disabled-dates')->group(function () {
+            Route::get('/', 'index')->name('admin.disabled_dates.index');
+            Route::post('/', 'store')->name('admin.disabled_dates.store');
+            Route::delete('/{id}', 'destroy')->name('admin.disabled_dates.destroy');
         });
 
-        // 📅 MANAJEMEN JADWAL PO / ORDERS
+        // 🛍️ MANAJEMEN INDUK PESANAN (ORDERS, HISTORY, VERIFIKASI / ORDER MANUAL)
+        Route::controller(OrderController::class)->prefix('orders')->group(function () {
+            Route::post('/', 'store')->name('orders.store');
+
+            // 📜 Sub-Menu: History Pesanan
+            Route::get('/history', 'history')->name('admin.orders.history');
+
+            // 💬 Sub-Menu: Order Manual (Transfer WhatsApp / Manual Direct)
+            Route::get('/manual', 'manualOrders')->name('admin.orders.manual');
+            Route::patch('/{id}/verify', 'verifyPayment')->name('admin.orders.verifyPayment');
+        });
+
+        // 📅 MANAJEMEN JADWAL PO / ANTREAN PRODUKSI
         Route::controller(OrderController::class)->prefix('jadwal-po')->group(function () {
             Route::get('/', 'index')->name('admin.po.index');
             Route::get('/{id}', 'show')->name('admin.po.show');
             Route::patch('/{id}/update-status', 'updateStatus')->name('admin.po.updateStatus');
             Route::patch('/{id}/update-payment', 'updatePaymentStatus')->name('admin.po.updatePayment');
+        });
+
+        // 📊 MANAJEMEN LAPORAN PENJUALAN & OMZET
+        Route::controller(LaporanController::class)->prefix('laporan')->group(function () {
+            Route::get('/', 'index')->name('admin.laporan.index');
+            Route::get('/export-excel', 'exportExcel')->name('admin.laporan.exportExcel');
+            Route::get('/export-pdf', 'exportPdf')->name('admin.laporan.exportPdf');
         });
 
         // 📝 Produk / Menu Management (CRUD Lengkap)

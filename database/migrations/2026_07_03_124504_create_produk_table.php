@@ -11,16 +11,16 @@ return new class extends Migration
         Schema::create('produk', function (Blueprint $table) {
             $table->id();
             $table->foreignId('category_id')->nullable()->constrained('categories')->nullOnDelete();
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete(); // pembuat/pengelola produk
+            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete(); // Pembuat/Pengelola
 
-            $table->string('nama_produk', 45);
+            $table->string('nama_produk', 100);
             $table->string('slug')->nullable()->unique();
-            $table->string('gambar', 100)->nullable();
-            $table->decimal('harga', 10, 2);
+            $table->string('gambar', 255)->nullable();
+            $table->decimal('harga', 12, 2);
             $table->text('deskripsi')->nullable();
-            $table->boolean('status')->default(true);       // tampil/tidak di katalog lama
-            $table->boolean('is_available')->default(true);  // stok tersedia untuk dipesan
-            $table->boolean('is_featured')->default(false);  // menu unggulan
+            $table->boolean('status')->default(true);       // Tampil di katalog
+            $table->boolean('is_available')->default(true);  // Stok tersedia
+            $table->boolean('is_featured')->default(false);  // Unggulan
 
             $table->softDeletes();
             $table->timestamps();

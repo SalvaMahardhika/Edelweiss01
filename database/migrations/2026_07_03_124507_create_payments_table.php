@@ -14,11 +14,11 @@ return new class extends Migration
 
             $table->string('type')->default('full'); // down_payment | settlement | full
             $table->string('provider')->default('midtrans');
-            $table->string('method')->nullable(); // qris | gopay | bank_transfer, dst
+            $table->string('method')->nullable(); // qris | gopay | bank_transfer, dll.
             $table->decimal('amount', 12, 2);
             $table->string('currency', 3)->default('IDR');
-            $table->string('status')->default('pending'); // pending|settlement|paid|failed|expired|refunded
-            $table->string('reference')->nullable()->unique(); // id transaksi gateway, unik cegah callback dobel // id transaksi gateway, unik cegah callback dobel
+            $table->string('status')->default('pending'); // pending | settlement | paid | failed | expired | refunded
+            $table->string('reference')->nullable()->unique(); // ID Transaksi Midtrans
             $table->string('snap_token')->nullable();
             $table->json('payload')->nullable();
             $table->timestamp('paid_at')->nullable();
