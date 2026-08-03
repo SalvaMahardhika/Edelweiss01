@@ -16,7 +16,7 @@
     {{-- HERO SECTION --}}
     <section class="relative min-h-screen flex items-center justify-center overflow-hidden">
         <div class="absolute inset-0">
-            <img src="{{ asset('img/dashboard/assets/3.png') }}" class="w-full h-full object-cover">
+            <img src="{{ asset('img/dashboard/assets/3.webp') }}" class="w-full h-full object-cover">
             <div class="absolute inset-0 bg-black/45"></div>
         </div>
 

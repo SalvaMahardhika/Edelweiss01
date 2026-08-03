@@ -28,6 +28,7 @@ class Order extends Model
         'payment_method', // 🟢 DITAMBAHKAN AGAR BISA DIISI SAAT CHECKOUT (payment_gateway | manual_wa)
         'payment_plan',
         'payment_status',
+        'payment_proof',
         'snap_token',
         'subtotal',
         'tax_amount',

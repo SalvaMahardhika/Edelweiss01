@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DisabledDate;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Produk;
@@ -51,6 +52,18 @@ class CheckoutController extends Controller
             'customer_email.required' => 'Alamat email wajib diisi untuk pengiriman bukti & tracking pesanan.',
             'fulfill_at.after_or_equal' => 'Waktu kesiapan pesanan minimal 2 jam dari sekarang.',
         ]);
+
+        // 🔒 0. VALIDASI PENGECEKAN TANGGAL TERBLOKIR / LOCK TANGGAL (BACKEND SECURITY)
+        $fulfillDateOnly = null;
+        if ($request->filled('fulfill_at')) {
+            $fulfillDateOnly = Carbon::parse($request->fulfill_at)->format('Y-m-d');
+        }
+
+        if ($fulfillDateOnly && DisabledDate::where('date', $fulfillDateOnly)->exists()) {
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['fulfill_at' => 'Maaf, kuota pesanan untuk tanggal '.Carbon::parse($fulfillDateOnly)->translatedFormat('d F Y').' sudah PENUH / Toko Libur. Silakan pilih tanggal lain.']);
+        }
 
         $cartData = json_decode($request->cart_items, true);
         if (empty($cartData)) {

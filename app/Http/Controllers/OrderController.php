@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\ImageHelper;
 use App\Models\Order;
+use Exception;
 use Illuminate\Http\Request;
 
 class OrderController extends Controller
@@ -84,7 +86,7 @@ class OrderController extends Controller
             ->whereNotIn('status', ['completed', 'cancelled']) // 🟢 Pesanan Selesai / Batal otomatis disembunyikan & masuk ke History
             ->latest();
 
-        // 🔍 Filter Pencarian Keyword (No. Order, Nama, No. HP)
+        // 🔍 Filter Pencarian Keyword (No. Order, Nama, No. HP, Email)
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -100,9 +102,69 @@ class OrderController extends Controller
             $query->where('payment_status', $request->status_bayar);
         }
 
+        // 🖼️ Filter Status Bukti Transfer (Ada / Belum Ada Upload)
+        if ($request->filled('has_proof')) {
+            if ($request->has_proof === '1') {
+                $query->whereNotNull('payment_proof');
+            } elseif ($request->has_proof === '0') {
+                $query->whereNull('payment_proof');
+            }
+        }
+
         $orders = $query->paginate(15)->withQueryString();
 
         return view('admin.orders.manual', compact('orders'));
+    }
+
+    // 📸 🆕 MENGUNGGAH BUKTI TRANSFER DARI SISI CUSTOMER/FRONTEND (WITH WEBP CONVERSION)
+    public function uploadProof(Request $request)
+    {
+        $request->validate([
+            'order_id' => 'required|exists:orders,id',
+            'payment_proof' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
+        ], [
+            'payment_proof.required' => 'Silakan pilih file foto bukti transfer.',
+            'payment_proof.image' => 'File bukti transfer harus berupa gambar.',
+            'payment_proof.mimes' => 'Format gambar yang diperbolehkan hanya JPG, JPEG, PNG, atau WebP.',
+            'payment_proof.max' => 'Ukuran file gambar maksimal 5MB.',
+        ]);
+
+        $order = Order::findOrFail($request->order_id);
+
+        if ($request->hasFile('payment_proof')) {
+            $file = $request->file('payment_proof');
+
+            // Hapus bukti lama jika pengguna melakukan re-upload
+            if ($order->payment_proof && file_exists(public_path('img/buktitf/'.$order->payment_proof))) {
+                @unlink(public_path('img/buktitf/'.$order->payment_proof));
+            }
+
+            // Path Folder Tujuan
+            $targetFolder = public_path('img/buktitf');
+            if (! file_exists($targetFolder)) {
+                mkdir($targetFolder, 0755, true);
+            }
+
+            // Nama file baru wajib menggunakan format ekstensi .webp
+            $fileName = 'tf_'.$order->order_number.'_'.time().'.webp';
+            $destinationPath = $targetFolder.'/'.$fileName;
+
+            try {
+                // 🚀 Konversi gambar ke format WebP menggunakan ImageHelper
+                ImageHelper::convertToWebp($file->getRealPath(), $destinationPath, 80, 1200);
+            } catch (Exception $e) {
+                // Fallback: Jika konversi GD gagal, simpan file secara standar
+                $fileName = 'tf_'.$order->order_number.'_'.time().'.'.$file->getClientOriginalExtension();
+                $file->move($targetFolder, $fileName);
+            }
+
+            // Simpan nama file ke kolom payment_proof di database
+            $order->update([
+                'payment_proof' => $fileName,
+            ]);
+        }
+
+        return back()->with('success', 'Bukti transfer untuk order '.$order->order_number.' berhasil diunggah. Tim kami akan segera memverifikasinya.');
     }
 
     // 📜 🆕 HALAMAN HISTORY & ARSIP PESANAN (MENGGABUNGKAN SEMUA METODE)

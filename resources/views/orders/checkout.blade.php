@@ -106,7 +106,10 @@
                     </div>
                     <div class="sm:col-span-1">
                         <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Pilih Tanggal</label>
-                        <input type="date" id="fulfill_date" required class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
+                        <input type="date" id="fulfill_date" onchange="validateDisabledDate(this)" oninput="validateDisabledDate(this)" required class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
+                        <p id="disabledDateErrorText" class="text-xs text-red-600 font-semibold mt-1 hidden">
+                            <i class="fa-solid fa-circle-exclamation mr-1"></i> Tanggal ini penuh / toko libur!
+                        </p>
                     </div>
                     <div class="sm:col-span-1">
                         <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Pilih Jam (Format 24 Jam)</label>
@@ -178,6 +181,23 @@
                     </div>
                 </div>
 
+                {{-- 📜 CHECKBOX SYARAT & KETENTUAN --}}
+                <div class="pt-2 border-t border-dashed border-[#3e2723]/20">
+                    <label class="flex items-start gap-2.5 cursor-pointer text-xs text-gray-700 select-none">
+                        <input type="checkbox" id="termsCheckbox" onchange="toggleTermsError()" class="mt-0.5 w-4 h-4 accent-[#3e2723] rounded">
+                        <span>
+                            Saya telah membaca dan menyetujui 
+                            <button type="button" onclick="openTermsModal()" class="font-bold text-[#a67c52] underline hover:text-[#3e2723]">
+                                Syarat & Ketentuan Pemesanan
+                            </button> 
+                            Edelweiss Bakery. <span class="text-red-500">*</span>
+                        </span>
+                    </label>
+                    <p id="termsErrorText" class="text-xs text-red-600 font-semibold mt-1 hidden">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i> Anda wajib menyetujui Syarat & Ketentuan terlebih dahulu!
+                    </p>
+                </div>
+
                 {{-- 🔒 RECAPTCHA V2 DI BAWAH TOTAL HARGA --}}
                 <div class="pt-2 flex flex-col items-center justify-center space-y-1">
                     <div class="g-recaptcha" data-sitekey="{{ env('NOCAPTCHA_SITEKEY', '6Ld_dummy_site_key_here') }}" data-callback="recaptchaSuccessCallback"></div>
@@ -244,12 +264,84 @@
     </div>
 </div>
 
+{{-- 📜 MODAL POPUP SYARAT & KETENTUAN --}}
+<div id="termsModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-xl bg-white/95 backdrop-blur-2xl border border-white/80 rounded-[2.5rem] shadow-2xl p-6 md:p-8 max-h-[85vh] flex flex-col justify-between">
+        <div>
+            <div class="flex items-center justify-between pb-3 border-b border-[#3e2723]/10">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-[#3e2723]/10 text-[#3e2723] flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-file-contract"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-[#3e2723]">Syarat & Ketentuan Pemesanan</h3>
+                </div>
+                <button type="button" onclick="closeTermsModal()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition">✕</button>
+            </div>
+
+            <div class="overflow-y-auto max-h-[55vh] mt-4 pr-2 space-y-4 text-xs md:text-sm text-[#4a3525] leading-relaxed">
+                <p class="font-medium text-gray-600">
+                    Dengan melakukan pemesanan (Pre-Order) di <strong>Edelweiss Bakery</strong>, Anda dianggap telah membaca, memahami, dan menyetujui seluruh ketentuan di bawah ini:
+                </p>
+
+                <div class="space-y-1">
+                    <h4 class="font-bold text-[#3e2723] uppercase tracking-wider text-xs">1. Ketentuan Pemesanan (Pre-Order)</h4>
+                    <ul class="list-disc pl-5 space-y-0.5 text-xs">
+                        <li>Seluruh produk dibuat secara fresh berdasarkan pemesanan (<em>made-to-order</em>).</li>
+                        <li>Pemesan wajib memastikan detail produk, jumlah pesanan, tanggal, dan jam pengambilan/pengiriman yang dipilih sudah benar sebelum transaksi.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h4 class="font-bold text-[#3e2723] uppercase tracking-wider text-xs">2. Skema Pembayaran</h4>
+                    <ul class="list-disc pl-5 space-y-0.5 text-xs">
+                        <li><strong>Bayar Lunas (Full Payment):</strong> Pembayaran secara penuh di awal transaksi.</li>
+                        <li><strong>Uang Muka (DP 50%):</strong> Pembayaran DP minimal 50% dilakukan saat pemesanan. Sisa pelunasan dibayarkan offline/tunai pada saat pengambilan atau penerimaan barang.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h4 class="font-bold text-[#3e2723] uppercase tracking-wider text-xs">3. Batas Waktu & Pembatalan Otomatis (Auto-Cancel)</h4>
+                    <ul class="list-disc pl-5 space-y-0.5 text-xs">
+                        <li>Pesanan yang belum dibayar dalam waktu <strong>1x24 jam</strong> akan secara otomatis dibatalkan oleh sistem.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h4 class="font-bold text-[#3e2723] uppercase tracking-wider text-xs">4. Pembatalan & Pengembalian Dana (Refund)</h4>
+                    <ul class="list-disc pl-5 space-y-0.5 text-xs">
+                        <li>Pembatalan sepihak oleh pelanggan kurang dari <strong>H-1 waktu pengambilan/pengiriman</strong> menyebabkan dana pembayaran (DP/Lunas) tidak dapat dikembalikan.</li>
+                        <li>Apabila terjadi kendala produksi dari pihak Edelweiss Bakery, dana dikembalikan penuh (100%).</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h4 class="font-bold text-[#3e2723] uppercase tracking-wider text-xs">5. Pengambilan & Pengiriman Produk</h4>
+                    <ul class="list-disc pl-5 space-y-0.5 text-xs">
+                        <li><strong>Ambil di Toko (Pickup):</strong> Pengambilan sesuai tanggal & jam operasional toko yang disepakati.</li>
+                        <li><strong>Pengiriman Alamat (Delivery):</strong> Seluruh pengiriman ditangani langsung oleh <strong> Internal Edelweiss Bakery</strong> untuk menjamin keamanan, kebersihan, dan kondisi produk tetap sempurna hingga tiba di lokasi Anda.</li>
+                        <li>Pelanggan wajib memastikan alamat lengkap & nomor telepon/WA penerima aktif saat jadwal pengiriman.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="pt-4 border-t border-[#3e2723]/10">
+            <button type="button" onclick="acceptTermsFromModal()" class="w-full py-3.5 bg-[#3e2723] text-white font-bold rounded-2xl shadow-lg hover:bg-[#2c1b18] transition text-center">
+                Saya Mengerti & Setuju
+            </button>
+        </div>
+    </div>
+</div>
+
 @include('layouts.footer')
 
 <script>
     let checkoutCart = [];
     const TAX_RATE = 0.10; // Persentase Pajak PPN (10%)
     const ADMIN_WA = '6287794082895'; // Nomor WA Admin Edelweiss Bakery
+    
+    // 🔒 DATA TANGGAL TERBLOKIR DARI ADMIN
+    const disabledDates = @json($disabledDates ?? []);
 
     if (sessionStorage.getItem('bakery_cart')) {
         checkoutCart = JSON.parse(sessionStorage.getItem('bakery_cart'));
@@ -259,9 +351,53 @@
         window.location.href = "{{ route('menu') }}";
     }
 
+    // 🔒 HELPER CEK TANGGAL TERBLOKIR
+    function isDateDisabled(dateString) {
+        if (!dateString) return false;
+        const formattedDate = dateString.split(' ')[0];
+        return disabledDates.includes(formattedDate);
+    }
+
+    // 🔒 VALIDASI PENGECEKAN TANGGAL TERBLOKIR REAL-TIME
+    function validateDisabledDate(input) {
+        const selectedDate = input.value;
+        const errorText = document.getElementById('disabledDateErrorText');
+
+        if (isDateDisabled(selectedDate)) {
+            errorText.classList.remove('hidden');
+            alert('Maaf, kuota pemesanan untuk tanggal tersebut sudah PENUH atau toko sedang LIBUR. Silakan pilih tanggal lain!');
+            input.value = ''; // Kosongkan pilihan tanggal
+        } else {
+            errorText.classList.add('hidden');
+        }
+    }
+
     // Callback reCAPTCHA
     function recaptchaSuccessCallback() {
         document.getElementById('captchaErrorText').classList.add('hidden');
+    }
+
+    // 📜 MODAL & CHECKBOX SYARAT & KETENTUAN LOGIC
+    function openTermsModal() {
+        document.getElementById('termsModal').classList.remove('hidden');
+    }
+
+    function closeTermsModal() {
+        document.getElementById('termsModal').classList.add('hidden');
+    }
+
+    function acceptTermsFromModal() {
+        document.getElementById('termsCheckbox').checked = true;
+        toggleTermsError();
+        closeTermsModal();
+    }
+
+    function toggleTermsError() {
+        const checkbox = document.getElementById('termsCheckbox');
+        const errorText = document.getElementById('termsErrorText');
+        if (checkbox.checked) {
+            errorText.classList.add('hidden');
+        }
     }
 
     function toggleDeliveryAddress(orderType) {
@@ -282,12 +418,33 @@
     // Pemicu Klik "Lanjut ke Pembayaran"
     function triggerFormSubmit() {
         const form = document.getElementById('mainCheckoutForm');
-        const dateVal = document.getElementById('fulfill_date').value;
+        const dateInput = document.getElementById('fulfill_date');
+        const dateVal = dateInput.value;
         const hourVal = document.getElementById('fulfill_hour').value;
         const hiddenField = document.getElementById('fulfillAtHiddenField');
         const captchaError = document.getElementById('captchaErrorText');
+        const termsCheckbox = document.getElementById('termsCheckbox');
+        const termsError = document.getElementById('termsErrorText');
+        const errorText = document.getElementById('disabledDateErrorText');
 
-        // 1. Cek reCAPTCHA
+        // 0. Cek kembali jika tanggal yang dipilih termasuk tanggal terblokir
+        if (isDateDisabled(dateVal)) {
+            errorText.classList.remove('hidden');
+            alert('Maaf, tanggal yang Anda pilih sedang tidak menerima pesanan. Silakan ganti tanggal.');
+            dateInput.value = '';
+            dateInput.focus();
+            return;
+        }
+
+        // 1. Cek Checkbox Syarat & Ketentuan
+        if (!termsCheckbox.checked) {
+            termsError.classList.remove('hidden');
+            termsCheckbox.focus();
+            return;
+        }
+        termsError.classList.add('hidden');
+
+        // 2. Cek reCAPTCHA
         const captchaResponse = typeof grecaptcha !== 'undefined' ? grecaptcha.getResponse() : '';
         if (!captchaResponse) {
             captchaError.classList.remove('hidden');
@@ -295,12 +452,12 @@
         }
         captchaError.classList.add('hidden');
 
-        // 2. Gabungkan tanggal & jam
+        // 3. Gabungkan tanggal & jam
         if (dateVal && hourVal) {
             hiddenField.value = `${dateVal} ${hourVal}:00`;
         }
 
-        // 3. Jika Form Valid, Buka Modal Pemilihan Metode Pembayaran
+        // 4. Jika Form Valid, Buka Modal Pemilihan Metode Pembayaran
         if (form.reportValidity()) {
             document.getElementById('paymentModal').classList.remove('hidden');
         }
@@ -312,12 +469,36 @@
 
     // Submit Opsi 1: Payment Gateway
     function submitViaPG() {
+        const dateInput = document.getElementById('fulfill_date');
+        const dateVal = dateInput.value;
+
+        // 🚨 PROTEKSI KETAT SEBELUM SUBMIT PAYMENT GATEWAY
+        if (isDateDisabled(dateVal)) {
+            alert('Maaf, tanggal yang Anda pilih sudah PENUH/LIBUR. Silakan ganti tanggal.');
+            closePaymentModal();
+            dateInput.value = '';
+            dateInput.focus();
+            return;
+        }
+
         document.getElementById('paymentMethodHiddenField').value = 'payment_gateway';
         document.getElementById('mainCheckoutForm').submit();
     }
 
     // 🟢 SCRIPT WHATSAPP BERSIH TANPA EMOJI (MENCEGAH KARAKTER TANDA TANYA / CORRUPT)
     function submitViaWhatsApp() {
+        const dateInput = document.getElementById('fulfill_date');
+        const dateVal = dateInput.value;
+
+        // 🚨 PROTEKSI KETAT SEBELUM PROSES WA & SUBMIT MANUAL
+        if (isDateDisabled(dateVal)) {
+            alert('Maaf, kuota pemesanan untuk tanggal tersebut sudah PENUH atau toko sedang LIBUR. Pesanan tidak dapat dilanjutkan.');
+            closePaymentModal();
+            dateInput.value = '';
+            dateInput.focus();
+            return;
+        }
+
         document.getElementById('paymentMethodHiddenField').value = 'manual_wa';
 
         // 1. Ambil Data Form untuk Template WhatsApp
@@ -326,7 +507,6 @@
         const email = document.getElementById('customer_email').value;
         const orderType = document.getElementById('orderTypeSelect').value;
         const address = document.getElementById('deliveryAddressInput').value;
-        const dateVal = document.getElementById('fulfill_date').value;
         const hourVal = document.getElementById('fulfill_hour').value;
         const notes = document.getElementById('notesInput').value;
         const paymentPlan = document.querySelector('input[name="payment_plan"]:checked').value;

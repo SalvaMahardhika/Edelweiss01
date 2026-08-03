@@ -70,6 +70,12 @@
                         <i class="fa-regular fa-images w-5 text-center text-lg"></i> Galeri Foto
                     </a>
                     
+                    {{-- 🔒 🆕 LOCK TANGGAL / KUOTA LIBUR --}}
+                    <a href="{{ route('admin.disabled_dates.index') }}" 
+                       class="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition duration-300 {{ Route::is('admin.disabled_dates.*') || Request::is('admin/disabled-dates*') ? 'bg-[#3e2723] text-white font-semibold shadow-lg' : 'hover:bg-white/50 text-[#3e2723]/80 font-medium' }}">
+                        <i class="fa-solid fa-calendar-xmark w-5 text-center text-lg"></i> Lock Tanggal
+                    </a>
+
                     {{-- 🛍️ INDUK MENU: PESANAN (WITH DROPDOWN) --}}
                     @php
                         $isPesananActive = Route::is('admin.po.*') || Request::is('admin/orders*') || Request::is('admin/laporan*');

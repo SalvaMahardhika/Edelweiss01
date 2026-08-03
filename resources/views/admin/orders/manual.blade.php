@@ -15,6 +15,11 @@
     verifyFormAction: '',
     verifyOrderNumber: '',
 
+    // 🖼️ State Modal Bukti Transfer
+    showProofModal: false,
+    modalProofUrl: '',
+    proofOrderNumber: '',
+
     openAddressModal(name, number, address) {
         this.modalCustomerName = name;
         this.modalOrderNumber = number;
@@ -26,6 +31,12 @@
         this.verifyFormAction = actionUrl;
         this.verifyOrderNumber = number;
         this.showVerifyModal = true;
+    },
+
+    openProofModal(url, number) {
+        this.modalProofUrl = url;
+        this.proofOrderNumber = number;
+        this.showProofModal = true;
     }
 }" class="max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 space-y-6">
 
@@ -99,11 +110,18 @@
                 <option value="paid" {{ request('status_bayar') == 'paid' ? 'selected' : '' }}>Lunas (Paid)</option>
             </select>
 
+            {{-- Filter Status Upload Bukti TF --}}
+            <select name="has_proof" class="px-4 py-2.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] font-medium text-[#3e2723]">
+                <option value="">Semua Bukti TF</option>
+                <option value="1" {{ request('has_proof') == '1' ? 'selected' : '' }}>Ada Bukti TF</option>
+                <option value="0" {{ request('has_proof') == '0' ? 'selected' : '' }}>Belum Ada Bukti</option>
+            </select>
+
             <button type="submit" class="px-5 py-2.5 bg-[#3e2723] text-white text-xs font-bold rounded-xl shadow-md hover:bg-[#2c1b18] transition flex items-center justify-center gap-2">
                 <i class="fa-solid fa-filter"></i> Filter
             </button>
             
-            @if(request()->hasAny(['search', 'status_bayar']))
+            @if(request()->hasAny(['search', 'status_bayar', 'has_proof']))
             <a href="{{ route('admin.orders.manual') }}" class="px-4 py-2.5 bg-white/60 text-[#3e2723] text-xs font-bold rounded-xl border border-white/50 hover:bg-white transition flex items-center justify-center">
                 Reset
             </a>
@@ -227,21 +245,36 @@
                             @endif
                         </td>
 
-                        {{-- STATUS PEMBAYARAN --}}
-                        <td class="px-4 py-3.5 text-center">
-                            @if(in_array(strtolower($paymentStatusVal), ['paid', 'lunas']))
-                                <span class="px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-600 text-white shadow-sm inline-block">
-                                    LUNAS
-                                </span>
-                            @elseif(in_array(strtolower($paymentStatusVal), ['dp', 'partial']))
-                                <span class="px-2.5 py-1 rounded-xl text-[10px] font-black bg-amber-500 text-white shadow-sm inline-block">
-                                    DP DITERIMA
-                                </span>
-                            @else
-                                <span class="px-2.5 py-1 rounded-xl text-[10px] font-black bg-rose-600 text-white shadow-sm inline-block">
-                                    BELUM BAYAR
-                                </span>
-                            @endif
+                        {{-- STATUS PEMBAYARAN & BUKTI TRANSFER --}}
+                        <td class="px-4 py-3.5 text-center space-y-1.5">
+                            <div>
+                                @if(in_array(strtolower($paymentStatusVal), ['paid', 'lunas']))
+                                    <span class="px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-600 text-white shadow-sm inline-block">
+                                        LUNAS
+                                    </span>
+                                @elseif(in_array(strtolower($paymentStatusVal), ['dp', 'partial']))
+                                    <span class="px-2.5 py-1 rounded-xl text-[10px] font-black bg-amber-500 text-white shadow-sm inline-block">
+                                        DP DITERIMA
+                                    </span>
+                                @else
+                                    <span class="px-2.5 py-1 rounded-xl text-[10px] font-black bg-rose-600 text-white shadow-sm inline-block">
+                                        BELUM BAYAR
+                                    </span>
+                                @endif
+                            </div>
+
+                            {{-- 🖼️ TOMBOL UNTUK MEMBUKA MODAL BUKTI TRANSFER --}}
+                            <div>
+                                @if(!empty($order->payment_proof))
+                                    <button type="button" 
+                                            @click="openProofModal('{{ asset('img/buktitf/' . $order->payment_proof) }}', '{{ $order->order_number }}')"
+                                            class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-100/80 hover:bg-emerald-200 border border-emerald-300 px-2 py-1 rounded-lg shadow-sm transition">
+                                        <i class="fa-solid fa-image text-emerald-700"></i> Cek Bukti TF
+                                    </button>
+                                @else
+                                    <span class="text-[10px] text-gray-400 italic block">Belum ada bukti</span>
+                                @endif
+                            </div>
                         </td>
 
                         {{-- AKSI VERIFIKASI / CHAT WA --}}
@@ -360,6 +393,47 @@
                     Ya, Verifikasi
                 </button>
             </form>
+        </div>
+    </div>
+
+    {{-- ========================================================================= --}}
+    {{-- MODAL 3: POPUP PREVIEW BUKTI TRANSFER (SINGLE IMAGE) --}}
+    {{-- ========================================================================= --}}
+    <div x-show="showProofModal" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
+         style="display: none;">
+        
+        <div @click.away="showProofModal = false" class="bg-white/95 backdrop-blur-2xl border border-white/80 rounded-[2.5rem] p-6 max-w-lg w-full shadow-2xl space-y-4 text-center my-auto">
+            
+            <div class="flex items-center justify-between pb-3 border-b border-gray-200">
+                <div class="flex items-center gap-2 text-[#3e2723]">
+                    <i class="fa-solid fa-receipt text-lg text-emerald-600"></i>
+                    <h3 class="font-black text-sm">Bukti Transfer - <span x-text="proofOrderNumber"></span></h3>
+                </div>
+                <button @click="showProofModal = false" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            {{-- GAMBAR BUKTI TF --}}
+            <div class="relative bg-gray-100 rounded-2xl overflow-hidden border border-gray-200 max-h-[60vh] flex items-center justify-center">
+                <img :src="modalProofUrl" alt="Foto Bukti Transfer" class="max-h-[58vh] w-auto object-contain rounded-xl shadow">
+            </div>
+
+            <div class="pt-2 flex justify-between items-center gap-2">
+                <a :href="modalProofUrl" target="_blank" class="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-200 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-up-right-from-square"></i> Buka Gambar di Tab Baru
+                </a>
+                <button @click="showProofModal = false" type="button" class="px-5 py-2 bg-[#3e2723] text-white text-xs font-bold rounded-xl shadow hover:bg-[#2c1b18] transition">
+                    Tutup
+                </button>
+            </div>
         </div>
     </div>
 

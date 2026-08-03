@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\DisabledDateController;
 use App\Http\Controllers\GaleriController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\MenuController;
@@ -43,6 +44,9 @@ Route::controller(CheckoutController::class)->group(function () {
     Route::get('/pesanan/{order_number?}', 'track')->name('orders.track');
 });
 
+// 📸 🆕 RUTE UPLOAD BUKTI TRANSFER DARI FRONTEND (Support Guest / Public)
+Route::post('/pesanan/upload-proof', [OrderController::class, 'uploadProof'])->name('orders.uploadProof');
+
 // 🔔 WEBHOOK NOTIFIKASI PEMBAYARAN (DOKU & MIDTRANS)
 Route::post('/api/midtrans/webhook', [PaymentNotificationController::class, 'handle'])->name('midtrans.webhook');
 Route::post('/api/doku/webhook', [PaymentNotificationController::class, 'handleDoku'])->name('doku.webhook');
@@ -80,6 +84,13 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
 
         // Halaman Utama CMS Dashboard
         Route::get('/', [AdminController::class, 'dashboard'])->name('admin.index');
+
+        // 🔒 🆕 MANAJEMEN LOCK TANGGAL / KUOTA LIBUR TOKO
+        Route::controller(DisabledDateController::class)->prefix('disabled-dates')->group(function () {
+            Route::get('/', 'index')->name('admin.disabled_dates.index');
+            Route::post('/', 'store')->name('admin.disabled_dates.store');
+            Route::delete('/{id}', 'destroy')->name('admin.disabled_dates.destroy');
+        });
 
         // 🛍️ MANAJEMEN INDUK PESANAN (ORDERS, HISTORY, VERIFIKASI / ORDER MANUAL)
         Route::controller(OrderController::class)->prefix('orders')->group(function () {
