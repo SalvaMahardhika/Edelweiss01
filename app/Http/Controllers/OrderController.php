@@ -7,17 +7,39 @@ use Illuminate\Http\Request;
 
 class OrderController extends Controller
 {
-    // Halaman Utama Jadwal PO
+    // 📅 Halaman Utama Jadwal PO (KHUSUS PAYMENT GATEWAY)
     public function index(Request $request)
     {
-        $query = Order::with(['items', 'payments'])->latest();
+        // 1. 🚨 OTOMATIS BATALKAN PESANAN UNPAID > 1 HARI (24 JAM)
+        Order::where('payment_status', 'unpaid')
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->where(function ($q) {
+                $q->where('placed_at', '<=', now()->subDay())
+                    ->orWhere(function ($subQ) {
+                        $subQ->whereNull('placed_at')
+                            ->where('created_at', '<=', now()->subDay());
+                    });
+            })
+            ->update([
+                'status' => 'cancelled',
+            ]);
+
+        // 2. 📋 QUERY UTAMA JADWAL PO (HANYA PAYMENT GATEWAY & EXCLUDE 'completed'/'cancelled')
+        $query = Order::with(['items', 'payments'])
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->where(function ($q) {
+                // Tampilkan hanya yang payment_gateway (atau null/default lama)
+                $q->where('payment_method', '!=', 'manual_wa')
+                    ->orWhereNull('payment_method');
+            })
+            ->latest();
 
         // Filter berdasarkan tanggal Fulfill/Siap
         if ($request->filled('date')) {
             $query->whereDate('fulfill_at', $request->date);
         }
 
-        // Filter Status Order
+        // Filter Status Order (Hanya untuk status aktif)
         if ($request->filled('status') && $request->status !== 'ALL') {
             $query->where('status', $request->status);
         }
@@ -27,14 +49,144 @@ class OrderController extends Controller
             $query->where('payment_status', $request->payment_status);
         }
 
-        $orders = $query->paginate(15);
+        $orders = $query->paginate(15)->withQueryString();
 
-        // Rekap ringkasan pesanan hari ini
-        $todayPO = Order::whereDate('fulfill_at', now())->count();
-        $pendingPO = Order::where('status', 'pending')->count();
-        $preparingPO = Order::where('status', 'preparing')->count();
+        // Rekap ringkasan pesanan aktif Payment Gateway
+        $todayPO = Order::whereNotIn('status', ['completed', 'cancelled'])
+            ->where(function ($q) {
+                $q->where('payment_method', '!=', 'manual_wa')->orWhereNull('payment_method');
+            })
+            ->whereDate('fulfill_at', now())
+            ->count();
+
+        $pendingPO = Order::whereNotIn('status', ['completed', 'cancelled'])
+            ->where(function ($q) {
+                $q->where('payment_method', '!=', 'manual_wa')->orWhereNull('payment_method');
+            })
+            ->where('status', 'pending')
+            ->count();
+
+        $preparingPO = Order::whereNotIn('status', ['completed', 'cancelled'])
+            ->where(function ($q) {
+                $q->where('payment_method', '!=', 'manual_wa')->orWhereNull('payment_method');
+            })
+            ->where('status', 'preparing')
+            ->count();
 
         return view('admin.po.index', compact('orders', 'todayPO', 'pendingPO', 'preparingPO'));
+    }
+
+    // 💬 🆕 HALAMAN ORDER MANUAL (KHUSUS WHATSAPP / MANUAL TRANSFER)
+    public function manualOrders(Request $request)
+    {
+        $query = Order::with(['items', 'payments'])
+            ->where('payment_method', 'manual_wa')
+            ->whereNotIn('status', ['completed', 'cancelled']) // 🟢 Pesanan Selesai / Batal otomatis disembunyikan & masuk ke History
+            ->latest();
+
+        // 🔍 Filter Pencarian Keyword (No. Order, Nama, No. HP)
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('order_number', 'like', "%{$search}%")
+                    ->orWhere('customer_name', 'like', "%{$search}%")
+                    ->orWhere('customer_phone', 'like', "%{$search}%")
+                    ->orWhere('customer_email', 'like', "%{$search}%");
+            });
+        }
+
+        // 💵 Filter Status Pembayaran
+        if ($request->filled('status_bayar')) {
+            $query->where('payment_status', $request->status_bayar);
+        }
+
+        $orders = $query->paginate(15)->withQueryString();
+
+        return view('admin.orders.manual', compact('orders'));
+    }
+
+    // 📜 🆕 HALAMAN HISTORY & ARSIP PESANAN (MENGGABUNGKAN SEMUA METODE)
+    public function history(Request $request)
+    {
+        // Query Dasar: Ambil pesanan yang berstatus 'completed' atau 'cancelled'
+        $query = Order::with(['items', 'payments'])->latest();
+
+        if ($request->filled('status') && $request->status !== 'ALL') {
+            $query->where('status', $request->status);
+        } else {
+            $query->whereIn('status', ['completed', 'cancelled']);
+        }
+
+        // 🔍 Pencarian Keyword (No. Order, Nama, No. HP, Email)
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('order_number', 'like', "%{$search}%")
+                    ->orWhere('customer_name', 'like', "%{$search}%")
+                    ->orWhere('customer_phone', 'like', "%{$search}%")
+                    ->orWhere('customer_email', 'like', "%{$search}%");
+            });
+        }
+
+        // 📅 Filter Tanggal Pemesanan (placed_at / created_at)
+        if ($request->filled('placed_date')) {
+            $query->where(function ($q) use ($request) {
+                $q->whereDate('placed_at', $request->placed_date)
+                    ->orWhereDate('created_at', $request->placed_date);
+            });
+        }
+
+        // 🚚 Filter Tanggal Pengambilan/Kirim (fulfill_at)
+        if ($request->filled('fulfill_date')) {
+            $query->whereDate('fulfill_at', $request->fulfill_date);
+        }
+
+        // Pagination data history
+        $orders = $query->paginate(15)->withQueryString();
+
+        // 📊 Rekap Statistik untuk Kartu Ringkasan
+        $totalHistoryCount = Order::whereIn('status', ['completed', 'cancelled'])->count();
+        $completedCount = Order::where('status', 'completed')->count();
+        $cancelledCount = Order::where('status', 'cancelled')->count();
+
+        // 🟢 PERBAIKAN RUMUS OMZET:
+        // Hanya menghitung transaksi berstatus 'completed' (pesanan batal tidak dihitung)
+        // Dan menggunakan sum('total_amount') agar pesanan DP yang sudah completed langsung terhitung nilai penuh (100%)
+        $totalRevenue = Order::where('status', 'completed')->sum('total_amount');
+
+        return view('admin.orders.history', compact(
+            'orders',
+            'totalHistoryCount',
+            'completedCount',
+            'cancelledCount',
+            'totalRevenue'
+        ));
+    }
+
+    // 🛠️ VERIFIKASI PEMBAYARAN MANUAL (TRANSFER / WA)
+    public function verifyPayment(Request $request, $id)
+    {
+        $order = Order::findOrFail($id);
+
+        // Ambil string skema pembayaran (dp/full)
+        $paymentPlanVal = is_object($order->payment_plan) ? ($order->payment_plan->value ?? (string) $order->payment_plan) : (string) $order->payment_plan;
+
+        // Jika skema DP 50%, ubah status ke 'partial' (Enum valid untuk DP), jika Full ubah ke 'paid'
+        if (strtolower($paymentPlanVal) === 'dp') {
+            $order->update([
+                'payment_status' => 'partial',
+                'amount_paid' => $order->dp_amount ?? ($order->total_amount * 0.5),
+                'status' => 'confirmed',
+            ]);
+        } else {
+            $order->update([
+                'payment_status' => 'paid',
+                'amount_paid' => $order->total_amount,
+                'status' => 'confirmed',
+            ]);
+        }
+
+        return back()->with('success', 'Pembayaran order '.$order->order_number.' berhasil diverifikasi & dikonfirmasi.');
     }
 
     // Update Status Pengerjaan Pesanan
@@ -45,12 +197,21 @@ class OrderController extends Controller
         ]);
 
         $order = Order::findOrFail($id);
-        $order->update(['status' => $request->status]);
+
+        $updateData = ['status' => $request->status];
+
+        // 🟢 Otomatis tandai pembayaran sebagai 'paid' (Lunas) bila pesanan diselesaikan (completed)
+        if ($request->status === 'completed') {
+            $updateData['payment_status'] = 'paid';
+            $updateData['amount_paid'] = $order->total_amount;
+        }
+
+        $order->update($updateData);
 
         return back()->with('success', 'Status pesanan '.$order->order_number.' berhasil diperbarui.');
     }
 
-    // Update Status Pelunasan Manual (Misal Pelanggan Bayar Sisa DP secara Tunai saat Pickup)
+    // Update Status Pelunasan Manual (Melayani pelunasan sisa DP secara tunai/offline saat pickup atau delivery)
     public function updatePaymentStatus(Request $request, $id)
     {
         $request->validate([
@@ -58,9 +219,20 @@ class OrderController extends Controller
         ]);
 
         $order = Order::findOrFail($id);
+
+        // Jika status diubah ke 'paid' (lunas offline), set amount_paid ke total_amount
+        $amountPaid = $order->amount_paid;
+        if ($request->payment_status === 'paid') {
+            $amountPaid = $order->total_amount;
+        } elseif ($request->payment_status === 'unpaid') {
+            $amountPaid = 0;
+        } elseif ($request->payment_status === 'partial') {
+            $amountPaid = $order->dp_amount ?? ($order->total_amount * 0.5);
+        }
+
         $order->update([
             'payment_status' => $request->payment_status,
-            'amount_paid' => $request->payment_status === 'paid' ? $order->total_amount : $order->amount_paid,
+            'amount_paid' => $amountPaid,
         ]);
 
         return back()->with('success', 'Status pembayaran '.$order->order_number.' berhasil diperbarui.');

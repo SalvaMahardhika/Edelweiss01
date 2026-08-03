@@ -34,11 +34,12 @@
         </div>
     @endif
 
-    {{-- TAG FORM UTAMA MEMBUNGKUS KEDUA KOLOM AGAR SEMUA INPUT TERTANGKAP DENGAN AMAN --}}
+    {{-- TAG FORM UTAMA MEMBUNGKUS KEDUA KOLOM --}}
     <form action="{{ route('checkout.store') }}" method="POST" id="mainCheckoutForm" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         @csrf
         <input type="hidden" name="cart_items" id="cartItemsHiddenField">
         <input type="hidden" name="fulfill_at" id="fulfillAtHiddenField">
+        <input type="hidden" name="payment_method" id="paymentMethodHiddenField" value="payment_gateway">
 
         {{-- LEFT COLUMN: DETAIL FORM --}}
         <div class="lg:col-span-2 space-y-6">
@@ -69,11 +70,11 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Nama Penerima <span class="text-red-500">*</span></label>
-                        <input type="text" name="customer_name" value="{{ old('customer_name', $user->name ?? '') }}" required placeholder="Nama lengkap penerima" class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
+                        <input type="text" name="customer_name" id="customer_name" value="{{ old('customer_name', $user->name ?? '') }}" required placeholder="Nama lengkap penerima" class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Nomor Telepon / WhatsApp <span class="text-red-500">*</span></label>
-                        <input type="tel" name="customer_phone" value="{{ old('customer_phone', $user->phone ?? '') }}" placeholder="Contoh: 08123456789" required class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
+                        <input type="tel" name="customer_phone" id="customer_phone" value="{{ old('customer_phone', $user->phone ?? '') }}" placeholder="Contoh: 08123456789" required class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
                     </div>
                 </div>
 
@@ -83,6 +84,7 @@
                     </label>
                     <input type="email" 
                            name="customer_email" 
+                           id="customer_email"
                            value="{{ old('customer_email', $user->email ?? '') }}" 
                            placeholder="Contoh: nama@email.com"
                            @auth readonly @else required @endauth 
@@ -143,7 +145,7 @@
 
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Catatan Tambahan / Kustomisasi Kue</label>
-                    <textarea name="notes" rows="3" placeholder="Tulis instruksi khusus (tulisan di kue, lilin, varian rasa cadangan dll)..." class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">{{ old('notes') }}</textarea>
+                    <textarea name="notes" id="notesInput" rows="3" placeholder="Tulis instruksi khusus (tulisan di kue, lilin, varian rasa cadangan dll)..." class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">{{ old('notes') }}</textarea>
                 </div>
             </div>
         </div>
@@ -163,8 +165,8 @@
                         <span id="summarySubtotal">Rp 0</span>
                     </div>
                     <div class="flex justify-between text-gray-600">
-                        <span>Pajak & Layanan</span>
-                        <span>Rp 0</span>
+                        <span>Pajak & Layanan (10%)</span>
+                        <span id="summaryTax">Rp 0</span>
                     </div>
                     <div class="flex justify-between font-bold text-base border-t border-dashed pt-2 text-[#3e2723]">
                         <span>Total Keseluruhan</span>
@@ -183,17 +185,71 @@
                 </div>
 
                 <button type="button" onclick="triggerFormSubmit()" class="w-full py-4 bg-[#3e2723] text-white font-bold rounded-2xl shadow-xl hover:bg-[#2c1b18] transition duration-300 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-shield-heart"></i> Proses Pre-Order Sekarang
+                    <i class="fa-solid fa-shield-heart"></i> Lanjut ke Pembayaran
                 </button>
             </div>
         </div>
     </form>
 </main>
 
+{{-- 💳 MODAL POPUP METODE PEMBAYARAN --}}
+<div id="paymentModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-md p-6 rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white/80 shadow-2xl space-y-6 text-center my-auto">
+        
+        <div>
+            <div class="w-16 h-16 rounded-3xl bg-[#3e2723]/10 text-[#3e2723] flex items-center justify-center text-2xl mx-auto mb-3 shadow-inner">
+                <i class="fa-solid fa-wallet"></i>
+            </div>
+            <h3 class="text-xl font-black text-[#3e2723]">Pilih Metode Pembayaran</h3>
+            <p class="text-xs font-medium text-gray-600 mt-1">Pilih alur pembayaran yang paling nyaman untuk Anda.</p>
+        </div>
+
+        <div class="space-y-3">
+            {{-- Pilihan 1: Payment Gateway --}}
+            <button type="button" onclick="submitViaPG()" class="w-full p-4 rounded-2xl bg-white/70 border border-white hover:border-[#3e2723] hover:bg-white text-left transition shadow-sm group">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center text-lg group-hover:scale-110 transition">
+                            <i class="fa-solid fa-bolt"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-[#3e2723]">Payment Gateway (Otomatis)</p>
+                            <p class="text-[10px] text-gray-500">QRIS, Virtual Account, & E-Wallet (DOKU)</p>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-xs text-gray-400 group-hover:translate-x-1 transition"></i>
+                </div>
+            </button>
+
+            {{-- Pilihan 2: Direct WhatsApp --}}
+            <button type="button" onclick="submitViaWhatsApp()" class="w-full p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 hover:border-emerald-500 hover:bg-emerald-100 text-left transition shadow-sm group">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-lg group-hover:scale-110 transition">
+                            <i class="fa-brands fa-whatsapp"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-emerald-950">Transfer Manual via WhatsApp</p>
+                            <p class="text-[10px] text-emerald-700">Kirim detail & konfirmasi bayar via Chat WA Admin</p>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-xs text-emerald-500 group-hover:translate-x-1 transition"></i>
+                </div>
+            </button>
+        </div>
+
+        <button type="button" onclick="closePaymentModal()" class="w-full py-2.5 text-xs font-bold text-gray-500 hover:text-gray-800 transition">
+            Batal & Kembali
+        </button>
+    </div>
+</div>
+
 @include('layouts.footer')
 
 <script>
     let checkoutCart = [];
+    const TAX_RATE = 0.10; // Persentase Pajak PPN (10%)
+    const ADMIN_WA = '6287794082895'; // Nomor WA Admin Edelweiss Bakery
 
     if (sessionStorage.getItem('bakery_cart')) {
         checkoutCart = JSON.parse(sessionStorage.getItem('bakery_cart'));
@@ -203,12 +259,11 @@
         window.location.href = "{{ route('menu') }}";
     }
 
-    // Callback saat reCAPTCHA dicentang
+    // Callback reCAPTCHA
     function recaptchaSuccessCallback() {
         document.getElementById('captchaErrorText').classList.add('hidden');
     }
 
-    // PERBAIKAN: Jangan pernah hapus addressInput.value saat toggle agar data alamat pengiriman aman!
     function toggleDeliveryAddress(orderType) {
         const addressContainer = document.getElementById('deliveryAddressContainer');
         const addressInput = document.getElementById('deliveryAddressInput');
@@ -220,10 +275,11 @@
         } else {
             addressContainer.classList.add('hidden');
             addressInput.required = false;
-            addressInput.disabled = true; // Disabled dipasang hanya saat pickup agar tidak terkirim
+            addressInput.disabled = true;
         }
     }
 
+    // Pemicu Klik "Lanjut ke Pembayaran"
     function triggerFormSubmit() {
         const form = document.getElementById('mainCheckoutForm');
         const dateVal = document.getElementById('fulfill_date').value;
@@ -231,7 +287,7 @@
         const hiddenField = document.getElementById('fulfillAtHiddenField');
         const captchaError = document.getElementById('captchaErrorText');
 
-        // 1. Verifikasi reCAPTCHA
+        // 1. Cek reCAPTCHA
         const captchaResponse = typeof grecaptcha !== 'undefined' ? grecaptcha.getResponse() : '';
         if (!captchaResponse) {
             captchaError.classList.remove('hidden');
@@ -244,10 +300,88 @@
             hiddenField.value = `${dateVal} ${hourVal}:00`;
         }
 
-        // 3. Submit form jika validasi HTML terpenuhi
+        // 3. Jika Form Valid, Buka Modal Pemilihan Metode Pembayaran
         if (form.reportValidity()) {
-            form.submit();
+            document.getElementById('paymentModal').classList.remove('hidden');
         }
+    }
+
+    function closePaymentModal() {
+        document.getElementById('paymentModal').classList.add('hidden');
+    }
+
+    // Submit Opsi 1: Payment Gateway
+    function submitViaPG() {
+        document.getElementById('paymentMethodHiddenField').value = 'payment_gateway';
+        document.getElementById('mainCheckoutForm').submit();
+    }
+
+    // 🟢 SCRIPT WHATSAPP BERSIH TANPA EMOJI (MENCEGAH KARAKTER TANDA TANYA / CORRUPT)
+    function submitViaWhatsApp() {
+        document.getElementById('paymentMethodHiddenField').value = 'manual_wa';
+
+        // 1. Ambil Data Form untuk Template WhatsApp
+        const name = document.getElementById('customer_name').value;
+        const phone = document.getElementById('customer_phone').value;
+        const email = document.getElementById('customer_email').value;
+        const orderType = document.getElementById('orderTypeSelect').value;
+        const address = document.getElementById('deliveryAddressInput').value;
+        const dateVal = document.getElementById('fulfill_date').value;
+        const hourVal = document.getElementById('fulfill_hour').value;
+        const notes = document.getElementById('notesInput').value;
+        const paymentPlan = document.querySelector('input[name="payment_plan"]:checked').value;
+
+        // Hitung Total Finansial
+        let subtotal = 0;
+        let itemLines = '';
+        checkoutCart.forEach(item => {
+            subtotal += item.price * item.quantity;
+            itemLines += `- ${item.quantity}x ${item.name} (Rp ${new Intl.NumberFormat('id-ID').format(item.price * item.quantity)})\n`;
+        });
+
+        const taxAmount = Math.round(subtotal * TAX_RATE);
+        const grandTotal = subtotal + taxAmount;
+        const payNow = paymentPlan === 'dp' ? Math.round(grandTotal * 0.5) : grandTotal;
+
+        // Format Pesan WhatsApp Standar Polos (Tanpa Emoji)
+        let waMessage = `Halo Admin Edelweiss Bakery!\n`;
+        waMessage += `Saya ingin memesan kue/roti secara *TRANSFER MANUAL*.\n\n`;
+        
+        waMessage += `INFORMASI PELANGGAN:\n`;
+        waMessage += `- Nama: *${name}*\n`;
+        waMessage += `- No. Telp/WA: ${phone}\n`;
+        waMessage += `- Email: ${email}\n\n`;
+
+        waMessage += `METODE DAN WAKTU:\n`;
+        waMessage += `- Tipe Pesanan: *${orderType.toUpperCase()}*\n`;
+        if (orderType === 'delivery') {
+            waMessage += `- Alamat Pengiriman: ${address}\n`;
+        }
+        waMessage += `- Waktu Siap: *${dateVal} ${hourVal} WIB*\n\n`;
+
+        waMessage += `ITEM PESANAN:\n${itemLines}\n`;
+
+        waMessage += `SKEMA PEMBAYARAN:\n`;
+        waMessage += `- Subtotal Item: Rp ${new Intl.NumberFormat('id-ID').format(subtotal)}\n`;
+        waMessage += `- Pajak dan Layanan (10%): Rp ${new Intl.NumberFormat('id-ID').format(taxAmount)}\n`;
+        waMessage += `- Total Tagihan: *Rp ${new Intl.NumberFormat('id-ID').format(grandTotal)}*\n`;
+        waMessage += `- Skema: *${paymentPlan === 'dp' ? 'Uang Muka (DP 50%)' : 'Bayar Lunas (Full)'}*\n`;
+        waMessage += `- *Wajib Bayar Sekarang: Rp ${new Intl.NumberFormat('id-ID').format(payNow)}*\n\n`;
+
+        if (notes && notes.trim() !== '') {
+            waMessage += `Catatan Tambahan: "${notes}"\n\n`;
+        }
+
+        waMessage += `Mohon info nomor rekening bank untuk transfer ya Kak. Terima kasih!`;
+
+        const waUrl = `https://wa.me/${ADMIN_WA}?text=${encodeURIComponent(waMessage)}`;
+
+        // 2. Submit Form ke Backend Laravel (Menyimpan Data Order)
+        const form = document.getElementById('mainCheckoutForm');
+        
+        // Buka WhatsApp di tab baru lalu submit form
+        window.open(waUrl, '_blank');
+        form.submit();
     }
 
     function renderCheckoutSummary() {
@@ -286,14 +420,18 @@
             subtotal += item.price * item.quantity;
         });
 
+        const taxAmount = Math.round(subtotal * TAX_RATE);
+        const grandTotal = subtotal + taxAmount;
+
         document.getElementById('summarySubtotal').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(subtotal);
-        document.getElementById('summaryTotal').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(subtotal);
+        document.getElementById('summaryTax').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(taxAmount);
+        document.getElementById('summaryTotal').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(grandTotal);
 
         const selectedPlan = document.querySelector('input[name="payment_plan"]:checked').value;
         const dpRow = document.getElementById('dpRowSummary');
 
         if (selectedPlan === 'dp') {
-            const dpCalculation = subtotal * 0.5;
+            const dpCalculation = Math.round(grandTotal * 0.5);
             document.getElementById('summaryDP').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(dpCalculation);
             dpRow.classList.remove('hidden');
         } else {

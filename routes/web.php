@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\GaleriController;
+use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentNotificationController;
@@ -35,11 +36,16 @@ Route::controller(CheckoutController::class)->group(function () {
     Route::get('/checkout', 'index')->name('checkout.index');
     Route::post('/checkout', 'store')->name('checkout.store');
     Route::get('/checkout/pay/{order_number}', 'pay')->name('checkout.pay');
+
+    // 🆕 RUTE REDIRECT SUKSES PEMBAYARAN DOKU
+    Route::get('/checkout/success/{order?}', 'success')->name('checkout.success');
+
     Route::get('/pesanan/{order_number?}', 'track')->name('orders.track');
 });
 
-// 🔔 WEBHOOK MIDTRANS
+// 🔔 WEBHOOK NOTIFIKASI PEMBAYARAN (DOKU & MIDTRANS)
 Route::post('/api/midtrans/webhook', [PaymentNotificationController::class, 'handle'])->name('midtrans.webhook');
+Route::post('/api/doku/webhook', [PaymentNotificationController::class, 'handleDoku'])->name('doku.webhook');
 
 // =========================================================================
 // AUTHENTICATION ROUTES (GUEST ONLY)
@@ -75,17 +81,31 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
         // Halaman Utama CMS Dashboard
         Route::get('/', [AdminController::class, 'dashboard'])->name('admin.index');
 
-        // Order Management
+        // 🛍️ MANAJEMEN INDUK PESANAN (ORDERS, HISTORY, VERIFIKASI / ORDER MANUAL)
         Route::controller(OrderController::class)->prefix('orders')->group(function () {
             Route::post('/', 'store')->name('orders.store');
+
+            // 📜 Sub-Menu: History Pesanan
+            Route::get('/history', 'history')->name('admin.orders.history');
+
+            // 💬 Sub-Menu: Order Manual (Transfer WhatsApp / Manual Direct)
+            Route::get('/manual', 'manualOrders')->name('admin.orders.manual');
+            Route::patch('/{id}/verify', 'verifyPayment')->name('admin.orders.verifyPayment');
         });
 
-        // 📅 MANAJEMEN JADWAL PO / ORDERS
+        // 📅 MANAJEMEN JADWAL PO / ANTREAN PRODUKSI
         Route::controller(OrderController::class)->prefix('jadwal-po')->group(function () {
             Route::get('/', 'index')->name('admin.po.index');
             Route::get('/{id}', 'show')->name('admin.po.show');
             Route::patch('/{id}/update-status', 'updateStatus')->name('admin.po.updateStatus');
             Route::patch('/{id}/update-payment', 'updatePaymentStatus')->name('admin.po.updatePayment');
+        });
+
+        // 📊 MANAJEMEN LAPORAN PENJUALAN & OMZET
+        Route::controller(LaporanController::class)->prefix('laporan')->group(function () {
+            Route::get('/', 'index')->name('admin.laporan.index');
+            Route::get('/export-excel', 'exportExcel')->name('admin.laporan.exportExcel');
+            Route::get('/export-pdf', 'exportPdf')->name('admin.laporan.exportPdf');
         });
 
         // 📝 Produk / Menu Management (CRUD Lengkap)

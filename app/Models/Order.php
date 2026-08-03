@@ -25,6 +25,7 @@ class Order extends Model
         'order_type',
         'delivery_address',
         'status',
+        'payment_method', // 🟢 DITAMBAHKAN AGAR BISA DIISI SAAT CHECKOUT (payment_gateway | manual_wa)
         'payment_plan',
         'payment_status',
         'snap_token',

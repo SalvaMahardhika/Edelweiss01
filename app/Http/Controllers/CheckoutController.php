@@ -6,13 +6,14 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Produk;
 use App\Models\User;
-use App\Services\MidtransService;
+use App\Services\DokuService;
 use App\Services\TelegramService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class CheckoutController extends Controller
@@ -40,6 +41,7 @@ class CheckoutController extends Controller
             'customer_email' => 'required|email|max:255', // Wajib diisi agar data tracing & account linking bekerja
             'order_type' => 'required|in:pickup,delivery',
             'delivery_address' => 'required_if:order_type,delivery|nullable|string',
+            'payment_method' => 'nullable|in:payment_gateway,manual_wa', // 🟢 DITAMBAHKAN: Validasi metode pembayaran
             'payment_plan' => 'required|in:full,dp',
             // Waktu kesiapan minimal 2 jam ke depan (now + 2 hours)
             'fulfill_at' => 'required|date|after_or_equal:'.now()->addHours(2)->format('Y-m-d H:i:s'),
@@ -118,7 +120,10 @@ class CheckoutController extends Controller
             $nextSequence = $latestOrder ? ((int) Str::afterLast($latestOrder->order_number, '-') + 1) : 1;
             $orderNumber = "EDL-{$dateString}-".str_pad($nextSequence, 4, '0', STR_PAD_LEFT);
 
-            // 5. Simpan ke tabel orders (user_id selalu terisi secara konsisten)
+            // Ambil metode pembayaran (Default ke 'payment_gateway' jika kosong)
+            $paymentMethod = $request->input('payment_method', 'payment_gateway');
+
+            // 5. Simpan ke tabel orders (user_id & payment_method terisi secara konsisten)
             $order = Order::create([
                 'order_number' => $orderNumber,
                 'user_id' => $userId,
@@ -128,6 +133,7 @@ class CheckoutController extends Controller
                 'order_type' => $request->order_type,
                 'delivery_address' => $request->delivery_address,
                 'status' => 'pending',
+                'payment_method' => $paymentMethod, // 🟢 SIMPAN NILAI PAYMENT METHOD
                 'payment_plan' => $request->payment_plan,
                 'payment_status' => 'unpaid',
                 'subtotal' => $subtotal,
@@ -151,14 +157,21 @@ class CheckoutController extends Controller
 
             // 🔔 7. KIRIM NOTIFIKASI REAL-TIME KE TELEGRAM GRUP PESANAN
             try {
-                $telegramService = new TelegramService();
+                $telegramService = new TelegramService;
                 $telegramService->sendOrderNotification($order->load('items'));
             } catch (\Exception $telegramEx) {
                 // Silently log error telegram agar transaksi user tidak terganggu meski bot gagal kirim
-                \Illuminate\Support\Facades\Log::error('Telegram notification error: ' . $telegramEx->getMessage());
+                Log::error('Telegram notification error: '.$telegramEx->getMessage());
             }
 
-            // Redirect ke halaman pembayaran Midtrans Snap
+            // 🟢 8. PEMBERCABANGAN REDIRECT
+            // Jika memilih Manual WA, langsung arahkan ke halaman Lacak Pesanan / Detail Pesanan
+            if ($paymentMethod === 'manual_wa') {
+                return redirect()->to('/pesanan/'.$order->order_number)
+                    ->with('success', 'Pesanan berhasil dibuat! Silakan lanjutkan konfirmasi pembayaran via WhatsApp.');
+            }
+
+            // Jika Payment Gateway (DOKU), redirect ke halaman bayar
             return redirect()->route('checkout.pay', $order->order_number);
 
         } catch (\Exception $e) {
@@ -169,27 +182,68 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Tampilkan halaman pembayaran Midtrans Snap (Awal / Pembuatan Pesanan).
+     * Tampilkan halaman pembayaran DOKU (Awal / Pembuatan Pesanan).
      */
-    public function pay($order_number, MidtransService $midtransService)
+    public function pay($order_number, DokuService $dokuService)
     {
         // 1. Cari data order
         $order = Order::where('order_number', $order_number)->firstOrFail();
 
-        // 2. Jika order SUDAH MEMILIKI snap_token, pakai token tersebut (TIDAK minta baru ke Midtrans)
+        // 2. Jika order SUDAH MEMILIKI snap_token (paymentUrl DOKU), pakai URL tersebut
         if ($order->snap_token) {
-            $snapToken = $order->snap_token;
+            $paymentUrl = $order->snap_token;
         } else {
-            // Jika BELUM PUNYA (transaksi baru), minta ke Midtrans lalu simpan ke DB
-            $snapToken = $midtransService->getSnapToken($order, 'initial');
+            // Jika BELUM PUNYA (transaksi baru), minta ke DOKU lalu simpan ke DB
+            $paymentUrl = $dokuService->getPaymentUrl($order, 'initial');
 
             $order->update([
-                'snap_token' => $snapToken,
+                'snap_token' => $paymentUrl,
             ]);
         }
 
         // 3. Tampilkan halaman pembayaran
-        return view('checkout.pay', compact('order', 'snapToken'));
+        return view('checkout.pay', compact('order', 'paymentUrl'));
+    }
+
+    /**
+     * Halaman Redirect setelah transaksi DOKU selesai
+     */
+    public function success($orderNumber)
+    {
+        // Cari pesanan berdasarkan order_number
+        $order = Order::where('order_number', $orderNumber)->firstOrFail();
+
+        // [AUTO-UPDATE STATUS] Update status pembayaran pesanan jika masih pending
+        if ($order->payment_status === 'pending' || $order->payment_status === 'unpaid') {
+            $paymentPlan = is_object($order->payment_plan) ? $order->payment_plan->value : $order->payment_plan;
+
+            if (strtolower($paymentPlan) === 'dp') {
+                $order->update([
+                    'payment_status' => 'dp',
+                    'amount_paid' => $order->dp_amount ?? ($order->total_amount / 2),
+                    'status' => 'confirmed', // Atau status produksi awal
+                ]);
+            } else {
+                $order->update([
+                    'payment_status' => 'paid', // atau 'lunas'
+                    'amount_paid' => $order->total_amount,
+                    'status' => 'confirmed',
+                ]);
+            }
+
+            // Kirim notifikasi pesanan ke Telegram jika TelegramService tersedia
+            try {
+                if (class_exists(TelegramService::class)) {
+                    app(TelegramService::class)->sendOrderNotification($order);
+                }
+            } catch (\Exception $e) {
+                Log::error('Telegram Notif Error: '.$e->getMessage());
+            }
+        }
+
+        // Tampilkan halaman sukses / detail pesanan via URL /pesanan/{order_number}
+        return redirect()->to('/pesanan/'.$order->order_number)
+            ->with('success', 'Pembayaran berhasil dikonfirmasi! Pesanan Anda sedang diproses.');
     }
 
     /**

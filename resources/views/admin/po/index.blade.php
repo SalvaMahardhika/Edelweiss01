@@ -49,13 +49,11 @@
             <div>
                 <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Status Produksi</label>
                 <select name="status" class="w-full mt-1 px-4 py-2 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-[#3e2723] font-medium">
-                    <option value="ALL">Semua Status</option>
+                    <option value="ALL">Semua Status Aktif</option>
                     <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
                     <option value="confirmed" {{ request('status') == 'confirmed' ? 'selected' : '' }}>Confirmed</option>
                     <option value="preparing" {{ request('status') == 'preparing' ? 'selected' : '' }}>Preparing (Dipanggang)</option>
                     <option value="ready" {{ request('status') == 'ready' ? 'selected' : '' }}>Ready (Siap)</option>
-                    <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>Completed (Selesai)</option>
-                    <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Batal</option>
                 </select>
             </div>
 
@@ -164,18 +162,22 @@
                             <p class="text-[11px] font-bold text-[#3e2723] mt-1">Rp {{ number_format($order->total_amount, 0, ',', '.') }}</p>
                         </td>
 
-                        {{-- Status Pengerjaan (Dapur/PO) --}}
+                        {{-- Status Pengerjaan (Dapur/PO) Dengan Modal Konfirmasi --}}
                         <td class="px-6 py-4 text-center">
-                            <form method="POST" action="{{ route('admin.po.updateStatus', $order->id) }}">
+                            <form id="status-form-{{ $order->id }}" method="POST" action="{{ route('admin.po.updateStatus', $order->id) }}">
                                 @csrf
                                 @method('PATCH')
-                                <select name="status" onchange="this.form.submit()" class="text-xs font-bold px-3 py-1.5 rounded-xl border border-white/50 shadow-md cursor-pointer transition focus:outline-none {{ $statusVal === 'completed' ? 'bg-emerald-600 text-white' : ($statusVal === 'preparing' ? 'bg-blue-600 text-white' : ($statusVal === 'ready' ? 'bg-purple-600 text-white' : 'bg-amber-500 text-white')) }}">
+                                <select name="status" 
+                                        onchange="handleStatusChange(this, '{{ $order->id }}', '{{ $order->order_number }}', '{{ $statusVal }}')" 
+                                        class="text-xs font-bold px-3 py-1.5 rounded-xl border border-white/50 shadow-md cursor-pointer transition focus:outline-none {{ $statusVal === 'completed' ? 'bg-emerald-600 text-white' : ($statusVal === 'preparing' ? 'bg-blue-600 text-white' : ($statusVal === 'ready' ? 'bg-purple-600 text-white' : 'bg-amber-500 text-white')) }}">
                                     <option value="pending" {{ $statusVal === 'pending' ? 'selected' : '' }}>Pending</option>
                                     <option value="confirmed" {{ $statusVal === 'confirmed' ? 'selected' : '' }}>Confirmed</option>
                                     <option value="preparing" {{ $statusVal === 'preparing' ? 'selected' : '' }}>Preparing (Dipanggang)</option>
                                     <option value="ready" {{ $statusVal === 'ready' ? 'selected' : '' }}>Ready (Siap Ambil/Kirim)</option>
-                                    <option value="completed" {{ $statusVal === 'completed' ? 'selected' : '' }}>Completed (Selesai)</option>
-                                    <option value="cancelled" {{ $statusVal === 'cancelled' ? 'selected' : '' }}>Batal</option>
+                                    
+                                    {{-- OPSI PINDAH KE HISTORY (LENGKAP DENGAN SELECTED) --}}
+                                    <option value="completed" {{ $statusVal === 'completed' ? 'selected' : '' }}>Completed (Selesai & Pindah ke History)</option>
+                                    <option value="cancelled" {{ $statusVal === 'cancelled' ? 'selected' : '' }}>Batal (Pindah ke History)</option>
                                 </select>
                             </form>
                         </td>
@@ -185,7 +187,7 @@
                     <tr>
                         <td colspan="5" class="px-6 py-8 text-center text-gray-500 text-sm">
                             <i class="fa-solid fa-calendar-xmark text-2xl mb-2 text-gray-400 block"></i>
-                            Tidak ada jadwal pesanan PO yang ditemukan.
+                            Tidak ada jadwal pesanan PO aktif saat ini.
                         </td>
                     </tr>
                     @endforelse
@@ -232,7 +234,38 @@
     </div>
 </div>
 
+{{-- ⚠️ MODAL POPUP: KONFIRMASI UBAH STATUS (SELESAI / BATAL) --}}
+<div id="confirmModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-sm p-6 rounded-[2rem] bg-white/60 backdrop-blur-3xl border border-white/70 shadow-2xl relative space-y-5 my-auto text-center">
+        
+        <!-- Icon Peringatan -->
+        <div id="confirmModalIconBg" class="w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto shadow-inner">
+            <i id="confirmModalIcon" class="fa-solid"></i>
+        </div>
+
+        <div>
+            <h3 id="confirmModalTitle" class="text-lg font-black text-[#3e2723]">Konfirmasi Tindakan</h3>
+            <p id="confirmModalDescription" class="text-xs font-medium text-gray-600 mt-1 leading-relaxed px-2">
+                Apakah Anda yakin ingin memperbarui status pesanan ini?
+            </p>
+        </div>
+
+        <div class="flex items-center gap-3 pt-1">
+            <button type="button" onclick="cancelStatusChange()" class="flex-1 py-2.5 text-xs font-bold rounded-xl bg-white/60 border border-white text-[#3e2723] hover:bg-white transition shadow-sm">
+                Batal
+            </button>
+            <button type="button" id="confirmSubmitBtn" class="flex-1 py-2.5 text-xs font-bold rounded-xl text-white shadow-md transition">
+                Ya, Lanjutkan
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
+    let activeSelectElement = null;
+    let activeFormId = null;
+    let originalValue = null;
+
     function openAddressModal(orderNumber, customerName, address) {
         document.getElementById('modalOrderInfo').innerText = `${orderNumber} - ${customerName}`;
         document.getElementById('modalAddressText').innerText = address && address.trim() !== '' ? address : 'Alamat pengiriman belum diisi / tidak tersedia.';
@@ -241,6 +274,58 @@
 
     function closeAddressModal() {
         document.getElementById('addressModal').classList.add('hidden');
+    }
+
+    // Intercept dropdown status
+    function handleStatusChange(selectElement, orderId, orderNumber, currentStatus) {
+        const selectedVal = selectElement.value;
+
+        // Jika mengubah ke 'completed' atau 'cancelled', tampilkan modal konfirmasi
+        if (selectedVal === 'completed' || selectedVal === 'cancelled') {
+            activeSelectElement = selectElement;
+            activeFormId = `status-form-${orderId}`;
+            originalValue = currentStatus;
+
+            const modal = document.getElementById('confirmModal');
+            const iconBg = document.getElementById('confirmModalIconBg');
+            const icon = document.getElementById('confirmModalIcon');
+            const title = document.getElementById('confirmModalTitle');
+            const desc = document.getElementById('confirmModalDescription');
+            const submitBtn = document.getElementById('confirmSubmitBtn');
+
+            if (selectedVal === 'completed') {
+                iconBg.className = 'w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto shadow-inner bg-emerald-500/10 text-emerald-700 border border-emerald-500/20';
+                icon.className = 'fa-solid fa-circle-check';
+                title.innerText = 'Pesanan Selesai?';
+                desc.innerHTML = `Pesanan <strong class="text-[#3e2723]">${orderNumber}</strong> akan ditandai <span class="text-emerald-700 font-bold">SELESAI</span> dan otomatis dipindahkan ke halaman <strong>History Pesanan</strong>.`;
+                submitBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-white shadow-md transition bg-emerald-600 hover:bg-emerald-700';
+            } else if (selectedVal === 'cancelled') {
+                iconBg.className = 'w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto shadow-inner bg-rose-500/10 text-rose-700 border border-rose-500/20';
+                icon.className = 'fa-solid fa-triangle-exclamation';
+                title.innerText = 'Batalkan Pesanan?';
+                desc.innerHTML = `Pesanan <strong class="text-[#3e2723]">${orderNumber}</strong> akan ditandai <span class="text-rose-700 font-bold">BATAL</span> dan otomatis dipindahkan ke halaman <strong>History Pesanan</strong>.`;
+                submitBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-white shadow-md transition bg-rose-600 hover:bg-rose-700';
+            }
+
+            submitBtn.onclick = function() {
+                document.getElementById(activeFormId).submit();
+            };
+
+            modal.classList.remove('hidden');
+        } else {
+            // Jika status biasa (pending, confirmed, preparing, ready), langsung submit
+            document.getElementById(`status-form-${orderId}`).submit();
+        }
+    }
+
+    function cancelStatusChange() {
+        if (activeSelectElement && originalValue) {
+            activeSelectElement.value = originalValue;
+        }
+        document.getElementById('confirmModal').classList.add('hidden');
+        activeSelectElement = null;
+        activeFormId = null;
+        originalValue = null;
     }
 </script>
 @endsection

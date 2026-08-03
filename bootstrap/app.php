@@ -35,7 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // 🚨 KIRIM NOTIFIKASI ERROR LOG OTOMATIS KE TELEGRAM
         $exceptions->reportable(function (Throwable $e) {
             try {
-                $telegram = new TelegramService();
+                $telegram = new TelegramService;
                 $telegram->sendErrorLog($e);
             } catch (Throwable $telegramEx) {
                 // Mencegah error loop jika Telegram API gagal merespons

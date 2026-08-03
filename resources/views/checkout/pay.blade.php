@@ -9,10 +9,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    {{-- 🔑 MIDTRANS SNAP JS (MENGGUNAKAN VERSI SANDBOX) --}}
-    <script type="text/javascript"
-            src="https://app.sandbox.midtrans.com/snap/snap.js"
-            data-client-key="{{ config('services.midtrans.client_key', env('MIDTRANS_CLIENT_KEY')) }}"></script>
+    {{-- 🔑 DOKU CHECKOUT JS SDK (AUTO-SWITCH SANDBOX / PRODUCTION) --}}
+    @if(config('services.doku.is_production', env('DOKU_IS_PRODUCTION', false)))
+        <script src="https://jokul.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js"></script>
+    @else
+        <script src="https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js"></script>
+    @endif
 
     <style>
         body { font-family: 'Poppins', sans-serif; }
@@ -74,56 +76,46 @@
             </a>
         </div>
 
-        <p class="text-[10px] text-gray-400">Pre-Order Anda aman terenkripsi melewati sistem pembayaran resmi Midtrans Gateway.</p>
+        <p class="text-[10px] text-gray-400">Pre-Order Anda aman terenkripsi melewati sistem pembayaran resmi DOKU Payment Gateway.</p>
     </div>
 </main>
 
 @include('layouts.footer')
 
-{{-- 🔑 SCRIPTS INTEGRASI SNAP MIDTRANS --}}
+{{-- 🔑 SCRIPTS INTEGRASI DOKU CHECKOUT --}}
 <script type="text/javascript">
     const payButton = document.getElementById('pay-button');
-    const snapToken = "{{ $snapToken }}";
+    // Menerima $paymentUrl dari controller (atau fallback ke $order->snap_token)
+    const paymentUrl = "{{ $paymentUrl ?? ($order->snap_token ?? '') }}";
 
-    // Fungsi pembuka Pop-Up Midtrans Snap Layer
-    function openMidtransSnap() {
-        window.snap.pay(snapToken, {
-            onSuccess: function(result) {
-                /* Terjadi ketika pembayaran sukses diselesaikan pembeli */
-                alert("Pembayaran sukses! Terima kasih.");
-                console.log(result);
-                // Kosongkan keranjang belanja karena pemesanan sudah fix
-                sessionStorage.removeItem('bakery_cart');
-                window.location.href = "{{ url('/pesanan') }}/" + "{{ $order->order_number }}";
-            },
-            onPending: function(result) {
-                /* Terjadi jika pembeli memilih opsi Transfer Bank / VA dan belum membayar */
-                alert("Menunggu pembayaran Anda. Mohon selesaikan transaksi.");
-                console.log(result);
-                sessionStorage.removeItem('bakery_cart');
-                window.location.href = "{{ url('/pesanan') }}/" + "{{ $order->order_number }}";
-            },
-            onError: function(result) {
-                /* Terjadi jika transaksi gagal / ditolak */
-                alert("Pembayaran gagal! Silakan coba lagi.");
-                console.log(result);
-            },
-            onClose: function() {
-                /* Terjadi ketika pop-up ditutup secara sengaja tanpa membayar */
-                console.log('Customer menutup pop-up tanpa menyelesaikan pembayaran.');
-            }
-        });
+    // Fungsi pembuka Pop-Up DOKU Checkout Layer
+    function openDokuCheckout() {
+        if (!paymentUrl) {
+            alert("URL Pembayaran tidak ditemukan. Silakan muat ulang halaman.");
+            return;
+        }
+
+        // Hapus keranjang lokal pengguna karena order sudah tercatat di sistem
+        sessionStorage.removeItem('bakery_cart');
+
+        // Panggil fungsi modal pop-up resmi milik DOKU JS
+        if (typeof loadJokulCheckout === 'function') {
+            loadJokulCheckout(paymentUrl);
+        } else {
+            // Fallback jika SDK gagal dimuat, redirect langsung ke halaman pembayaran DOKU
+            window.location.href = paymentUrl;
+        }
     }
 
-    // Picu trigger pop-up otomatis saat pertama kali halaman termuat penuh demi kenyamanan user
+    // Picu trigger pop-up otomatis saat pertama kali halaman termuat penuh
     document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(openMidtransSnap, 800);
+        setTimeout(openDokuCheckout, 800);
     });
 
-    // Pasang event klik manual jika pengguna tidak sengaja menutup pop-up bawaan
+    // Event handler klik tombol "Bayar Sekarang"
     payButton.addEventListener('click', function (e) {
         e.preventDefault();
-        openMidtransSnap();
+        openDokuCheckout();
     });
 </script>
 </body>

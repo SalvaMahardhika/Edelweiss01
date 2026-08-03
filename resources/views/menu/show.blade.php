@@ -22,6 +22,15 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+        /* Hide Number Input Spinners for sleek UI */
+        input[type='number']::-webkit-inner-spin-button,
+        input[type='number']::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type='number'] {
+            -moz-appearance: textfield;
+        }
     </style>
 </head>
 
@@ -105,8 +114,16 @@
                         </p>
                     </div>
 
-                    {{-- TRANSACTION ACTION CART TRIGGER --}}
-                    <div class="pt-4">
+                    {{-- 🟢 INPUT JUMLAH LANGSUNG & KONTROL TRANSAKSI --}}
+                    <div class="pt-4 space-y-3 border-t border-white/30">
+                        <p class="text-xs font-bold text-[#8b6f63] uppercase tracking-wider">Jumlah Pesanan</p>
+                        
+                        <div class="flex items-center w-36 border border-white/60 bg-white/50 rounded-2xl overflow-hidden shadow-inner p-1">
+                            <button type="button" onclick="adjustDetailQty(-1)" class="w-10 h-10 flex items-center justify-center text-lg font-bold text-[#3e2723] hover:bg-white/80 rounded-xl transition">-</button>
+                            <input type="number" id="detail_qty_input" value="1" min="1" class="w-16 text-center text-base font-bold bg-transparent text-[#3e2723] focus:outline-none">
+                            <button type="button" onclick="adjustDetailQty(1)" class="w-10 h-10 flex items-center justify-center text-lg font-bold text-[#3e2723] hover:bg-white/80 rounded-xl transition">+</button>
+                        </div>
+
                         <button onclick="addSingleProductToCart()" 
                                 class="w-full py-4 bg-[#3e2723] text-white font-bold rounded-2xl shadow-xl hover:bg-[#2c1b18] hover:scale-[1.01] transition duration-300 flex items-center justify-center gap-2 text-base">
                             <i class="fa-solid fa-basket-shopping text-lg"></i> Masukkan ke Keranjang Belanja
@@ -132,7 +149,13 @@
 <div id="cartDrawer" class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white/40 backdrop-blur-3xl border-l border-white/40 shadow-[0_0_60px_rgba(0,0,0,0.2)] p-6 flex flex-col justify-between transform translate-x-full transition-transform duration-500">
     <div>
         <div class="flex justify-between items-center pb-4 border-b border-[#3e2723]/20">
-            <h3 class="text-lg font-bold text-[#3e2723]"><i class="fa-solid fa-basket-shopping mr-2"></i> Keranjang Pre-Order</h3>
+            <div class="flex items-center gap-3">
+                <h3 class="text-lg font-bold text-[#3e2723]"><i class="fa-solid fa-basket-shopping mr-1"></i> Keranjang Pre-Order</h3>
+                {{-- 🔴 TOMBOL MEMBUKA MODAL BERSIHKAN KERANJANG --}}
+                <button type="button" id="clearCartBtn" onclick="openClearCartModal()" class="hidden text-xs font-bold text-rose-700 bg-rose-100 hover:bg-rose-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 shadow-sm" title="Kosongkan seluruh isi keranjang">
+                    <i class="fa-solid fa-trash-can text-[11px]"></i> Bersihkan
+                </button>
+            </div>
             <button onclick="toggleCartDrawer()" class="w-8 h-8 rounded-full bg-white/40 flex items-center justify-center font-bold text-[#3e2723] hover:bg-white/70">✕</button>
         </div>
         
@@ -147,12 +170,37 @@
             <span id="cartTotalPrice">Rp 0</span>
         </div>
         
-        {{-- MODIFIKASI FORM CHECKOUT MENJADI GET KE CHECKOUT.INDEX --}}
-        <form action="{{ route('checkout.index') }}" method="GET" id="checkoutForm">
+        {{-- FORM CHECKOUT --}}
+        <form action="{{ route('checkout.index') }}" method="GET" id="checkoutForm" onsubmit="return handleCheckoutSubmit(event)">
             <button type="submit" id="checkoutBtn" disabled class="w-full py-3.5 bg-[#3e2723] text-white font-semibold rounded-2xl shadow-xl hover:bg-[#2c1b18] disabled:bg-gray-400 disabled:scale-100 disabled:shadow-none transition duration-300 text-center block">
                 <i class="fa-solid fa-credit-card mr-2"></i> Lanjutkan Ke Pre-Order
             </button>
         </form>
+    </div>
+</div>
+
+{{-- 🗑️ MODAL MANDIRI KONFIRMASI BERSIHKAN KERANJANG --}}
+<div id="clearCartModal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-md flex items-center justify-center p-4 hidden transition-opacity duration-300">
+    <div class="w-full max-w-sm p-6 rounded-[2rem] bg-white/90 backdrop-blur-2xl border border-white/80 shadow-2xl text-center space-y-4">
+        <div class="w-14 h-14 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-2xl mx-auto shadow-inner">
+            <i class="fa-solid fa-trash-can"></i>
+        </div>
+        
+        <div>
+            <h3 class="text-lg font-black text-[#3e2723]">Kosongkan Keranjang?</h3>
+            <p class="text-xs text-gray-600 mt-1 leading-relaxed">
+                Apakah Anda yakin ingin menghapus seluruh pesanan dari keranjang belanja Anda?
+            </p>
+        </div>
+
+        <div class="pt-2 flex gap-3">
+            <button type="button" onclick="closeClearCartModal()" class="w-1/2 py-2.5 text-xs font-bold text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-xl transition">
+                Batal
+            </button>
+            <button type="button" onclick="confirmClearCart()" class="w-1/2 py-2.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-lg transition">
+                Ya, Hapus Semua
+            </button>
+        </div>
     </div>
 </div>
 
@@ -175,7 +223,6 @@
     document.querySelectorAll('.thumbnail-item').forEach((thumb) => {
         thumb.addEventListener('click', function() {
             const index = parseInt(this.getAttribute('data-index'));
-            // Karena menggunakan loop:true, indeks asli bergeser +1 pada slide kontainer internal Swiper
             swiper.slideTo(index + 1);
             this.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         });
@@ -184,13 +231,13 @@
     // ================= SCRIPT INTERAKTIF KERANJANG STORAGE ENGINE =================
     let cart = [];
 
-    // Mengambil state autentikasi dari Laravel Blade ke variabel JavaScript global
-    const isAuthenticated = @json(auth()->check());
-    const loginUrl = "{{ route('login') }}";
-
     // Mengambil state data dari SessionStorage browser agar sinkron antar halaman
     if (sessionStorage.getItem('bakery_cart')) {
-        cart = JSON.parse(sessionStorage.getItem('bakery_cart'));
+        try {
+            cart = JSON.parse(sessionStorage.getItem('bakery_cart')) || [];
+        } catch(e) {
+            cart = [];
+        }
         setTimeout(() => { updateCartUI(); }, 100);
     }
 
@@ -199,21 +246,68 @@
         drawer.classList.toggle('translate-x-full');
     }
 
+    // 🗑️ MODAL MANDIRI LOGIKA BERSIHKAN KERANJANG
+    function openClearCartModal() {
+        if (cart.length === 0) return;
+        document.getElementById('clearCartModal').classList.remove('hidden');
+    }
+
+    function closeClearCartModal() {
+        document.getElementById('clearCartModal').classList.add('hidden');
+    }
+
+    function confirmClearCart() {
+        cart = [];
+        sessionStorage.removeItem('bakery_cart');
+        updateCartUI();
+        closeClearCartModal();
+    }
+
+    // Adjust jumlah kuantitas di halaman detail
+    function adjustDetailQty(change) {
+        const input = document.getElementById('detail_qty_input');
+        if (!input) return;
+        let val = parseInt(input.value) || 1;
+        val += change;
+        if (val < 1) val = 1;
+        input.value = val;
+    }
+
+    // Menambahkan produk sejumlah yang diketik ke keranjang
     function addSingleProductToCart() {
+        const qtyInput = document.getElementById('detail_qty_input');
+        const qtyToAdd = qtyInput ? (parseInt(qtyInput.value) || 1) : 1;
+
         const pId = {{ $produk->id }};
-        const pName = "{{ $produk->nama_produk }}";
+        const pName = "{{ addslashes($produk->nama_produk) }}";
         const pPrice = {{ $produk->harga }};
         const pImg = "{{ count($images) > 0 ? asset('img/menu/' . $produk->gambar . '/' . $images[0]) : '' }}";
         
         const existingItem = cart.find(item => item.id === pId);
         if (existingItem) {
-            existingItem.quantity += 1;
+            existingItem.quantity += qtyToAdd;
         } else {
-            cart.push({ id: pId, name: pName, price: pPrice, image: pImg, quantity: 1 });
+            cart.push({ id: pId, name: pName, price: pPrice, image: pImg, quantity: qtyToAdd });
         }
         
+        // Reset input kuantitas halaman detail kembali ke 1
+        if (qtyInput) qtyInput.value = 1;
+
         updateCartUI();
-        toggleCartDrawer();
+        const drawer = document.getElementById('cartDrawer');
+        if (drawer.classList.contains('translate-x-full')) toggleCartDrawer();
+    }
+
+    // Mengubah jumlah item langsung dari input angka di dalam drawer keranjang
+    function setItemQuantity(id, newQty) {
+        let val = parseInt(newQty);
+        if (isNaN(val) || val <= 0) {
+            cart = cart.filter(c => c.id !== id);
+        } else {
+            const item = cart.find(i => i.id === id);
+            if (item) item.quantity = val;
+        }
+        updateCartUI();
     }
 
     function updateQuantity(id, amount) {
@@ -227,22 +321,26 @@
         updateCartUI();
     }
 
-    // ================= INTERSEPSI TOMBOL PRE-ORDER JIKA USER BELUM LOGIN =================
-    function handleCheckoutGuard(event) {
-        if (!isAuthenticated) {
-            event.preventDefault(); // Mencegah form disubmit secara default
-            window.location.href = loginUrl; // Paksa arahkan ke rute login /edelweiss-admin
+    // 🟢 SUBMIT CHECKOUT (MENJAGA KERANJANG TETAP ADA SAAT PINDAH HALAMAN)
+    function handleCheckoutSubmit(event) {
+        if (cart.length === 0) {
+            event.preventDefault();
             return false;
         }
-        return true; // Jika sudah login, izinkan form submit menuju halaman checkout backend
+
+        // Simpan data keranjang terbaru ke sessionStorage agar dapat dibaca di halaman checkout.blade
+        sessionStorage.setItem('bakery_cart', JSON.stringify(cart));
+
+        // Izinkan navigasi tanpa menghapus sessionStorage
+        return true;
     }
 
     function updateCartUI() {
         const listContainer = document.getElementById('cartItemsList');
         const badge = document.getElementById('cartCountBadge');
         const totalContainer = document.getElementById('cartTotalPrice');
-        // const hiddenInput = document.getElementById('cartDataHiddenInput'); // Tidak lagi digunakan karena method GET
         const checkoutBtn = document.getElementById('checkoutBtn');
+        const clearCartBtn = document.getElementById('clearCartBtn');
 
         listContainer.innerHTML = '';
         sessionStorage.setItem('bakery_cart', JSON.stringify(cart));
@@ -250,8 +348,8 @@
         if (cart.length === 0) {
             listContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-8">Keranjang belanja Anda kosong.</p>';
             badge.classList.add('hidden');
+            if (clearCartBtn) clearCartBtn.classList.add('hidden');
             totalContainer.innerText = 'Rp 0';
-            // hiddenInput.value = ''; // Tidak lagi digunakan
             checkoutBtn.disabled = true;
             return;
         }
@@ -266,15 +364,15 @@
             const row = document.createElement('div');
             row.className = "flex items-center gap-3 p-3 bg-white/40 border border-white/50 rounded-2xl shadow-sm";
             row.innerHTML = `
-                <img src="${item.image ? item.image : '/img/logo/logo2.png'}" class="w-12 h-12 object-cover rounded-xl bg-gray-100">
+                <img src="${item.image ? item.image : '/img/logo/logo2.png'}" class="w-12 h-12 object-cover rounded-xl bg-gray-100 shrink-0">
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-bold text-[#3e2723] truncate">${item.name}</p>
                     <p class="text-xs gold-text font-semibold">Rp ${new Intl.NumberFormat('id-ID').format(item.price)}</p>
                 </div>
-                <div class="flex items-center gap-2 bg-white/60 border rounded-xl px-2 py-1">
-                    <button onclick="updateQuantity(${item.id}, -1)" class="font-bold text-[#3e2723] hover:text-red-600">-</button>
-                    <span class="text-xs font-bold px-1">${item.quantity}</span>
-                    <button onclick="updateQuantity(${item.id}, 1)" class="font-bold text-[#3e2723] hover:text-green-600">+</button>
+                <div class="flex items-center gap-1 bg-white/60 border rounded-xl px-2 py-1 shadow-inner">
+                    <button type="button" onclick="updateQuantity(${item.id}, -1)" class="font-bold text-[#3e2723] hover:text-red-600 px-1.5">-</button>
+                    <input type="number" min="1" value="${item.quantity}" onchange="setItemQuantity(${item.id}, this.value)" class="w-10 text-center text-xs font-bold bg-transparent text-[#3e2723] focus:outline-none">
+                    <button type="button" onclick="updateQuantity(${item.id}, 1)" class="font-bold text-[#3e2723] hover:text-green-600 px-1.5">+</button>
                 </div>
             `;
             listContainer.appendChild(row);
@@ -282,9 +380,9 @@
 
         badge.innerText = totalItems;
         badge.classList.remove('hidden');
+        if (clearCartBtn) clearCartBtn.classList.remove('hidden');
         totalContainer.innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(totalPrice);
         
-        // hiddenInput.value = JSON.stringify(cart); // Tidak lagi digunakan
         checkoutBtn.disabled = false;
     }
 </script>

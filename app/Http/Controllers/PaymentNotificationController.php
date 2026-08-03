@@ -18,6 +18,9 @@ class PaymentNotificationController extends Controller
         $this->paymentService = $paymentService;
     }
 
+    /**
+     * 🔔 WEBHOOK NOTIFIKASI PEMBAYARAN MIDTRANS
+     */
     public function handle(Request $request)
     {
         $payload = $request->all();
@@ -81,8 +84,13 @@ class PaymentNotificationController extends Controller
         } elseif ($transactionStatus == 'settlement') {
             $isSuccess = true;
         } elseif (in_array($transactionStatus, ['cancel', 'deny', 'expire'])) {
-            // Jika transaksi gagal/kadaluarsa
-            Log::info("ℹ️ Pesanan {$orderNumber} ditandai {$transactionStatus}.");
+            // Jika transaksi gagal/kadaluarsa, update status menjadi cancelled
+            $order->update([
+                'payment_status' => 'unpaid',
+                'status' => 'cancelled',
+            ]);
+
+            Log::info("ℹ️ Pesanan {$orderNumber} ditandai {$transactionStatus} dan dibatalkan.");
 
             return response()->json(['message' => 'Payment Failed/Expired Handled'], 200);
         } elseif ($transactionStatus == 'pending') {
@@ -140,5 +148,117 @@ class PaymentNotificationController extends Controller
 
             return response()->json(['message' => 'Error processing transaction', 'error' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * 🔔 WEBHOOK NOTIFIKASI PEMBAYARAN DOKU
+     */
+    public function handleDoku(Request $request)
+    {
+        $payload = $request->all();
+        Log::info('📥 Webhook DOKU Diterima:', $payload);
+
+        // 1. Parsing Parameter Utama dari Payload DOKU
+        $invoiceNumber = $payload['order']['invoice_number'] ?? null;
+        $transactionStatus = strtoupper($payload['transaction']['status'] ?? '');
+        $amount = $payload['order']['amount'] ?? 0;
+        $dokuTxId = $payload['transaction']['id'] ?? ($payload['order']['invoice_number'] ?? null);
+
+        if (! $invoiceNumber) {
+            Log::error('❌ Webhook DOKU Gagal: Invoice number tidak ditemukan.');
+
+            return response()->json(['message' => 'Invoice number missing'], 400);
+        }
+
+        // 2. Parsing Order Number Asli
+        $cleanOrderNumber = $invoiceNumber;
+        if (Str::contains($cleanOrderNumber, '-LUNAS-')) {
+            $cleanOrderNumber = Str::before($cleanOrderNumber, '-LUNAS-');
+        } elseif (Str::contains($cleanOrderNumber, '-REPAY-')) {
+            $cleanOrderNumber = Str::before($cleanOrderNumber, '-REPAY-');
+        }
+
+        $order = Order::where('order_number', $cleanOrderNumber)->first();
+
+        if (! $order) {
+            Log::error("❌ Webhook DOKU Gagal: Order {$cleanOrderNumber} tidak ditemukan di database.");
+
+            return response()->json(['message' => 'Order Not Found'], 404);
+        }
+
+        // 3. 🟢 PEMBAYARAN SUKSES (SUCCESS)
+        if ($transactionStatus === 'SUCCESS') {
+
+            // Cek Idempotensi Pembayaran
+            $alreadyProcessed = DB::table('payments')
+                ->where('reference', $dokuTxId)
+                ->whereIn('status', ['settlement', 'paid'])
+                ->exists();
+
+            if ($alreadyProcessed) {
+                Log::info('🛑 Webhook DOKU duplikat diabaikan: '.$dokuTxId);
+
+                return response()->json(['status' => 'SUCCESS', 'message' => 'Duplicate webhook ignored']);
+            }
+
+            try {
+                // Simpan transaksi via PaymentService jika tersedia
+                if (method_exists($this->paymentService, 'processPayment')) {
+                    $this->paymentService->processPayment($order, [
+                        'amount' => (float) $amount,
+                        'transaction_status' => 'settlement',
+                        'payment_type' => $payload['channel']['id'] ?? 'doku',
+                        'reference' => $dokuTxId,
+                        'raw_payload' => $payload,
+                    ]);
+                }
+
+                // Update status pembayaran & status pesanan
+                $paymentPlan = is_object($order->payment_plan)
+                    ? ($order->payment_plan->value ?? $order->payment_plan->name)
+                    : $order->payment_plan;
+
+                if (strtolower((string) $paymentPlan) === 'dp' && $order->amount_paid == 0) {
+                    $order->update([
+                        'payment_status' => 'dp',
+                        'amount_paid' => $order->dp_amount ?? ($order->total_amount / 2),
+                        'status' => 'confirmed', // Lanjut ke dapur
+                    ]);
+                } else {
+                    $order->update([
+                        'payment_status' => 'paid',
+                        'amount_paid' => $order->total_amount,
+                        'status' => 'confirmed', // Lanjut ke dapur
+                    ]);
+                }
+
+                if (method_exists($order, 'recalculatePaymentStatus')) {
+                    $order->recalculatePaymentStatus();
+                }
+
+                Log::info("✅ Webhook DOKU Sukses Diproses! Order {$order->order_number} terbayar Rp {$amount}");
+
+                return response()->json(['status' => 'SUCCESS']);
+
+            } catch (\Exception $e) {
+                Log::error('🛑 Webhook DOKU Engine Error: '.$e->getMessage());
+
+                return response()->json(['message' => 'Error processing DOKU transaction', 'error' => $e->getMessage()], 500);
+            }
+        }
+
+        // 4. 🔴 PEMBAYARAN KEDALUWARSA / BATAL / GAGAL (EXPIRED, FAILED, CANCELLED)
+        elseif (in_array($transactionStatus, ['EXPIRED', 'FAILED', 'CANCELLED'])) {
+            $order->update([
+                'payment_status' => 'unpaid',
+                'status' => 'cancelled', // Otomatis ubah status pesanan menjadi BATAL di admin
+            ]);
+
+            Log::info("⚠️ Pesanan DOKU {$order->order_number} telah dibatalkan otomatis karena status: {$transactionStatus}");
+
+            return response()->json(['status' => 'SUCCESS', 'message' => 'Order marked as cancelled']);
+        }
+
+        return response()->json(['status' => 'SUCCESS', 'message' => 'Status ignored']);
     }
 }

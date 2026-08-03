@@ -56,20 +56,20 @@ class MidtransService
         if ($order->relationLoaded('items') && $order->items->count() > 0) {
             foreach ($order->items as $item) {
                 $itemDetails[] = [
-                    'id'       => (string) $item->product_id,
-                    'price'    => intval(round((float) $item->unit_price)),
+                    'id' => (string) $item->product_id,
+                    'price' => intval(round((float) $item->unit_price)),
                     'quantity' => (int) $item->quantity,
-                    'name'     => substr($item->product_name, 0, 50), // Batas max 50 karakter Midtrans
+                    'name' => substr($item->product_name, 0, 50), // Batas max 50 karakter Midtrans
                 ];
             }
 
             // Jika pembayaran DP 50%, atur item adjustment agar total item_details pas dengan gross_amount
             if ($paymentType === 'initial' && $paymentPlanVal === 'dp') {
                 $itemDetails = [[
-                    'id'       => $order->order_number . '-DP',
-                    'price'    => $grossAmountRounded,
+                    'id' => $order->order_number.'-DP',
+                    'price' => $grossAmountRounded,
                     'quantity' => 1,
-                    'name'     => 'Uang Muka (DP 50%) - ' . $order->order_number,
+                    'name' => 'Uang Muka (DP 50%) - '.$order->order_number,
                 ]];
             }
         }
@@ -82,12 +82,12 @@ class MidtransService
             ],
             'customer_details' => [
                 'first_name' => $order->customer_name,
-                'phone'      => $order->customer_phone,
-                'email'      => $order->customer_email ?? 'customer@edelweiss.com',
+                'phone' => $order->customer_phone,
+                'email' => $order->customer_email ?? 'customer@edelweiss.com',
             ],
             'expiry' => [
                 'duration' => 24,
-                'unit'     => 'hours',
+                'unit' => 'hours',
             ],
         ];
 
@@ -111,7 +111,7 @@ class MidtransService
                     'http_errors' => false,     // Mencegah throw exception mentah saat status 400
                 ])
                 ->withHeaders([
-                    'Accept'       => 'application/json',
+                    'Accept' => 'application/json',
                     'Content-Type' => 'application/json',
                 ])
                 ->withBasicAuth($this->serverKey, '')
