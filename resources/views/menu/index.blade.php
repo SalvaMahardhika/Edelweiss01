@@ -71,6 +71,20 @@
 
 @include('layouts.navbar')
 
+{{-- 🔔 TOAST NOTIFICATION POPUP (SAMPLING DISAMPING) --}}
+<div id="cartToast" class="fixed top-24 right-4 z-50 transform translate-x-full opacity-0 transition-all duration-500 ease-in-out pointer-events-none">
+    <div class="flex items-center gap-3 px-4 py-3 bg-[#3e2723]/95 backdrop-blur-xl border border-[#c8a97e]/40 text-white rounded-2xl shadow-2xl max-w-xs sm:max-w-sm">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#c8a97e] to-[#a67c52] flex items-center justify-center text-white shrink-0 shadow-inner">
+            <i class="fa-solid fa-basket-shopping text-base"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="text-xs font-bold text-[#e6c89c]">Berhasil Ditambahkan</p>
+            <p id="toastMessage" class="text-xs text-gray-200 truncate font-medium">1x Item dimasukkan ke keranjang</p>
+        </div>
+        <button onclick="hideCartToast()" class="text-gray-400 hover:text-white text-xs p-1 pointer-events-auto">✕</button>
+    </div>
+</div>
+
 <main class="relative overflow-hidden pt-32">
 
     {{-- BACKGROUND GLOW --}}
@@ -128,7 +142,16 @@
             @foreach($produk->where('status', true) as $item)
 
             @php
-                $folder = public_path('img/menu/' . $item->gambar);
+                // PENGECEKAN PATH DYNAMIC UNTUK PUBLIC_HTML HOSTING DAN LOCALHOST
+                $publicHtmlFolder = base_path('../public_html/img/menu/' . $item->gambar);
+                $localFolder = public_path('img/menu/' . $item->gambar);
+
+                if (file_exists($publicHtmlFolder)) {
+                    $folder = $publicHtmlFolder;
+                } else {
+                    $folder = $localFolder;
+                }
+
                 $files = file_exists($folder) ? scandir($folder) : [];
                 $images = array_values(array_diff($files, ['.', '..']));
             @endphp
@@ -268,6 +291,7 @@
     // State Global Filter & Keranjang
     let activeCategory = 'all';
     let cart = [];
+    let toastTimeout = null;
 
     // ================= SCRIPT LOGIK LIVE FILTER (SEARCH & CATEGORY) =================
     function filterCategory(catId, btnElement) {
@@ -320,6 +344,7 @@
         input.value = val;
     }
 
+    // 🟢 DITAMBAHKAN NOTIFIKASI TOAST POPUP (TANPA MEMBUKA CART DRAWER)
     function addToCartFromCard(id, name, price, image) {
         const input = document.getElementById(`card_qty_${id}`);
         const qtyToAdd = input ? (parseInt(input.value) || 1) : 1;
@@ -335,8 +360,33 @@
         if (input) input.value = 1;
 
         updateCartUI();
-        const drawer = document.getElementById('cartDrawer');
-        if (drawer.classList.contains('translate-x-full')) toggleCartDrawer();
+
+        // 🟢 Munculkan Notifikasi Toast Melayang disamping tanpa membuka drawer
+        showCartToast(`${qtyToAdd}x ${name} ditambahkan`);
+    }
+
+    function showCartToast(msg) {
+        const toast = document.getElementById('cartToast');
+        const toastMsg = document.getElementById('toastMessage');
+
+        if (!toast) return;
+
+        toastMsg.innerText = msg;
+        toast.classList.remove('translate-x-full', 'opacity-0');
+        toast.classList.add('translate-x-0', 'opacity-100');
+
+        if (toastTimeout) clearTimeout(toastTimeout);
+
+        toastTimeout = setTimeout(() => {
+            hideCartToast();
+        }, 2500);
+    }
+
+    function hideCartToast() {
+        const toast = document.getElementById('cartToast');
+        if (!toast) return;
+        toast.classList.remove('translate-x-0', 'opacity-100');
+        toast.classList.add('translate-x-full', 'opacity-0');
     }
 
     // ================= SCRIPT LOGIK KERANJANG STORAGE =================

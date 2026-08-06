@@ -100,7 +100,7 @@ class AdminController extends Controller
     {
         $user = User::findOrFail($id);
 
-        // 🔒 Proteksi super admin utama
+        // ðŸ”’ Proteksi super admin utama
         if ($user->id == 1) {
             return back()->with('error', 'Super admin utama tidak bisa diubah');
         }
@@ -145,7 +145,7 @@ class AdminController extends Controller
     {
         $user = User::findOrFail($id);
 
-        // 🔒 Super admin tidak bisa dihapus
+        // ðŸ”’ Super admin tidak bisa dihapus
         if ($user->role === 'super_admin' || $user->id == 1) {
             return back()->with('error', 'Super admin tidak bisa dihapus');
         }

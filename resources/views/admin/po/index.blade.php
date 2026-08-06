@@ -62,7 +62,7 @@
                 <select name="payment_status" class="w-full mt-1 px-4 py-2 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-[#3e2723] font-medium">
                     <option value="ALL">Semua Pembayaran</option>
                     <option value="unpaid" {{ request('payment_status') == 'unpaid' ? 'selected' : '' }}>Belum Bayar</option>
-                    <option value="partial" {{ request('payment_status') == 'partial' ? 'selected' : '' }}>DP (Sebagian)</option>
+                    <option value="partial" {{ request('payment_status') == 'partial' ? 'selected' : '' }}>DP (Ada Sisa Pelunasan)</option>
                     <option value="paid" {{ request('payment_status') == 'paid' ? 'selected' : '' }}>Lunas</option>
                 </select>
             </div>
@@ -84,11 +84,11 @@
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-white/40 text-xs font-bold uppercase tracking-wider text-[#3e2723]/70">
-                        <th class="px-6 py-4">No. Order & Pelanggan</th>
-                        <th class="px-6 py-4">Item Pesanan (Kue)</th>
-                        <th class="px-6 py-4 text-center">Jadwal Siap (`fulfill_at`)</th>
-                        <th class="px-6 py-4 text-center">Pembayaran</th>
-                        <th class="px-6 py-4 text-center">Status Produksi</th>
+                        <th class="px-5 py-4 w-1/4">No. Order & Pelanggan</th>
+                        <th class="px-5 py-4 w-2/5">Item Pesanan (Kue)</th>
+                        <th class="px-4 py-4 text-center">Jadwal Siap (`fulfill_at`)</th>
+                        <th class="px-4 py-4 text-center">Status Pembayaran</th>
+                        <th class="px-3 py-4 text-center w-36">Status Produksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-white/30 text-sm font-medium">
@@ -97,11 +97,13 @@
                         $orderTypeVal = is_object($order->order_type) ? $order->order_type->value : $order->order_type;
                         $statusVal = is_object($order->status) ? $order->status->value : $order->status;
                         $paymentStatusVal = is_object($order->payment_status) ? $order->payment_status->value : $order->payment_status;
+                        $paymentPlanVal = is_object($order->payment_plan) ? ($order->payment_plan->value ?? $order->payment_plan->name) : $order->payment_plan;
+                        $isDpScheme = strtolower((string) $paymentPlanVal) === 'dp';
                     @endphp
                     <tr class="hover:bg-white/30 transition">
                         
                         {{-- No Order & Info Pembeli --}}
-                        <td class="px-6 py-4">
+                        <td class="px-5 py-4">
                             <p class="font-black text-[#3e2723]">{{ $order->order_number }}</p>
                             <p class="text-xs font-bold text-gray-700 mt-0.5">{{ $order->customer_name }}</p>
                             <p class="text-[11px] text-gray-500"><i class="fa-solid fa-phone text-[9px] mr-1"></i>{{ $order->customer_phone }}</p>
@@ -123,7 +125,7 @@
                         </td>
 
                         {{-- Item Kue & Catatan --}}
-                        <td class="px-6 py-4">
+                        <td class="px-5 py-4">
                             <ul class="space-y-1 text-xs">
                                 @foreach($order->items as $item)
                                     <li class="text-[#2d1f1b]">
@@ -139,7 +141,7 @@
                         </td>
 
                         {{-- Tanggal SIAP (Fulfill At) --}}
-                        <td class="px-6 py-4 text-center">
+                        <td class="px-4 py-4 text-center whitespace-nowrap">
                             @if($order->fulfill_at)
                                 <p class="font-bold text-xs text-[#3e2723]">{{ \Carbon\Carbon::parse($order->fulfill_at)->translatedFormat('d M Y') }}</p>
                                 <p class="text-[11px] font-semibold text-gray-500">{{ \Carbon\Carbon::parse($order->fulfill_at)->format('H:i') }} WIB</p>
@@ -148,36 +150,64 @@
                             @endif
                         </td>
 
-                        {{-- Status Pembayaran & Sisa DP --}}
-                        <td class="px-6 py-4 text-center">
-                            <form method="POST" action="{{ route('admin.po.updatePayment', $order->id) }}">
-                                @csrf
-                                @method('PATCH')
-                                <select name="payment_status" onchange="this.form.submit()" class="text-xs font-bold px-2 py-1 rounded-xl border border-white/40 shadow-sm cursor-pointer {{ $paymentStatusVal === 'paid' ? 'bg-emerald-100 text-emerald-800' : ($paymentStatusVal === 'partial' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800') }}">
-                                    <option value="unpaid" {{ $paymentStatusVal === 'unpaid' ? 'selected' : '' }}>Belum Bayar</option>
-                                    <option value="partial" {{ $paymentStatusVal === 'partial' ? 'selected' : '' }}>DP (Sebagian)</option>
-                                    <option value="paid" {{ $paymentStatusVal === 'paid' ? 'selected' : '' }}>Lunas</option>
-                                </select>
-                            </form>
-                            <p class="text-[11px] font-bold text-[#3e2723] mt-1">Rp {{ number_format($order->total_amount, 0, ',', '.') }}</p>
+                        {{-- Status Pembayaran --}}
+                        <td class="px-4 py-4 text-center">
+                            <div class="mb-1.5">
+                                @if($isDpScheme)
+                                    <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                        <i class="fa-solid fa-pie-chart mr-1"></i> SKEMA DP
+                                    </span>
+                                @else
+                                    <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                                        <i class="fa-solid fa-credit-card mr-1"></i> FULL PAYMENT
+                                    </span>
+                                @endif
+                            </div>
+
+                            <div>
+                                @if($paymentStatusVal === 'paid')
+                                    <span class="inline-flex items-center gap-1 text-xs font-extrabold px-3 py-1 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm">
+                                        <i class="fa-solid fa-circle-check text-emerald-600"></i> LUNAS 100%
+                                    </span>
+                                @elseif($paymentStatusVal === 'partial')
+                                    <span class="inline-flex items-center gap-1 text-xs font-extrabold px-3 py-1 rounded-xl bg-amber-100 text-amber-800 border border-amber-300 shadow-sm">
+                                        <i class="fa-solid fa-pie-chart text-amber-600"></i> BAYAR DP
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 text-xs font-extrabold px-3 py-1 rounded-xl bg-rose-100 text-rose-800 border border-rose-300 shadow-sm">
+                                        <i class="fa-solid fa-clock text-rose-600"></i> BELUM BAYAR
+                                    </span>
+                                @endif
+                            </div>
+
+                            <div class="mt-1.5 space-y-0.5">
+                                @if($paymentStatusVal === 'partial')
+                                    <p class="text-[11px] font-bold text-amber-700">DP Terbayar: Rp {{ number_format($order->amount_paid, 0, ',', '.') }}</p>
+                                    <p class="text-[10px] font-black text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-md inline-block">
+                                        Sisa Bayar: Rp {{ number_format($order->total_amount - $order->amount_paid, 0, ',', '.') }}
+                                    </p>
+                                @elseif($paymentStatusVal === 'paid')
+                                    <p class="text-[11px] font-bold text-emerald-700"><i class="fa-solid fa-check-circle mr-1"></i>Rp {{ number_format($order->total_amount, 0, ',', '.') }}</p>
+                                @else
+                                    <p class="text-[11px] font-bold text-red-700">Rp {{ number_format($order->total_amount, 0, ',', '.') }}</p>
+                                @endif
+                            </div>
                         </td>
 
-                        {{-- Status Pengerjaan (Dapur/PO) Dengan Modal Konfirmasi --}}
-                        <td class="px-6 py-4 text-center">
+                        {{-- Status Pengerjaan (SEMUA GANTI STATUS MEMILIKI KONFIRMASI) --}}
+                        <td class="px-3 py-4 text-center">
                             <form id="status-form-{{ $order->id }}" method="POST" action="{{ route('admin.po.updateStatus', $order->id) }}">
                                 @csrf
                                 @method('PATCH')
                                 <select name="status" 
                                         onchange="handleStatusChange(this, '{{ $order->id }}', '{{ $order->order_number }}', '{{ $statusVal }}')" 
-                                        class="text-xs font-bold px-3 py-1.5 rounded-xl border border-white/50 shadow-md cursor-pointer transition focus:outline-none {{ $statusVal === 'completed' ? 'bg-emerald-600 text-white' : ($statusVal === 'preparing' ? 'bg-blue-600 text-white' : ($statusVal === 'ready' ? 'bg-purple-600 text-white' : 'bg-amber-500 text-white')) }}">
-                                    <option value="pending" {{ $statusVal === 'pending' ? 'selected' : '' }}>Pending</option>
-                                    <option value="confirmed" {{ $statusVal === 'confirmed' ? 'selected' : '' }}>Confirmed</option>
-                                    <option value="preparing" {{ $statusVal === 'preparing' ? 'selected' : '' }}>Preparing (Dipanggang)</option>
-                                    <option value="ready" {{ $statusVal === 'ready' ? 'selected' : '' }}>Ready (Siap Ambil/Kirim)</option>
-                                    
-                                    {{-- OPSI PINDAH KE HISTORY (LENGKAP DENGAN SELECTED) --}}
-                                    <option value="completed" {{ $statusVal === 'completed' ? 'selected' : '' }}>Completed (Selesai & Pindah ke History)</option>
-                                    <option value="cancelled" {{ $statusVal === 'cancelled' ? 'selected' : '' }}>Batal (Pindah ke History)</option>
+                                        class="w-full text-xs font-bold px-2 py-1.5 rounded-xl border border-white/50 shadow-md cursor-pointer transition focus:outline-none {{ $statusVal === 'completed' ? 'bg-emerald-600 text-white' : ($statusVal === 'preparing' ? 'bg-blue-600 text-white' : ($statusVal === 'ready' ? 'bg-purple-600 text-white' : ($statusVal === 'confirmed' ? 'bg-indigo-600 text-white' : ($statusVal === 'cancelled' ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white')))) }}">
+                                    <option value="pending" class="bg-white text-gray-800" {{ $statusVal === 'pending' ? 'selected' : '' }}>Pending</option>
+                                    <option value="confirmed" class="bg-white text-gray-800" {{ $statusVal === 'confirmed' ? 'selected' : '' }}>Confirmed</option>
+                                    <option value="preparing" class="bg-white text-gray-800" {{ $statusVal === 'preparing' ? 'selected' : '' }}>Preparing</option>
+                                    <option value="ready" class="bg-white text-gray-800" {{ $statusVal === 'ready' ? 'selected' : '' }}>Ready</option>
+                                    <option value="completed" class="bg-white text-gray-800" {{ $statusVal === 'completed' ? 'selected' : '' }}>Completed (Selesai)</option>
+                                    <option value="cancelled" class="bg-white text-gray-800" {{ $statusVal === 'cancelled' ? 'selected' : '' }}>Batal</option>
                                 </select>
                             </form>
                         </td>
@@ -202,7 +232,7 @@
     </div>
 </div>
 
-{{-- 🚚 MODAL POPUP: ALAMAT PENGIRIMAN --}}
+{{-- MODAL POPUP: ALAMAT PENGIRIMAN --}}
 <div id="addressModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center p-4">
     <div class="w-full max-w-md p-6 rounded-[2rem] bg-white/50 backdrop-blur-3xl border border-white/60 shadow-2xl relative space-y-4 my-auto">
         <div class="flex justify-between items-center pb-2 border-b border-[#3e2723]/15">
@@ -234,7 +264,7 @@
     </div>
 </div>
 
-{{-- ⚠️ MODAL POPUP: KONFIRMASI UBAH STATUS (SELESAI / BATAL) --}}
+{{-- MODAL POPUP: KONFIRMASI UBAH STATUS (SEMUA PERUBAHAN STATUS PRODUKSI) --}}
 <div id="confirmModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center p-4">
     <div class="w-full max-w-sm p-6 rounded-[2rem] bg-white/60 backdrop-blur-3xl border border-white/70 shadow-2xl relative space-y-5 my-auto text-center">
         
@@ -276,46 +306,73 @@
         document.getElementById('addressModal').classList.add('hidden');
     }
 
-    // Intercept dropdown status
+    // Intercept dropdown status (Berlaku untuk SEMUA pilihan status)
     function handleStatusChange(selectElement, orderId, orderNumber, currentStatus) {
         const selectedVal = selectElement.value;
 
-        // Jika mengubah ke 'completed' atau 'cancelled', tampilkan modal konfirmasi
-        if (selectedVal === 'completed' || selectedVal === 'cancelled') {
-            activeSelectElement = selectElement;
-            activeFormId = `status-form-${orderId}`;
-            originalValue = currentStatus;
+        // Jika nilai yang dipilih sama dengan status saat ini, abaikan
+        if (selectedVal === currentStatus) return;
 
-            const modal = document.getElementById('confirmModal');
-            const iconBg = document.getElementById('confirmModalIconBg');
-            const icon = document.getElementById('confirmModalIcon');
-            const title = document.getElementById('confirmModalTitle');
-            const desc = document.getElementById('confirmModalDescription');
-            const submitBtn = document.getElementById('confirmSubmitBtn');
+        activeSelectElement = selectElement;
+        activeFormId = `status-form-${orderId}`;
+        originalValue = currentStatus;
 
-            if (selectedVal === 'completed') {
-                iconBg.className = 'w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto shadow-inner bg-emerald-500/10 text-emerald-700 border border-emerald-500/20';
-                icon.className = 'fa-solid fa-circle-check';
-                title.innerText = 'Pesanan Selesai?';
-                desc.innerHTML = `Pesanan <strong class="text-[#3e2723]">${orderNumber}</strong> akan ditandai <span class="text-emerald-700 font-bold">SELESAI</span> dan otomatis dipindahkan ke halaman <strong>History Pesanan</strong>.`;
-                submitBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-white shadow-md transition bg-emerald-600 hover:bg-emerald-700';
-            } else if (selectedVal === 'cancelled') {
-                iconBg.className = 'w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto shadow-inner bg-rose-500/10 text-rose-700 border border-rose-500/20';
-                icon.className = 'fa-solid fa-triangle-exclamation';
-                title.innerText = 'Batalkan Pesanan?';
-                desc.innerHTML = `Pesanan <strong class="text-[#3e2723]">${orderNumber}</strong> akan ditandai <span class="text-rose-700 font-bold">BATAL</span> dan otomatis dipindahkan ke halaman <strong>History Pesanan</strong>.`;
-                submitBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-white shadow-md transition bg-rose-600 hover:bg-rose-700';
-            }
+        const modal = document.getElementById('confirmModal');
+        const iconBg = document.getElementById('confirmModalIconBg');
+        const icon = document.getElementById('confirmModalIcon');
+        const title = document.getElementById('confirmModalTitle');
+        const desc = document.getElementById('confirmModalDescription');
+        const submitBtn = document.getElementById('confirmSubmitBtn');
 
-            submitBtn.onclick = function() {
-                document.getElementById(activeFormId).submit();
-            };
+        // Konfigurasi visual modal berdasarkan status yang dipilih
+        if (selectedVal === 'pending') {
+            iconBg.className = 'w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto shadow-inner bg-amber-500/10 text-amber-700 border border-amber-500/20';
+            icon.className = 'fa-solid fa-hourglass-start';
+            title.innerText = 'Ubah ke Pending?';
+            desc.innerHTML = `Status pesanan <strong class="text-[#3e2723]">${orderNumber}</strong> akan dikembalikan menjadi <span class="text-amber-700 font-bold">PENDING</span>.`;
+            submitBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-white shadow-md transition bg-amber-600 hover:bg-amber-700';
 
-            modal.classList.remove('hidden');
-        } else {
-            // Jika status biasa (pending, confirmed, preparing, ready), langsung submit
-            document.getElementById(`status-form-${orderId}`).submit();
+        } else if (selectedVal === 'confirmed') {
+            iconBg.className = 'w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto shadow-inner bg-indigo-500/10 text-indigo-700 border border-indigo-500/20';
+            icon.className = 'fa-solid fa-thumbs-up';
+            title.innerText = 'Konfirmasi Pesanan?';
+            desc.innerHTML = `Pesanan <strong class="text-[#3e2723]">${orderNumber}</strong> akan ditandai <span class="text-indigo-700 font-bold">CONFIRMED</span> (Siap diproses dapur).`;
+            submitBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-white shadow-md transition bg-indigo-600 hover:bg-indigo-700';
+
+        } else if (selectedVal === 'preparing') {
+            iconBg.className = 'w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto shadow-inner bg-blue-500/10 text-blue-700 border border-blue-500/20';
+            icon.className = 'fa-solid fa-fire-burner';
+            title.innerText = 'Mulai Produksi Dapur?';
+            desc.innerHTML = `Status pesanan <strong class="text-[#3e2723]">${orderNumber}</strong> akan diubah menjadi <span class="text-blue-700 font-bold">PREPARING</span> (Sedang diproduksi/dipanggang).`;
+            submitBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-white shadow-md transition bg-blue-600 hover:bg-blue-700';
+
+        } else if (selectedVal === 'ready') {
+            iconBg.className = 'w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto shadow-inner bg-purple-500/10 text-purple-700 border border-purple-500/20';
+            icon.className = 'fa-solid fa-box-open';
+            title.innerText = 'Pesanan Siap (Ready)?';
+            desc.innerHTML = `Pesanan <strong class="text-[#3e2723]">${orderNumber}</strong> akan ditandai <span class="text-purple-700 font-bold">READY</span> (Siap diambil/dikirim).`;
+            submitBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-white shadow-md transition bg-purple-600 hover:bg-purple-700';
+
+        } else if (selectedVal === 'completed') {
+            iconBg.className = 'w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto shadow-inner bg-emerald-500/10 text-emerald-700 border border-emerald-500/20';
+            icon.className = 'fa-solid fa-circle-check';
+            title.innerText = 'Pesanan Selesai?';
+            desc.innerHTML = `Pesanan <strong class="text-[#3e2723]">${orderNumber}</strong> akan ditandai <span class="text-emerald-700 font-bold">SELESAI</span> dan dipindahkan ke halaman <strong>History Pesanan</strong>.`;
+            submitBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-white shadow-md transition bg-emerald-600 hover:bg-emerald-700';
+
+        } else if (selectedVal === 'cancelled') {
+            iconBg.className = 'w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto shadow-inner bg-rose-500/10 text-rose-700 border border-rose-500/20';
+            icon.className = 'fa-solid fa-triangle-exclamation';
+            title.innerText = 'Batalkan Pesanan?';
+            desc.innerHTML = `Pesanan <strong class="text-[#3e2723]">${orderNumber}</strong> akan ditandai <span class="text-rose-700 font-bold">BATAL</span> dan dipindahkan ke halaman <strong>History Pesanan</strong>.`;
+            submitBtn.className = 'flex-1 py-2.5 text-xs font-bold rounded-xl text-white shadow-md transition bg-rose-600 hover:bg-rose-700';
         }
+
+        submitBtn.onclick = function() {
+            document.getElementById(activeFormId).submit();
+        };
+
+        modal.classList.remove('hidden');
     }
 
     function cancelStatusChange() {

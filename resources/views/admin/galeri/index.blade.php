@@ -3,7 +3,7 @@
 @section('page_title', 'Manajemen Galeri Portofolio')
 
 @section('content')
-{{-- 💎 AREA SCROLL MANDIRI PANEL UTAMA CMS --}}
+{{-- ðŸ’Ž AREA SCROLL MANDIRI PANEL UTAMA CMS --}}
 <div class="max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 space-y-6">
 
     {{-- HEADER MANAGEMENT INTERFACE --}}
@@ -33,7 +33,16 @@
                 <tbody class="divide-y divide-white/30 text-sm font-medium">
                     @foreach($galeri as $album)
                     @php
-                        $folder = public_path('img/galeri/' . $album->album);
+                        // PENGECEKAN PATH DYNAMIC UNTUK PUBLIC_HTML HOSTING DAN LOCALHOST
+                        $publicHtmlFolder = base_path('../public_html/img/galeri/' . $album->album);
+                        $localFolder = public_path('img/galeri/' . $album->album);
+
+                        if (file_exists($publicHtmlFolder)) {
+                            $folder = $publicHtmlFolder;
+                        } else {
+                            $folder = $localFolder;
+                        }
+
                         $files = file_exists($folder) ? array_values(array_diff(scandir($folder), ['.', '..'])) : [];
                     @endphp
                     <tr class="hover:bg-white/30 transition">
@@ -69,12 +78,12 @@
     </div>
 </div>
 
-{{-- 🔒 COMPONENT: MODAL POPUP INPUT ALBUM BARU --}}
+{{-- ðŸ”’ COMPONENT: MODAL POPUP INPUT ALBUM BARU --}}
 <div id="addAlbumModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
     <div class="w-full max-w-lg p-6 rounded-[2rem] bg-white/40 backdrop-blur-3xl border border-white/50 shadow-2xl relative space-y-4 my-auto">
         <div class="flex justify-between items-center pb-2 border-b border-[#3e2723]/15">
             <h3 class="text-lg font-bold text-[#3e2723]"><i class="fa-regular fa-images mr-2"></i> Form Pembuatan Album Baru</h3>
-            <button type="button" onclick="closeAddModal()" class="w-8 h-8 rounded-full bg-white/40 flex items-center justify-center font-bold text-[#3e2723] hover:bg-white/70">✕</button>
+            <button type="button" onclick="closeAddModal()" class="w-8 h-8 rounded-full bg-white/40 flex items-center justify-center font-bold text-[#3e2723] hover:bg-white/70">âœ•</button>
         </div>
 
         <form id="addAlbumForm" method="POST" action="{{ route('galeri.store') }}" enctype="multipart/form-data" class="space-y-4">
@@ -103,7 +112,7 @@
     </div>
 </div>
 
-{{-- 🚨 CUSTOM GLOBAL SYSTEM MODAL ALERT --}}
+{{-- ðŸš¨ CUSTOM GLOBAL SYSTEM MODAL ALERT --}}
 <div id="systemAlertModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center p-4">
     <div class="w-full max-w-sm p-6 rounded-[2rem] bg-white/50 backdrop-blur-3xl border border-white/60 shadow-2xl text-center space-y-4">
         <div id="alertIconContainer" class="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-2xl shadow-md">
@@ -130,7 +139,7 @@
     function openAddModal() {
         document.getElementById('addAlbumModal').classList.remove('hidden');
     }
-     Kak // Tutup Modal Sekaligus Bersihkan Draft di localstorage jika selesai submit
+    
     function closeAddModal() {
         document.getElementById('addAlbumModal').classList.add('hidden');
     }

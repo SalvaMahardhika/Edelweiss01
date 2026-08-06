@@ -6,9 +6,66 @@ use App\Helpers\ImageHelper;
 use App\Models\Order;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
 
 class OrderController extends Controller
 {
+    // ==========================================
+    // HELPER METHOD PRIVAT (DYNAMIC HOSTING PATH & PROOF HISTORY SCANNER)
+    // ==========================================
+
+    /**
+     * Menentukan path folder fisik tempat menyimpan bukti transfer.
+     * Mendukung alur Live cPanel (public_html) maupun Localhost (public_path).
+     */
+    private function getBuktiTfPath(): string
+    {
+        $publicHtmlPath = base_path('../public_html');
+
+        if (file_exists($publicHtmlPath)) {
+            return $publicHtmlPath.'/img/buktitf';
+        }
+
+        return public_path('img/buktitf');
+    }
+
+    /**
+     * Memindai seluruh riwayat file bukti transfer fisik di folder buktitf berdasarkan nomor order.
+     * Mengembalikan array berurut dari -001, -002, dst., tanpa memerlukan kolom database baru.
+     */
+    private function getProofHistoryFiles(string $orderNumber): array
+    {
+        $targetFolder = $this->getBuktiTfPath();
+
+        if (! file_exists($targetFolder)) {
+            return [];
+        }
+
+        // Scan seluruh file dengan pola prefix No. Order (misal: EDL-20260805-0007-*.*)
+        $pattern = $targetFolder.'/'.$orderNumber.'-*.*';
+        $files = glob($pattern);
+
+        if (empty($files) || ! is_array($files)) {
+            return [];
+        }
+
+        // Urutkan file secara ascending berdasarkan nama file (-001, -002, dst.)
+        sort($files);
+
+        $historyFormatted = [];
+        foreach ($files as $index => $filePath) {
+            $fileName = basename($filePath);
+            $historyFormatted[] = [
+                'url' => asset('img/buktitf/'.$fileName),
+                'file' => $fileName,
+                'sequence' => $index + 1,
+                'uploaded_at' => date('d M Y, H:i', filemtime($filePath)).' WIB',
+            ];
+        }
+
+        return $historyFormatted;
+    }
+
     // 📅 Halaman Utama Jadwal PO (KHUSUS PAYMENT GATEWAY)
     public function index(Request $request)
     {
@@ -113,10 +170,26 @@ class OrderController extends Controller
 
         $orders = $query->paginate(15)->withQueryString();
 
+        // 🔍 PINDAI SECARA DINAMIS SELURUH RIWAYAT FOTO BUKTI TRANSFER UNTUK TIAP ORDER
+        $orders->getCollection()->transform(function ($order) {
+            $historyFiles = $this->getProofHistoryFiles($order->order_number);
+
+            // Lekatkan array riwayat bukti transfer hasil scan ke objek order
+            $order->payment_proof_history = $historyFiles;
+
+            // Jika di DB payment_proof belum terisi tetapi file fisik terdeteksi, ambil file fisik dengan nomor urut tertinggi
+            if (empty($order->payment_proof) && ! empty($historyFiles)) {
+                $latest = end($historyFiles);
+                $order->payment_proof = $latest['file'];
+            }
+
+            return $order;
+        });
+
         return view('admin.orders.manual', compact('orders'));
     }
 
-    // 📸 🆕 MENGUNGGAH BUKTI TRANSFER DARI SISI CUSTOMER/FRONTEND (WITH WEBP CONVERSION)
+    // 📸 🆕 MENGUNGGAH BUKTI TRANSFER DARI SISI CUSTOMER/FRONTEND (WITH WEBP CONVERSION & SEQUENTIAL HISTORY AUDIT)
     public function uploadProof(Request $request)
     {
         $request->validate([
@@ -134,19 +207,22 @@ class OrderController extends Controller
         if ($request->hasFile('payment_proof')) {
             $file = $request->file('payment_proof');
 
-            // Hapus bukti lama jika pengguna melakukan re-upload
-            if ($order->payment_proof && file_exists(public_path('img/buktitf/'.$order->payment_proof))) {
-                @unlink(public_path('img/buktitf/'.$order->payment_proof));
-            }
+            // Path Folder Tujuan (Dinamis cPanel public_html vs Localhost)
+            $targetFolder = $this->getBuktiTfPath();
 
-            // Path Folder Tujuan
-            $targetFolder = public_path('img/buktitf');
             if (! file_exists($targetFolder)) {
                 mkdir($targetFolder, 0755, true);
             }
 
-            // Nama file baru wajib menggunakan format ekstensi .webp
-            $fileName = 'tf_'.$order->order_number.'_'.time().'.webp';
+            // 🕒 BACA RIWAYAT FOTO FISIK EKSISTING DI FOLDER BUKTITF
+            $existingHistory = $this->getProofHistoryFiles($order->order_number);
+
+            // Hitung nomor urut file berikutnya (Contoh: -001, -002, dst.)
+            $nextSequence = count($existingHistory) + 1;
+            $sequenceStr = str_pad($nextSequence, 3, '0', STR_PAD_LEFT);
+
+            // Penamaan File Baru: EDL-20260805-0006-001.webp
+            $fileName = $order->order_number.'-'.$sequenceStr.'.webp';
             $destinationPath = $targetFolder.'/'.$fileName;
 
             try {
@@ -154,11 +230,11 @@ class OrderController extends Controller
                 ImageHelper::convertToWebp($file->getRealPath(), $destinationPath, 80, 1200);
             } catch (Exception $e) {
                 // Fallback: Jika konversi GD gagal, simpan file secara standar
-                $fileName = 'tf_'.$order->order_number.'_'.time().'.'.$file->getClientOriginalExtension();
+                $fileName = $order->order_number.'-'.$sequenceStr.'.'.$file->getClientOriginalExtension();
                 $file->move($targetFolder, $fileName);
             }
 
-            // Simpan nama file ke kolom payment_proof di database
+            // Update record database (payment_proof menyimpan nama file terbaru)
             $order->update([
                 'payment_proof' => $fileName,
             ]);
@@ -233,7 +309,7 @@ class OrderController extends Controller
         // Ambil string skema pembayaran (dp/full)
         $paymentPlanVal = is_object($order->payment_plan) ? ($order->payment_plan->value ?? (string) $order->payment_plan) : (string) $order->payment_plan;
 
-        // Jika skema DP 50%, ubah status ke 'partial' (Enum valid untuk DP), jika Full ubah ke 'paid'
+        // Jika skema DP 50%, ubah status ke 'partial' (DP Terbayar, Menunggu Pelunasan Offline)
         if (strtolower($paymentPlanVal) === 'dp') {
             $order->update([
                 'payment_status' => 'partial',
@@ -251,7 +327,7 @@ class OrderController extends Controller
         return back()->with('success', 'Pembayaran order '.$order->order_number.' berhasil diverifikasi & dikonfirmasi.');
     }
 
-    // Update Status Pengerjaan Pesanan
+    // Update Status Pengerjaan Pesanan (Dapur)
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
@@ -273,7 +349,7 @@ class OrderController extends Controller
         return back()->with('success', 'Status pesanan '.$order->order_number.' berhasil diperbarui.');
     }
 
-    // Update Status Pelunasan Manual (Melayani pelunasan sisa DP secara tunai/offline saat pickup atau delivery)
+    // 💵 Update Status Pelunasan Offline (Melayani pelunasan sisa DP secara tunai/offline saat pickup atau delivery)
     public function updatePaymentStatus(Request $request, $id)
     {
         $request->validate([
@@ -282,13 +358,15 @@ class OrderController extends Controller
 
         $order = Order::findOrFail($id);
 
-        // Jika status diubah ke 'paid' (lunas offline), set amount_paid ke total_amount
         $amountPaid = $order->amount_paid;
+
         if ($request->payment_status === 'paid') {
+            // Ketika diubah ke Lunas, anggap sisa pelunasan tunai/offline sudah diterima penuh
             $amountPaid = $order->total_amount;
         } elseif ($request->payment_status === 'unpaid') {
             $amountPaid = 0;
         } elseif ($request->payment_status === 'partial') {
+            // Jika dikembalikan ke DP (Sebagian), set amount_paid kembali ke nominal DP awal
             $amountPaid = $order->dp_amount ?? ($order->total_amount * 0.5);
         }
 

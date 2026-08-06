@@ -8,15 +8,15 @@
 
 <div class="max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 space-y-6">
 
-    {{-- 1. RINGKASAN AMBIEN KPI PENJUALAN --}}
-    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+    {{-- 1. RINGKASAN AMBIEN KPI PENJUALAN (DENGAN CARD KETIGA / PENDING REALIZATION) --}}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {{-- Total Omzet --}}
         <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
             <div>
                 <p class="text-xs font-bold text-amber-900/60 uppercase tracking-wider">Total Omzet</p>
-                <h3 class="text-2xl font-black text-amber-950 mt-1">Rp {{ number_format($totalOmzet, 0, ',', '.') }}</h3>
+                <h3 class="text-xl sm:text-2xl font-black text-amber-950 mt-1">Rp {{ number_format($totalOmzet ?? 0, 0, ',', '.') }}</h3>
             </div>
-            <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-800 flex items-center justify-center text-xl shadow-sm">
+            <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-800 flex items-center justify-center text-xl shadow-sm shrink-0">
                 <i class="fa-solid fa-sack-dollar"></i>
             </div>
         </div>
@@ -25,10 +25,25 @@
         <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
             <div>
                 <p class="text-xs font-bold text-emerald-800/60 uppercase tracking-wider">Pesanan Selesai</p>
-                <h3 class="text-2xl font-black text-emerald-900 mt-1">{{ $totalPesanan }} Transaksi</h3>
+                <h3 class="text-xl sm:text-2xl font-black text-emerald-900 mt-1">{{ $totalPesanan ?? 0 }} Transaksi</h3>
             </div>
-            <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-800 flex items-center justify-center text-xl shadow-sm">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-800 flex items-center justify-center text-xl shadow-sm shrink-0">
                 <i class="fa-solid fa-circle-check"></i>
+            </div>
+        </div>
+
+        {{-- SARAN NO. 2: Pending Realization / Uang Gantung Dapur --}}
+        @php
+            $realtimeCash = $totalCashflowRealtime ?? ($totalOmzet ?? 0);
+            $pendingRealization = max(0, $realtimeCash - ($totalOmzet ?? 0));
+        @endphp
+        <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold text-purple-900/60 uppercase tracking-wider" title="Uang masuk DP/Lunas dari PO yang belum diserahterimakan">Pending Realisasi</p>
+                <h3 class="text-xl sm:text-2xl font-black text-purple-950 mt-1">Rp {{ number_format($pendingRealization, 0, ',', '.') }}</h3>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-800 flex items-center justify-center text-xl shadow-sm shrink-0">
+                <i class="fa-solid fa-vault"></i>
             </div>
         </div>
 
@@ -36,9 +51,9 @@
         <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
             <div>
                 <p class="text-xs font-bold text-blue-800/60 uppercase tracking-wider">Kue/Roti Terjual</p>
-                <h3 class="text-2xl font-black text-blue-900 mt-1">{{ $totalProdukTerjual }} Item</h3>
+                <h3 class="text-xl sm:text-2xl font-black text-blue-900 mt-1">{{ $totalProdukTerjual ?? 0 }} Item</h3>
             </div>
-            <div class="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-800 flex items-center justify-center text-xl shadow-sm">
+            <div class="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-800 flex items-center justify-center text-xl shadow-sm shrink-0">
                 <i class="fa-solid fa-bread-slice"></i>
             </div>
         </div>
@@ -47,9 +62,9 @@
         <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
             <div>
                 <p class="text-xs font-bold text-[#3e2723]/60 uppercase tracking-wider">Rata-Rata Order</p>
-                <h3 class="text-2xl font-black text-[#3e2723] mt-1">Rp {{ number_format($avgOrderVal, 0, ',', '.') }}</h3>
+                <h3 class="text-xl sm:text-2xl font-black text-[#3e2723] mt-1">Rp {{ number_format($avgOrderVal ?? 0, 0, ',', '.') }}</h3>
             </div>
-            <div class="w-12 h-12 rounded-2xl bg-[#3e2723]/10 text-[#3e2723] flex items-center justify-center text-xl shadow-sm">
+            <div class="w-12 h-12 rounded-2xl bg-[#3e2723]/10 text-[#3e2723] flex items-center justify-center text-xl shadow-sm shrink-0">
                 <i class="fa-solid fa-chart-line"></i>
             </div>
         </div>
@@ -89,23 +104,67 @@
                 <a href="{{ route('admin.laporan.exportExcel', request()->query()) }}" class="py-2 px-3 bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md hover:bg-emerald-800 transition flex items-center justify-center gap-1">
                     <i class="fa-solid fa-file-excel"></i> Export Excel
                 </a>
-
-                {{-- TOMBOL CETAK / PRINT
-                <button type="button" onclick="window.print()" class="py-2 px-3 bg-amber-800 text-white text-xs font-bold rounded-xl shadow-md hover:bg-amber-900 transition flex items-center justify-center gap-1">
-                    <i class="fa-solid fa-print"></i> Cetak
-                </button> --}}
             </div>
         </form>
     </div>
 
-    {{-- 3. 📈 VISUALISASI GRAFIK OMZET PENJUALAN --}}
-    <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6">
-        <h3 class="text-sm font-black text-[#3e2723] uppercase tracking-wider mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-chart-area text-amber-800"></i> Grafik Pendapatan Penjualan
-        </h3>
-        <div class="w-full h-64">
-            <canvas id="revenueChart"></canvas>
+    {{-- 3. GRID UTAMA VISUALISASI GRAFIK & DONUT SKEMA PEMBAYARAN --}}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {{-- SARAN NO. 1 & DUAL LINE CHART (KOLOM KIRI 2/3) --}}
+        <div class="lg:col-span-2 backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="text-sm font-black text-[#3e2723] uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-chart-area text-amber-800"></i> Grafik Pendapatan Penjualan
+                    </h3>
+                    <p class="text-[11px] text-gray-500 font-semibold mt-0.5">Real-time Transfer vs Realisasi Pesanan Selesai</p>
+                </div>
+
+                {{-- SARAN NO. 1: Toggle Switch Tampilan Grafik (Harian / Mingguan / Bulanan) --}}
+                <div class="flex items-center bg-white/60 p-1 rounded-xl border border-white/50 text-xs font-bold text-[#3e2723] shadow-sm">
+                    <button type="button" onclick="switchChartGranularity('daily')" id="btn-daily" class="px-3 py-1 rounded-lg bg-[#3e2723] text-white transition">
+                        Harian
+                    </button>
+                    <button type="button" onclick="switchChartGranularity('weekly')" id="btn-weekly" class="px-3 py-1 rounded-lg hover:bg-white/80 transition">
+                        Mingguan
+                    </button>
+                    <button type="button" onclick="switchChartGranularity('monthly')" id="btn-monthly" class="px-3 py-1 rounded-lg hover:bg-white/80 transition">
+                        Bulanan
+                    </button>
+                </div>
+            </div>
+
+            <div class="w-full h-72">
+                <canvas id="revenueChart"></canvas>
+            </div>
         </div>
+
+        {{-- SARAN NO. 3: BREAKDOWN SKEMA PEMBAYARAN (DONUT CHART - KOLOM KANAN 1/3) --}}
+        <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 flex flex-col justify-between">
+            <div>
+                <h3 class="text-sm font-black text-[#3e2723] uppercase tracking-wider mb-1 flex items-center gap-2">
+                    <i class="fa-solid fa-pie-chart text-purple-700"></i> Skema Pembayaran
+                </h3>
+                <p class="text-[11px] text-gray-500 font-semibold mb-4">DP 50% vs Full Payment</p>
+            </div>
+
+            <div class="w-full h-56 flex items-center justify-center my-auto">
+                <canvas id="paymentSchemeChart"></canvas>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-white/40 text-center">
+                <div class="bg-white/40 p-2 rounded-xl border border-white/50">
+                    <p class="text-[10px] text-gray-500 font-bold uppercase">Skema DP</p>
+                    <p class="text-xs font-black text-amber-800" id="dp-count-text">{{ $dpCount ?? 0 }} Transaksi</p>
+                </div>
+                <div class="bg-white/40 p-2 rounded-xl border border-white/50">
+                    <p class="text-[10px] text-gray-500 font-bold uppercase">Full Payment</p>
+                    <p class="text-xs font-black text-emerald-800" id="full-count-text">{{ $fullCount ?? 0 }} Transaksi</p>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     {{-- 4. GRID 2 KOLOM: TOP PRODUK TERLARIS & RINCIAN PENJUALAN --}}
@@ -196,43 +255,129 @@
 
 {{-- SCRIPT RENDERING CHART.JS --}}
 <script>
+    let mainRevenueChart = null;
+    let currentGranularity = 'daily';
+
+    // Data dari Backend Controller
+    const rawDailyLabels   = @json($chartLabels ?? []);
+    const rawDailyCashflow = @json($chartCashflow ?? $chartData ?? []);
+    const rawDailyRealized = @json($chartRealized ?? $chartData ?? []);
+
+    const dpCountVal   = @json($dpCount ?? 0);
+    const fullCountVal = @json($fullCount ?? 0);
+
+    // Function Agregasi Data untuk Toggle Harian, Mingguan, Bulanan
+    function aggregateData(labels, cashflow, realized, type) {
+        if (type === 'daily' || labels.length === 0) {
+            return { labels, cashflow, realized };
+        }
+
+        let aggregated = {};
+
+        labels.forEach((label, idx) => {
+            let key = label;
+            if (type === 'weekly') {
+                key = 'W-' + Math.ceil((idx + 1) / 7);
+            } else if (type === 'monthly') {
+                const parts = label.split(' ');
+                key = parts.length > 1 ? parts[1] : label;
+            }
+
+            if (!aggregated[key]) {
+                aggregated[key] = { cashflow: 0, realized: 0 };
+            }
+
+            aggregated[key].cashflow += (cashflow[idx] || 0);
+            aggregated[key].realized += (realized[idx] || 0);
+        });
+
+        return {
+            labels: Object.keys(aggregated),
+            cashflow: Object.values(aggregated).map(item => item.cashflow),
+            realized: Object.values(aggregated).map(item => item.realized)
+        };
+    }
+
+    // Function Switch Granularitas Tampilan Grafik
+    function switchChartGranularity(type) {
+        currentGranularity = type;
+
+        ['daily', 'weekly', 'monthly'].forEach(mode => {
+            const btn = document.getElementById(`btn-${mode}`);
+            if (btn) {
+                if (mode === type) {
+                    btn.className = 'px-3 py-1 rounded-lg bg-[#3e2723] text-white transition';
+                } else {
+                    btn.className = 'px-3 py-1 rounded-lg hover:bg-white/80 transition';
+                }
+            }
+        });
+
+        const agg = aggregateData(rawDailyLabels, rawDailyCashflow, rawDailyRealized, type);
+
+        if (mainRevenueChart) {
+            mainRevenueChart.data.labels = agg.labels.length > 0 ? agg.labels : ['Tanpa Data'];
+            mainRevenueChart.data.datasets[0].data = agg.cashflow.length > 0 ? agg.cashflow : [0];
+            mainRevenueChart.data.datasets[1].data = agg.realized.length > 0 ? agg.realized : [0];
+            mainRevenueChart.update();
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
-        const ctx = document.getElementById('revenueChart').getContext('2d');
+        // 1. INITIALIZE DUAL LINE CHART (GRAFIK UTAMA)
+        const ctxRevenue = document.getElementById('revenueChart').getContext('2d');
         
-        const labels = @json($chartLabels);
-        const dataValues = @json($chartData);
-
-        // Ambient Gradient Background
-        const gradient = ctx.createLinearGradient(0, 0, 0, 250);
-        gradient.addColorStop(0, 'rgba(184, 134, 11, 0.4)');
-        gradient.addColorStop(1, 'rgba(184, 134, 11, 0.0)');
-
-        new Chart(ctx, {
+        mainRevenueChart = new Chart(ctxRevenue, {
             type: 'line',
             data: {
-                labels: labels.length > 0 ? labels : ['Tanpa Data'],
-                datasets: [{
-                    label: 'Pendapatan (Rp)',
-                    data: dataValues.length > 0 ? dataValues : [0],
-                    borderColor: '#3e2723',
-                    borderWidth: 3,
-                    backgroundColor: gradient,
-                    fill: true,
-                    tension: 0.35,
-                    pointBackgroundColor: '#b8860b',
-                    pointBorderColor: '#fff',
-                    pointHoverRadius: 6
-                }]
+                labels: rawDailyLabels.length > 0 ? rawDailyLabels : ['Tanpa Data'],
+                datasets: [
+                    {
+                        label: 'Cashflow Real-Time (Uang Masuk / Transfer)',
+                        data: rawDailyCashflow.length > 0 ? rawDailyCashflow : [0],
+                        borderColor: '#d97706',
+                        backgroundColor: 'rgba(217, 119, 6, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.35,
+                        pointBackgroundColor: '#d97706',
+                        pointBorderColor: '#fff',
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Realisasi Omzet (Pesanan Selesai / Fulfill)',
+                        data: rawDailyRealized.length > 0 ? rawDailyRealized : [0],
+                        borderColor: '#0284c7',
+                        backgroundColor: 'rgba(2, 132, 199, 0.05)',
+                        borderWidth: 3,
+                        borderDash: [5, 5],
+                        fill: false,
+                        tension: 0.35,
+                        pointBackgroundColor: '#0284c7',
+                        pointBorderColor: '#fff',
+                        pointHoverRadius: 6
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false },
+                    legend: { 
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            font: { size: 10, weight: 'bold' },
+                            color: '#3e2723',
+                            usePointStyle: true
+                        }
+                    },
                     tooltip: {
+                        mode: 'index',
+                        intersect: false,
                         callbacks: {
                             label: function(context) {
-                                return ' Omzet: Rp ' + context.parsed.y.toLocaleString('id-ID');
+                                return ' ' + context.dataset.label + ': Rp ' + context.parsed.y.toLocaleString('id-ID');
                             }
                         }
                     }
@@ -254,6 +399,44 @@
                         grid: { display: false }
                     }
                 }
+            }
+        });
+
+        // 2. INITIALIZE DONUT CHART (SARAN NO. 3 - SKEMA PEMBAYARAN)
+        const ctxPayment = document.getElementById('paymentSchemeChart').getContext('2d');
+        new Chart(ctxPayment, {
+            type: 'doughnut',
+            data: {
+                labels: ['Skema DP (50%)', 'Full Payment'],
+                datasets: [{
+                    data: [dpCountVal > 0 ? dpCountVal : 1, fullCountVal > 0 ? fullCountVal : 1],
+                    backgroundColor: ['#d97706', '#10b981'],
+                    borderColor: '#ffffff',
+                    borderWidth: 2,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 10, weight: 'bold' },
+                            color: '#3e2723',
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ' ' + context.label + ': ' + context.parsed + ' Transaksi';
+                            }
+                        }
+                    }
+                },
+                cutout: '70%'
             }
         });
     });

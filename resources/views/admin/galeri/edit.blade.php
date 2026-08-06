@@ -17,7 +17,16 @@
             <h4 class="text-xs font-bold text-[#3e2723]/80 uppercase tracking-wide">Daftar Gambar Foto</h4>
             
             @php
-                $folder = public_path('img/galeri/' . $galeri->album);
+                // PENGECEKAN PATH DYNAMIC UNTUK PUBLIC_HTML HOSTING DAN LOCALHOST
+                $publicHtmlFolder = base_path('../public_html/img/galeri/' . $galeri->album);
+                $localFolder = public_path('img/galeri/' . $galeri->album);
+
+                if (file_exists($publicHtmlFolder)) {
+                    $folder = $publicHtmlFolder;
+                } else {
+                    $folder = $localFolder;
+                }
+
                 $files = file_exists($folder) ? array_values(array_diff(scandir($folder), ['.', '..'])) : [];
             @endphp
 

@@ -28,7 +28,19 @@ class CheckoutController extends Controller
         // Ambil data user jika terautentikasi (null jika guest)
         $user = Auth::user();
 
-        return view('orders.checkout', compact('user'));
+        // ðŸ”´ FIX: Memformat tanggal secara eksplisit menjadi string 'YYYY-MM-DD'
+        // agar terhindar dari casting ISO Carbon string ("YYYY-MM-DDT00:00:00Z") di JavaScript JSON
+        $disabledDates = DisabledDate::where('date', '>=', now()->toDateString())
+            ->orderBy('date', 'asc')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'date' => Carbon::parse($item->date)->format('Y-m-d'),
+                    'reason' => $item->reason ?? 'Kuota Penuh / Toko Libur',
+                ];
+            });
+
+        return view('orders.checkout', compact('user', 'disabledDates'));
     }
 
     /**
@@ -42,7 +54,7 @@ class CheckoutController extends Controller
             'customer_email' => 'required|email|max:255', // Wajib diisi agar data tracing & account linking bekerja
             'order_type' => 'required|in:pickup,delivery',
             'delivery_address' => 'required_if:order_type,delivery|nullable|string',
-            'payment_method' => 'nullable|in:payment_gateway,manual_wa', // 🟢 DITAMBAHKAN: Validasi metode pembayaran
+            'payment_method' => 'nullable|in:payment_gateway,manual_wa', // ðŸŸ¢ Validasi metode pembayaran
             'payment_plan' => 'required|in:full,dp',
             // Waktu kesiapan minimal 2 jam ke depan (now + 2 hours)
             'fulfill_at' => 'required|date|after_or_equal:'.now()->addHours(2)->format('Y-m-d H:i:s'),
@@ -53,7 +65,7 @@ class CheckoutController extends Controller
             'fulfill_at.after_or_equal' => 'Waktu kesiapan pesanan minimal 2 jam dari sekarang.',
         ]);
 
-        // 🔒 0. VALIDASI PENGECEKAN TANGGAL TERBLOKIR / LOCK TANGGAL (BACKEND SECURITY)
+        // ðŸ”’ 0. VALIDASI PENGECEKAN TANGGAL TERBLOKIR / LOCK TANGGAL (BACKEND SECURITY)
         $fulfillDateOnly = null;
         if ($request->filled('fulfill_at')) {
             $fulfillDateOnly = Carbon::parse($request->fulfill_at)->format('Y-m-d');
@@ -146,7 +158,7 @@ class CheckoutController extends Controller
                 'order_type' => $request->order_type,
                 'delivery_address' => $request->delivery_address,
                 'status' => 'pending',
-                'payment_method' => $paymentMethod, // 🟢 SIMPAN NILAI PAYMENT METHOD
+                'payment_method' => $paymentMethod, // ðŸŸ¢ SIMPAN NILAI PAYMENT METHOD
                 'payment_plan' => $request->payment_plan,
                 'payment_status' => 'unpaid',
                 'subtotal' => $subtotal,
@@ -168,7 +180,7 @@ class CheckoutController extends Controller
 
             DB::commit();
 
-            // 🔔 7. KIRIM NOTIFIKASI REAL-TIME KE TELEGRAM GRUP PESANAN
+            // ðŸ”” 7. KIRIM NOTIFIKASI REAL-TIME KE TELEGRAM GRUP PESANAN
             try {
                 $telegramService = new TelegramService;
                 $telegramService->sendOrderNotification($order->load('items'));
@@ -177,7 +189,7 @@ class CheckoutController extends Controller
                 Log::error('Telegram notification error: '.$telegramEx->getMessage());
             }
 
-            // 🟢 8. PEMBERCABANGAN REDIRECT
+            // ðŸŸ¢ 8. PEMBERCABANGAN REDIRECT
             // Jika memilih Manual WA, langsung arahkan ke halaman Lacak Pesanan / Detail Pesanan
             if ($paymentMethod === 'manual_wa') {
                 return redirect()->to('/pesanan/'.$order->order_number)
@@ -260,7 +272,7 @@ class CheckoutController extends Controller
     }
 
     /**
-     * 🔔 Halaman Publik Lacak Pesanan & Riwayat Pre-Order
+     * ðŸ”” Halaman Publik Lacak Pesanan & Riwayat Pre-Order
      * Rute: /pesanan/{order_number?}
      */
     public function track(Request $request, $order_number = null)
@@ -275,7 +287,7 @@ class CheckoutController extends Controller
 
         $orders = collect();
 
-        // 🔒 HANYA TAMPILKAN PESANAN JIKA USER SUDAH MEMASUKKAN NOMOR HP / EMAIL / ORDER LENGKAP
+        // ðŸ”’ HANYA TAMPILKAN PESANAN JIKA USER SUDAH MEMASUKKAN NOMOR HP / EMAIL / ORDER LENGKAP
         if (! empty($search)) {
             $orders = Order::with(['items', 'payments'])
                 ->where('customer_phone', $search)  // Match nomor HP

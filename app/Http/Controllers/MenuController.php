@@ -13,6 +13,42 @@ use Illuminate\Support\Str;
 class MenuController extends Controller
 {
     // ==========================================
+    // HELPER METHOD PRIVAT (HOSTING & SLUG SAFE)
+    // ==========================================
+
+    /**
+     * Menentukan path folder fisik tempat menyimpan gambar produk.
+     * Mendukung alur Live cPanel (public_html) maupun Localhost (public_path).
+     */
+    private function getFolderPath(string $folderName): string
+    {
+        $publicHtmlPath = base_path('../public_html');
+
+        if (file_exists($publicHtmlPath)) {
+            return $publicHtmlPath.'/img/menu/'.$folderName;
+        }
+
+        return public_path('img/menu/'.$folderName);
+    }
+
+    /**
+     * Memastikan slug yang dihasilkan bersifat unik di tabel produk.
+     */
+    private function generateUniqueSlug(string $namaProduk, ?int $ignoreId = null): string
+    {
+        $slugBase = Str::slug($namaProduk);
+        $slug = $slugBase;
+        $count = 1;
+
+        while (Produk::where('slug', $slug)->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))->exists()) {
+            $slug = $slugBase.'-'.$count;
+            $count++;
+        }
+
+        return $slug;
+    }
+
+    // ==========================================
     // PUBLIC METHODS
     // ==========================================
 
@@ -31,9 +67,8 @@ class MenuController extends Controller
             ->when($request->category, fn ($q, $slug) => $q->whereHas('category', fn ($c) => $c->where('slug', $slug)))
             ->orderByDesc('is_featured')
             ->orderBy('nama_produk')
-            ->get(); // Menggunakan get() sesuai integrasi live filter JavaScript halaman menu sebelumnya
+            ->get();
 
-        // 🔧 PERBAIKAN 1: Mengarahkan return ke folder 'menu.index' bukan 'menu' biasa
         return view('menu.index', compact('categories', 'produk'));
     }
 
@@ -105,7 +140,6 @@ class MenuController extends Controller
             abort(403);
         }
 
-        // 🔧 PERBAIKAN 2: Mengubah validasi max file upload gambar menjadi 5MB (5120 KB)
         $request->validate([
             'nama_produk' => 'required|max:255',
             'category_id' => 'required|exists:categories,id',
@@ -114,9 +148,10 @@ class MenuController extends Controller
             'gambar.*' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
-        $slug = Str::slug($request->nama_produk);
+        // ðŸŸ¢ Generate Unique Slug & Path Folder Safe Hosting (public_html / public_path)
+        $slug = $this->generateUniqueSlug($request->nama_produk);
         $folderName = time().'_'.$slug;
-        $folderPath = public_path('img/menu/'.$folderName);
+        $folderPath = $this->getFolderPath($folderName);
 
         // Buat folder penampung gambar fisik terlebih dahulu
         if (! File::exists($folderPath)) {
@@ -168,7 +203,7 @@ class MenuController extends Controller
 
         $produk = Produk::findOrFail($id);
         $folderName = $produk->gambar;
-        $folderPath = public_path('img/menu/'.$folderName);
+        $folderPath = $this->getFolderPath($folderName);
 
         // 1. Aksi Hapus File Gambar Spesifik
         if ($request->has('delete_image')) {
@@ -180,7 +215,7 @@ class MenuController extends Controller
             return back()->with('success', 'Gambar album berhasil dihapus.');
         }
 
-        // 2. Validasi Data Umum (Wajib ada agar tidak error saat update)
+        // 2. Validasi Data Umum
         $request->validate([
             'nama_produk' => 'required|max:255',
             'category_id' => 'required|exists:categories,id',
@@ -189,11 +224,14 @@ class MenuController extends Controller
             'gambar.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
-        // 3. Update Data Teks (Selalu dijalankan)
+        // ðŸŸ¢ Generate Unique Slug (mengabaikan ID produk ini sendiri)
+        $slug = $this->generateUniqueSlug($request->nama_produk, $produk->id);
+
+        // 3. Update Data Teks
         $produk->update([
             'category_id' => $request->category_id,
             'nama_produk' => $request->nama_produk,
-            'slug' => Str::slug($request->nama_produk),
+            'slug' => $slug,
             'harga' => $request->harga,
             'deskripsi' => $request->deskripsi,
         ]);
@@ -254,9 +292,9 @@ class MenuController extends Controller
         }
 
         $produk = Produk::findOrFail($id);
-        $folderPath = public_path('img/menu/'.$produk->gambar);
+        $folderPath = $this->getFolderPath($produk->gambar);
 
-        // 🔧 PERBAIKAN 4: Menghapus folder album fisik beserta seluruh aset foto di dalamnya saat baris produk di-delete
+        // Menghapus folder album fisik beserta seluruh aset foto di dalamnya saat baris produk di-delete
         if ($produk->gambar && File::exists($folderPath)) {
             File::deleteDirectory($folderPath);
         }

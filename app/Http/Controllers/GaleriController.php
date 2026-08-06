@@ -12,6 +12,25 @@ use Illuminate\Support\Str;
 class GaleriController extends Controller
 {
     // ==========================================
+    // HELPER METHOD PRIVAT (DYNAMIC HOSTING PATH)
+    // ==========================================
+
+    /**
+     * Menentukan path folder fisik tempat menyimpan album galeri.
+     * Mendukung alur Live cPanel (public_html) maupun Localhost (public_path).
+     */
+    private function getFolderPath(string $folderName): string
+    {
+        $publicHtmlPath = base_path('../public_html');
+
+        if (file_exists($publicHtmlPath)) {
+            return $publicHtmlPath.'/img/galeri/'.$folderName;
+        }
+
+        return public_path('img/galeri/'.$folderName);
+    }
+
+    // ==========================================
     // PUBLIC METHODS (DISPLAY CUSTOMER)
     // ==========================================
 
@@ -61,7 +80,7 @@ class GaleriController extends Controller
             abort(403);
         }
 
-        // 🔧 PEMBATASAN: Batas maksimal upload ditingkatkan ke 10MB (10240 KB)
+        // ЁЯЫая╕П PEMBATASAN: Batas maksimal upload ditingkatkan ke 10MB (10240 KB)
         $request->validate([
             'judul' => 'required|max:255',
             'deskripsi' => 'required',
@@ -70,7 +89,7 @@ class GaleriController extends Controller
 
         // Generate nama folder unik berbasis timestamp dan slug judul
         $folderName = time().'_'.Str::slug($request->judul);
-        $folderPath = public_path('img/galeri/'.$folderName);
+        $folderPath = $this->getFolderPath($folderName);
 
         if (! File::exists($folderPath)) {
             File::makeDirectory($folderPath, 0755, true);
@@ -110,7 +129,7 @@ class GaleriController extends Controller
 
         $galeri = Galeri::findOrFail($id);
         $folderName = $galeri->album;
-        $folderPath = public_path('img/galeri/'.$folderName);
+        $folderPath = $this->getFolderPath($folderName);
 
         // Aksi 1: Hapus File Gambar Spesifik
         if ($request->has('delete_image')) {
@@ -170,9 +189,9 @@ class GaleriController extends Controller
         }
 
         $galeri = Galeri::findOrFail($id);
-        $folderPath = public_path('img/galeri/'.$galeri->album);
+        $folderPath = $this->getFolderPath($galeri->album);
 
-        // 💥 Bersihkan folder penyimpanan berkas fisik secara total agar storage hemat
+        // ЁЯТе Bersihkan folder penyimpanan berkas fisik secara total agar storage hemat
         if ($galeri->album && File::exists($folderPath)) {
             File::deleteDirectory($folderPath);
         }

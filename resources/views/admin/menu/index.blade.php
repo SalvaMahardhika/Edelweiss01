@@ -3,7 +3,7 @@
 @section('page_title', 'Manajemen Produk Menu')
 
 @section('content')
-{{-- 💎 AREA SCROLL MANDIRI PADA PANEL KONTEN UTAMA --}}
+{{-- ðŸ’Ž AREA SCROLL MANDIRI PADA PANEL KONTEN UTAMA --}}
 <div class="max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 space-y-6">
 
     {{-- HEADER MANAGEMENT INTERFACE --}}
@@ -25,7 +25,7 @@
                     <tr class="bg-white/40 text-xs font-bold uppercase tracking-wider text-[#3e2723]/70">
                         <th class="px-6 py-4 w-24 text-center">Foto</th>
                         <th class="px-6 py-4">Nama Produk</th>
-                        <th class="px-6 py-4 text-center">Unggulan</th> <!-- 🆕 Kolom Baru -->
+                        <th class="px-6 py-4 text-center">Unggulan</th>
                         <th class="px-6 py-4 text-center">Status</th>
                         <th class="px-6 py-4 text-center">Aksi</th>
                     </tr>
@@ -33,7 +33,16 @@
                 <tbody class="divide-y divide-white/30 text-sm font-medium">
                     @foreach($produk as $item)
                     @php
-                        $folder = public_path('img/menu/' . $item->gambar);
+                        // PENGECEKAN PATH DYNAMIC UNTUK PUBLIC_HTML HOSTING DAN LOCALHOST
+                        $publicHtmlFolder = base_path('../public_html/img/menu/' . $item->gambar);
+                        $localFolder = public_path('img/menu/' . $item->gambar);
+
+                        if (file_exists($publicHtmlFolder)) {
+                            $folder = $publicHtmlFolder;
+                        } else {
+                            $folder = $localFolder;
+                        }
+
                         $files = file_exists($folder) ? array_values(array_diff(scandir($folder), ['.', '..'])) : [];
                     @endphp
                     <tr class="hover:bg-white/30 transition">
@@ -46,7 +55,7 @@
                             <p class="text-xs text-gray-400 line-clamp-1 max-w-xs font-normal">{{ $item->deskripsi }}</p>
                         </td>
                         
-                        {{-- 🆕 TOMBOL TOGGLE UNGGULAN --}}
+                        {{-- ðŸ†• TOMBOL TOGGLE UNGGULAN --}}
                         <td class="px-6 py-3 text-center">
                             <form method="POST" action="{{ route('produk.toggleStatus', $item->id) }}">
                                 @csrf
@@ -87,12 +96,12 @@
     </div>
 </div>
 
-{{-- 🔒 COMPONENT: MODAL POPUP TAMBAH PRODUK --}}
+{{-- ðŸ”’ COMPONENT: MODAL POPUP TAMBAH PRODUK --}}
 <div id="addProductModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
     <div class="w-full max-w-lg p-6 rounded-[2rem] bg-white/40 backdrop-blur-3xl border border-white/50 shadow-2xl relative space-y-4 my-auto">
         <div class="flex justify-between items-center pb-2 border-b border-[#3e2723]/15">
             <h3 class="text-lg font-bold text-[#3e2723]"><i class="fa-solid fa-cake-candles mr-2"></i> Form Input Menu Baru</h3>
-            <button type="button" onclick="closeAddModal()" class="w-8 h-8 rounded-full bg-white/40 flex items-center justify-center font-bold text-[#3e2723] hover:bg-white/70">✕</button>
+            <button type="button" onclick="closeAddModal()" class="w-8 h-8 rounded-full bg-white/40 flex items-center justify-center font-bold text-[#3e2723] hover:bg-white/70">âœ•</button>
         </div>
 
         <form method="POST" action="{{ route('produk.store') }}" enctype="multipart/form-data" class="space-y-4">
@@ -137,7 +146,7 @@
     </div>
 </div>
 
-{{-- 🚨 CUSTOM GLOBAL SYSTEM MODAL ALERT (SUCCESS / ERROR / CONFIRMATION) --}}
+{{-- ðŸš¨ CUSTOM GLOBAL SYSTEM MODAL ALERT (SUCCESS / ERROR / CONFIRMATION) --}}
 <div id="systemAlertModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center p-4">
     <div class="w-full max-w-sm p-6 rounded-[2rem] bg-white/50 backdrop-blur-3xl border border-white/60 shadow-2xl text-center space-y-4">
         {{-- Dynamic Icon Container --}}

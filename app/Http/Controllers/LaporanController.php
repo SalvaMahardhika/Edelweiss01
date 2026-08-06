@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\OrderItem;
+use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -11,11 +12,11 @@ class LaporanController extends Controller
 {
     public function index(Request $request)
     {
+        $startDate = $request->input('start_date', now()->startOfMonth()->toDateString());
+        $endDate = $request->input('end_date', now()->toDateString());
+
         // 1. Query Utama: Hanya order 'completed'
         $query = Order::with(['items', 'payments'])->where('status', 'completed');
-
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
 
         if ($request->filled('start_date') && $request->filled('end_date')) {
             $query->where(function ($q) use ($startDate, $endDate) {
@@ -34,6 +35,16 @@ class LaporanController extends Controller
         $totalOmzet = (clone $query)->sum('total_amount');
         $totalPesanan = (clone $query)->count();
         $avgOrderVal = $totalPesanan > 0 ? ($totalOmzet / $totalPesanan) : 0;
+
+        // 🟢 HITUNG CASHFLOW REAL-TIME (Uang masuk DP + Lunas dari transaksi aktif/selesai)
+        $cashflowQuery = Order::whereNotIn('status', ['cancelled']);
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $cashflowQuery->whereBetween(DB::raw('DATE(created_at)'), [$startDate, $endDate]);
+        }
+        if ($request->filled('order_type') && $request->order_type !== 'ALL') {
+            $cashflowQuery->where('order_type', $request->order_type);
+        }
+        $totalCashflowRealtime = $cashflowQuery->sum('amount_paid');
 
         // Callback Filter Tanggal
         $dateFilterCallback = function ($q) use ($startDate, $endDate, $request) {
@@ -57,19 +68,58 @@ class LaporanController extends Controller
             ->take(5)
             ->get();
 
-        // 3. 📈 DATA GRAFIK PENJUALAN HARIAN
-        $chartQuery = (clone $query)
+        // 📈 3. DUAL DATASET GRAFIK PENJUALAN HARIAN (REAL-TIME vs REALISASI)
+
+        // a. Cashflow Real-time Harian (Berdasarkan created_at)
+        $rawCashflow = Order::whereNotIn('status', ['cancelled'])
+            ->whereBetween(DB::raw('DATE(created_at)'), [$startDate, $endDate])
+            ->when($request->filled('order_type') && $request->order_type !== 'ALL', function ($q) use ($request) {
+                $q->where('order_type', $request->order_type);
+            })
+            ->select(DB::raw('DATE(created_at) as date'), DB::raw('SUM(amount_paid) as total'))
+            ->groupBy('date')
+            ->pluck('total', 'date')
+            ->toArray();
+
+        // b. Realisasi Omzet Harian (Berdasarkan status completed)
+        $rawRealized = (clone $query)
             ->select(
                 DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at)) as date'),
-                DB::raw('SUM(total_amount) as daily_revenue'),
-                DB::raw('COUNT(id) as daily_orders')
+                DB::raw('SUM(total_amount) as total')
             )
             ->groupBy('date')
-            ->orderBy('date', 'ASC')
-            ->get();
+            ->pluck('total', 'date')
+            ->toArray();
 
-        $chartLabels = $chartQuery->pluck('date')->map(fn ($d) => date('d M', strtotime($d)));
-        $chartData = $chartQuery->pluck('daily_revenue');
+        // Petakan rentang tanggal berurutan agar grafik presisi
+        $chartLabels = [];
+        $chartCashflow = [];
+        $chartRealized = [];
+
+        try {
+            $period = CarbonPeriod::create($startDate, $endDate);
+            foreach ($period as $date) {
+                $dateKey = $date->format('Y-m-d');
+                $chartLabels[] = $date->format('d M');
+                $chartCashflow[] = (float) ($rawCashflow[$dateKey] ?? 0);
+                $chartRealized[] = (float) ($rawRealized[$dateKey] ?? 0);
+            }
+        } catch (\Exception $e) {
+            $chartLabels = [];
+            $chartCashflow = [];
+            $chartRealized = [];
+        }
+
+        // Variable fallback $chartData agar tetap kompatibel
+        $chartData = $chartRealized;
+
+        // 🍩 4. HITUNG SKEMA PEMBAYARAN (DP vs FULL PAYMENT FOR DONUT CHART)
+        $dpCount = (clone $query)->where(function ($q) {
+            $q->where('payment_plan', 'dp')
+                ->orWhere('payment_plan', 'like', '%dp%');
+        })->count();
+
+        $fullCount = max(0, $totalPesanan - $dpCount);
 
         return view('admin.laporan.index', compact(
             'completedOrders',
@@ -77,11 +127,16 @@ class LaporanController extends Controller
             'totalPesanan',
             'totalProdukTerjual',
             'avgOrderVal',
+            'totalCashflowRealtime',
             'topProducts',
             'startDate',
             'endDate',
             'chartLabels',
-            'chartData'
+            'chartCashflow',
+            'chartRealized',
+            'chartData',
+            'dpCount',
+            'fullCount'
         ));
     }
 

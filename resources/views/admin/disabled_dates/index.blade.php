@@ -29,6 +29,19 @@
     </div>
     @endif
 
+    {{-- ALERT ERROR FLASHDATA --}}
+    @if(session('error'))
+    <div x-data="{ show: true }" x-show="show" x-transition class="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-900 text-xs font-bold flex items-center justify-between shadow-lg">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-triangle-exclamation text-rose-600 text-base"></i>
+            <span>{{ session('error') }}</span>
+        </div>
+        <button @click="show = false" class="text-rose-700 hover:text-rose-950">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    @endif
+
     {{-- HEADER KETERANGAN SINGKAT --}}
     <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
@@ -46,20 +59,145 @@
         </div>
     </div>
 
+    {{-- ========================================================================= --}}
+    {{-- KALENDER VISUAL TANGGAL TERKUNCI --}}
+    {{-- ========================================================================= --}}
+    @php
+        $calMonth = request('cal_month', date('n'));
+        $calYear = request('cal_year', date('Y'));
+
+        $firstDayOfMonth = \Carbon\Carbon::createFromDate($calYear, $calMonth, 1);
+        $daysInMonth = $firstDayOfMonth->daysInMonth;
+        $startDayOfWeek = $firstDayOfMonth->dayOfWeek;
+
+        $lockedMap = collect($allDisabledDates ?? $disabledDates->items())->keyBy(function($item) {
+            return \Carbon\Carbon::parse($item->date)->format('Y-m-d');
+        });
+
+        $prevMonthDate = $firstDayOfMonth->copy()->subMonth();
+        $nextMonthDate = $firstDayOfMonth->copy()->addMonth();
+    @endphp
+
+    <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 border-b border-[#3e2723]/10 pb-4">
+            <h4 class="text-sm font-bold text-[#3e2723] flex items-center gap-2">
+                <i class="fa-regular fa-calendar-days text-rose-600"></i> Visualisasi Kalender Libur / Lock
+            </h4>
+
+            {{-- Navigasi Bulan & Tahun --}}
+            <div class="flex items-center gap-3">
+                <a href="{{ route('admin.disabled_dates.index', array_merge(request()->query(), ['cal_month' => $prevMonthDate->month, 'cal_year' => $prevMonthDate->year])) }}" 
+                   class="w-8 h-8 rounded-xl bg-white/60 border border-white/50 hover:bg-white flex items-center justify-center text-[#3e2723] transition shadow-sm"
+                   title="Bulan Sebelumnya">
+                    <i class="fa-solid fa-chevron-left text-xs"></i>
+                </a>
+
+                <span class="text-xs font-black text-[#3e2723] uppercase tracking-wider min-w-[120px] text-center">
+                    {{ $firstDayOfMonth->translatedFormat('F Y') }}
+                </span>
+
+                <a href="{{ route('admin.disabled_dates.index', array_merge(request()->query(), ['cal_month' => $nextMonthDate->month, 'cal_year' => $nextMonthDate->year])) }}" 
+                   class="w-8 h-8 rounded-xl bg-white/60 border border-white/50 hover:bg-white flex items-center justify-center text-[#3e2723] transition shadow-sm"
+                   title="Bulan Selanjutnya">
+                    <i class="fa-solid fa-chevron-right text-xs"></i>
+                </a>
+            </div>
+        </div>
+
+        {{-- Legend Indicator --}}
+        <div class="flex items-center gap-4 text-[11px] font-bold text-gray-600 pt-1">
+            <div class="flex items-center gap-1.5">
+                <span class="w-3 h-3 rounded-md bg-rose-500 shadow-sm inline-block"></span>
+                <span>Terkunci / Libur (Merah)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <span class="w-3 h-3 rounded-md bg-white/80 border border-gray-300 inline-block"></span>
+                <span>Buka / Normal</span>
+            </div>
+        </div>
+
+        {{-- Grid Kalender --}}
+        <div class="grid grid-cols-7 gap-1.5 text-center">
+            @foreach(['Ming', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'] as $dayName)
+            <div class="py-2 text-[10px] font-black uppercase text-[#3e2723]/60 tracking-wider">
+                {{ $dayName }}
+            </div>
+            @endforeach
+
+            @for ($i = 0; $i < $startDayOfWeek; $i++)
+            <div class="h-14 sm:h-16 rounded-2xl bg-gray-100/30 border border-transparent"></div>
+            @endfor
+
+            @for ($day = 1; $day <= $daysInMonth; $day++)
+                @php
+                    $currentDateString = sprintf('%04d-%02d-%02d', $calYear, $calMonth, $day);
+                    $isLocked = $lockedMap->has($currentDateString);
+                    $lockInfo = $isLocked ? $lockedMap->get($currentDateString) : null;
+                    $isToday = $currentDateString === date('Y-m-d');
+                @endphp
+
+                <div class="relative group h-14 sm:h-16 p-1.5 rounded-2xl border transition flex flex-col justify-between
+                    {{ $isLocked ? 'bg-rose-500 text-white border-rose-600 shadow-md' : 'bg-white/60 border-white/50 text-[#3e2723] hover:bg-white/90' }}
+                    {{ $isToday && !$isLocked ? 'ring-2 ring-[#c8a97e] font-black' : '' }}">
+                    
+                    <div class="flex justify-between items-center w-full">
+                        <span class="text-xs font-black">{{ $day }}</span>
+                        @if($isLocked)
+                            <i class="fa-solid fa-lock text-[9px] text-white/80"></i>
+                        @elseif($isToday)
+                            <span class="text-[8px] px-1 bg-[#c8a97e] text-white font-bold rounded">Hari Ini</span>
+                        @endif
+                    </div>
+
+                    @if($isLocked)
+                        <p class="text-[9px] font-bold truncate text-left text-white/90 px-0.5" title="{{ $lockInfo->reason ?? 'Kuota Penuh / Toko Libur' }}">
+                            {{ $lockInfo->reason ?? 'Kuota Penuh' }}
+                        </p>
+
+                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-30 w-40 p-2 bg-[#3e2723] text-white text-[10px] rounded-xl shadow-2xl pointer-events-none text-left space-y-0.5">
+                            <p class="font-bold text-amber-300">{{ \Carbon\Carbon::parse($currentDateString)->translatedFormat('d F Y') }}</p>
+                            <p class="text-gray-200">Keterangan: {{ $lockInfo->reason ?? 'Kuota Penuh / Toko Libur' }}</p>
+                        </div>
+                    @endif
+                </div>
+            @endfor
+        </div>
+    </div>
+
     {{-- MAIN CONTENT GRID (FORM INPUT + TABEL DATA) --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {{-- KOLOM KIRI: FORM KUNCI TANGGAL BARU --}}
-        <div class="lg:col-span-1">
+        {{-- KOLOM KIRI: FORM KUNCI TANGGAL BARU (SINGLE & RENTANG TANGGAL) --}}
+        <div class="lg:col-span-1" x-data="{ mode: 'single', startDate: '{{ date('Y-m-d') }}' }">
             <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] p-6 shadow-xl space-y-4 sticky top-0">
-                <h4 class="text-sm font-bold text-[#3e2723] border-b border-[#3e2723]/10 pb-3 flex items-center gap-2">
-                    <i class="fa-solid fa-lock text-[#c8a97e]"></i> Kunci Tanggal Baru
-                </h4>
+                <div class="flex items-center justify-between border-b border-[#3e2723]/10 pb-3">
+                    <h4 class="text-sm font-bold text-[#3e2723] flex items-center gap-2">
+                        <i class="fa-solid fa-lock text-[#c8a97e]"></i> Kunci Tanggal Baru
+                    </h4>
+                </div>
+
+                {{-- SWITCH MODE: TUNGGAL VS RENTANG TANGGAL --}}
+                <div class="p-1 bg-white/60 border border-white/50 rounded-xl flex gap-1 text-[11px] font-bold text-[#3e2723]">
+                    <button type="button" 
+                            @click="mode = 'single'" 
+                            :class="mode === 'single' ? 'bg-[#3e2723] text-white shadow' : 'hover:bg-white/50 text-gray-600'"
+                            class="flex-1 py-1.5 rounded-lg transition text-center flex items-center justify-center gap-1">
+                        <i class="fa-regular fa-calendar-check"></i> 1 Hari
+                    </button>
+                    <button type="button" 
+                            @click="mode = 'range'" 
+                            :class="mode === 'range' ? 'bg-[#3e2723] text-white shadow' : 'hover:bg-white/50 text-gray-600'"
+                            class="flex-1 py-1.5 rounded-lg transition text-center flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-calendar-week"></i> Rentang Tanggal
+                    </button>
+                </div>
 
                 <form action="{{ route('admin.disabled_dates.store') }}" method="POST" class="space-y-4">
                     @csrf
+                    <input type="hidden" name="input_mode" :value="mode">
 
-                    <div>
+                    {{-- MODE 1: SINGLE TANGGAL (SEMULA) --}}
+                    <div x-show="mode === 'single'" x-transition>
                         <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">
                             Pilih Tanggal <span class="text-red-500">*</span>
                         </label>
@@ -67,13 +205,51 @@
                                name="date" 
                                value="{{ old('date', date('Y-m-d')) }}"
                                min="{{ date('Y-m-d') }}"
-                               required 
+                               :required="mode === 'single'"
                                class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-xs font-bold text-[#3e2723] transition @error('date') border-red-400 @enderror">
                         @error('date')
                             <p class="text-[11px] text-red-600 font-semibold mt-1">{{ $message }}</p>
                         @enderror
                     </div>
 
+                    {{-- MODE 2: RENTANG TANGGAL (NEW FEATURE) --}}
+                    <div x-show="mode === 'range'" x-transition class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider mb-1.5 text-gray-600">
+                                Dari Tanggal <span class="text-red-500">*</span>
+                            </label>
+                            <input type="date" 
+                                   name="start_date" 
+                                   x-model="startDate"
+                                   min="{{ date('Y-m-d') }}"
+                                   :required="mode === 'range'"
+                                   class="w-full px-4 py-2.5 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-xs font-bold text-[#3e2723] transition @error('start_date') border-red-400 @enderror">
+                            @error('start_date')
+                                <p class="text-[11px] text-red-600 font-semibold mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider mb-1.5 text-gray-600">
+                                Sampai Tanggal <span class="text-red-500">*</span>
+                            </label>
+                            <input type="date" 
+                                   name="end_date" 
+                                   value="{{ old('end_date', date('Y-m-d')) }}"
+                                   :min="startDate"
+                                   :required="mode === 'range'"
+                                   class="w-full px-4 py-2.5 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-xs font-bold text-[#3e2723] transition @error('end_date') border-red-400 @enderror">
+                            @error('end_date')
+                                <p class="text-[11px] text-red-600 font-semibold mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        
+                        <p class="text-[10px] text-amber-800 bg-amber-50/80 p-2 rounded-lg border border-amber-200">
+                            <i class="fa-solid fa-lightbulb text-amber-600"></i> Seluruh tanggal dalam rentang ini akan dikunci sekaligus.
+                        </p>
+                    </div>
+
+                    {{-- ALASAN / KETERANGAN --}}
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">
                             Alasan / Keterangan (Opsional)
@@ -90,7 +266,8 @@
                     </div>
 
                     <button type="submit" class="w-full py-3.5 bg-[#3e2723] text-white text-xs font-bold rounded-xl shadow-lg hover:bg-[#2c1b18] transition flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-lock"></i> Kunci Tanggal
+                        <i class="fa-solid fa-lock"></i> 
+                        <span x-text="mode === 'range' ? 'Kunci Rentang Tanggal' : 'Kunci Tanggal'"></span>
                     </button>
                 </form>
             </div>

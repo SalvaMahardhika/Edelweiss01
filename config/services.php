@@ -41,4 +41,19 @@ return [
         'is_production' => env('DOKU_IS_PRODUCTION', false),
     ],
 
+    'recaptcha' => [
+        'sitekey' => env('NOCAPTCHA_SITEKEY'),
+        'secret' => env('NOCAPTCHA_SECRET'),
+    ],
+
+    // 🤖 KONFIGURASI BOT TELEGRAM (Ditambahkan agar aman saat Config Caching Production)
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'chat_id' => env('TELEGRAM_CHAT_ID'),
+        'topics' => [
+            'errors' => env('TELEGRAM_TOPIC_ERRORS'),
+            'orders' => env('TELEGRAM_TOPIC_ORDERS'),
+        ],
+    ],
+
 ];

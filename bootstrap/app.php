@@ -15,24 +15,25 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
 
-        // ✅ REGISTER MIDDLEWARE CUSTOM
+        // âœ… REGISTER MIDDLEWARE CUSTOM
         $middleware->alias([
             'role' => RoleMiddleware::class,
         ]);
 
-        // 🔑 MASUKKAN CHECK STATUS KE DALAM MIDDLEWARE WEB BERSAMA AUTH
+        // ðŸ”‘ MASUKKAN CHECK STATUS KE DALAM MIDDLEWARE WEB BERSAMA AUTH
         $middleware->web(append: [
             CheckUserStatus::class,
         ]);
 
-        // 🔑 PERBAIKAN: Kecualikan rute webhook Midtrans dari pemeriksaan token CSRF
+        // ðŸ”‘ PERBAIKAN: Kecualikan rute webhook Midtrans & DOKU dari pemeriksaan token CSRF
         $middleware->validateCsrfTokens(except: [
             'api/midtrans/webhook',
+            'api/doku/webhook',
         ]);
 
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        // 🚨 KIRIM NOTIFIKASI ERROR LOG OTOMATIS KE TELEGRAM
+        // ðŸš¨ KIRIM NOTIFIKASI ERROR LOG OTOMATIS KE TELEGRAM
         $exceptions->reportable(function (Throwable $e) {
             try {
                 $telegram = new TelegramService;

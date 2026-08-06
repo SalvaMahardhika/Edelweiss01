@@ -46,7 +46,7 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        // 🔑 REDIRECT BERDASARKAN ROLE
+        // ðŸ”‘ REDIRECT BERDASARKAN ROLE
         if ($user->role === 'admin' || $user->role === 'super_admin') {
             return redirect()->route('admin.index'); // Langsung ke http://127.0.0.1:8000/admin
         }
@@ -55,7 +55,7 @@ class AuthController extends Controller
     }
 
     /**
-     * 🆕 Menampilkan halaman form pendaftaran akun customer baru
+     * ðŸ†• Menampilkan halaman form pendaftaran akun customer baru
      */
     public function registerForm()
     {
@@ -73,7 +73,7 @@ class AuthController extends Controller
     }
 
     /**
-     * 🆕 Memproses data registrasi customer
+     * ðŸ†• Memproses data registrasi customer
      */
     public function register(Request $request)
     {

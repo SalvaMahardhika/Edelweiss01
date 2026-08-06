@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    {{-- 🔒 GOOGLE RECAPTCHA V2 API --}}
+    {{-- ðŸ”’ GOOGLE RECAPTCHA V2 API --}}
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
     <style>
@@ -104,13 +104,25 @@
                             <option value="delivery" {{ old('order_type') == 'delivery' ? 'selected' : '' }}>Kirim ke Alamat (Delivery)</option>
                         </select>
                     </div>
+
+                    {{-- ðŸ“… INPUT TANGGAL DENGAN TRIGGER MODAL KALENDER CUSTOM --}}
                     <div class="sm:col-span-1">
                         <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Pilih Tanggal</label>
-                        <input type="date" id="fulfill_date" onchange="validateDisabledDate(this)" oninput="validateDisabledDate(this)" required class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
+                        
+                        <!-- Hidden Field untuk Nilai Form (YYYY-MM-DD) -->
+                        <input type="hidden" id="fulfill_date" required>
+
+                        <!-- Input Visual untuk Pemicu Modal Kalender -->
+                        <div class="relative cursor-pointer" onclick="openDateModal()">
+                            <input type="text" id="fulfill_date_display" placeholder="Klik pilih tanggal..." readonly required class="w-full px-4 py-3 pr-10 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition cursor-pointer font-semibold text-[#3e2723]">
+                            <i class="fa-regular fa-calendar absolute right-4 top-1/2 -translate-y-1/2 text-[#3e2723]/60 text-lg pointer-events-none"></i>
+                        </div>
+
                         <p id="disabledDateErrorText" class="text-xs text-red-600 font-semibold mt-1 hidden">
                             <i class="fa-solid fa-circle-exclamation mr-1"></i> Tanggal ini penuh / toko libur!
                         </p>
                     </div>
+
                     <div class="sm:col-span-1">
                         <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Pilih Jam (Format 24 Jam)</label>
                         <select id="fulfill_hour" required class="w-full px-4 py-3 rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
@@ -181,7 +193,7 @@
                     </div>
                 </div>
 
-                {{-- 📜 CHECKBOX SYARAT & KETENTUAN --}}
+                {{-- ðŸ“œ CHECKBOX SYARAT & KETENTUAN --}}
                 <div class="pt-2 border-t border-dashed border-[#3e2723]/20">
                     <label class="flex items-start gap-2.5 cursor-pointer text-xs text-gray-700 select-none">
                         <input type="checkbox" id="termsCheckbox" onchange="toggleTermsError()" class="mt-0.5 w-4 h-4 accent-[#3e2723] rounded">
@@ -198,9 +210,9 @@
                     </p>
                 </div>
 
-                {{-- 🔒 RECAPTCHA V2 DI BAWAH TOTAL HARGA --}}
+                {{-- ðŸ”’ RECAPTCHA V2 DI BAWAH TOTAL HARGA --}}
                 <div class="pt-2 flex flex-col items-center justify-center space-y-1">
-                    <div class="g-recaptcha" data-sitekey="{{ env('NOCAPTCHA_SITEKEY', '6Ld_dummy_site_key_here') }}" data-callback="recaptchaSuccessCallback"></div>
+                    <div class="g-recaptcha" data-sitekey="{{ config('services.recaptcha.sitekey') }}" data-callback="recaptchaSuccessCallback"></div>
                     <p id="captchaErrorText" class="text-xs text-red-600 font-semibold hidden">Silakan centang reCAPTCHA terlebih dahulu!</p>
                 </div>
 
@@ -212,7 +224,72 @@
     </form>
 </main>
 
-{{-- 💳 MODAL POPUP METODE PEMBAYARAN --}}
+{{-- ðŸ“… CUSTOM MODAL KALENDER (TANGGAL TERKUNCI OTOMATIS MERAH & DISABLED) --}}
+<div id="customDateModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white/95 backdrop-blur-2xl border border-white/80 rounded-[2.5rem] shadow-2xl p-6 space-y-4 my-auto">
+        
+        {{-- Header Modal --}}
+        <div class="flex items-center justify-between pb-3 border-b border-[#3e2723]/10">
+            <div class="flex items-center gap-2 text-[#3e2723]">
+                <i class="fa-solid fa-calendar-days text-xl text-[#c8a97e]"></i>
+                <h3 class="font-black text-base">Pilih Tanggal Pengambilan</h3>
+            </div>
+            <button type="button" onclick="closeDateModal()" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        {{-- Navigasi Bulan --}}
+        <div class="flex items-center justify-between px-2">
+            <button type="button" onclick="changeCalendarMonth(-1)" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-[#3e2723] font-bold">
+                <i class="fa-solid fa-chevron-left text-xs"></i>
+            </button>
+            <span id="calendarMonthYearTitle" class="text-sm font-black text-[#3e2723] uppercase tracking-wider">
+                <!-- Dinamis via JS -->
+            </span>
+            <button type="button" onclick="changeCalendarMonth(1)" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-[#3e2723] font-bold">
+                <i class="fa-solid fa-chevron-right text-xs"></i>
+            </button>
+        </div>
+
+        {{-- Legend Petunjuk Warna --}}
+        <div class="flex items-center justify-center gap-4 text-[10px] font-bold text-gray-600 bg-gray-50 p-2 rounded-xl">
+            <div class="flex items-center gap-1">
+                <span class="w-3 h-3 rounded-md bg-rose-500 inline-block"></span>
+                <span>Full / Libur</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <span class="w-3 h-3 rounded-md bg-white border border-gray-300 inline-block"></span>
+                <span>Tersedia</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <span class="w-3 h-3 rounded-md bg-[#3e2723] inline-block"></span>
+                <span>Dipilih</span>
+            </div>
+        </div>
+
+        {{-- Grid Kalender --}}
+        <div>
+            <!-- Header Nama Hari -->
+            <div class="grid grid-cols-7 gap-1 text-center text-[11px] font-black uppercase text-gray-400 mb-2">
+                <div>Min</div><div>Sen</div><div>Sel</div><div>Rab</div><div>Kam</div><div>Jum</div><div>Sab</div>
+            </div>
+            
+            <!-- Slots Hari dalam Bulan -->
+            <div id="calendarDaysGrid" class="grid grid-cols-7 gap-1.5 text-center">
+                <!-- Rendered dynamically by JS -->
+            </div>
+        </div>
+
+        <div class="pt-2 flex justify-end">
+            <button type="button" onclick="closeDateModal()" class="w-full py-3 bg-[#3e2723] text-white text-xs font-bold rounded-xl shadow hover:bg-[#2c1b18] transition">
+                Tutup
+            </button>
+        </div>
+    </div>
+</div>
+
+{{-- ðŸ’³ MODAL POPUP METODE PEMBAYARAN --}}
 <div id="paymentModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-md flex items-center justify-center p-4">
     <div class="w-full max-w-md p-6 rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white/80 shadow-2xl space-y-6 text-center my-auto">
         
@@ -264,7 +341,7 @@
     </div>
 </div>
 
-{{-- 📜 MODAL POPUP SYARAT & KETENTUAN --}}
+{{-- ðŸ“œ MODAL POPUP SYARAT & KETENTUAN --}}
 <div id="termsModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
     <div class="w-full max-w-xl bg-white/95 backdrop-blur-2xl border border-white/80 rounded-[2.5rem] shadow-2xl p-6 md:p-8 max-h-[85vh] flex flex-col justify-between">
         <div>
@@ -275,7 +352,7 @@
                     </div>
                     <h3 class="text-lg font-bold text-[#3e2723]">Syarat & Ketentuan Pemesanan</h3>
                 </div>
-                <button type="button" onclick="closeTermsModal()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition">✕</button>
+                <button type="button" onclick="closeTermsModal()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition">âœ–</button>
             </div>
 
             <div class="overflow-y-auto max-h-[55vh] mt-4 pr-2 space-y-4 text-xs md:text-sm text-[#4a3525] leading-relaxed">
@@ -340,8 +417,19 @@
     const TAX_RATE = 0.10; // Persentase Pajak PPN (10%)
     const ADMIN_WA = '6287794082895'; // Nomor WA Admin Edelweiss Bakery
     
-    // 🔒 DATA TANGGAL TERBLOKIR DARI ADMIN
-    const disabledDates = @json($disabledDates ?? []);
+    // ðŸ”’ DATA TANGGAL TERBLOKIR DARI ADMIN
+    const rawDisabledDates = @json($disabledDates ?? []);
+    const disabledDatesMap = {};
+    
+    if (Array.isArray(rawDisabledDates)) {
+        rawDisabledDates.forEach(item => {
+            if (typeof item === 'object' && item !== null) {
+                disabledDatesMap[item.date] = item.reason || 'Kuota Penuh / Toko Libur';
+            } else {
+                disabledDatesMap[item] = 'Kuota Penuh / Toko Libur';
+            }
+        });
+    }
 
     if (sessionStorage.getItem('bakery_cart')) {
         checkoutCart = JSON.parse(sessionStorage.getItem('bakery_cart'));
@@ -351,14 +439,14 @@
         window.location.href = "{{ route('menu') }}";
     }
 
-    // 🔒 HELPER CEK TANGGAL TERBLOKIR
+    // ðŸ”’ HELPER CEK TANGGAL TERBLOKIR
     function isDateDisabled(dateString) {
         if (!dateString) return false;
         const formattedDate = dateString.split(' ')[0];
-        return disabledDates.includes(formattedDate);
+        return Object.prototype.hasOwnProperty.call(disabledDatesMap, formattedDate);
     }
 
-    // 🔒 VALIDASI PENGECEKAN TANGGAL TERBLOKIR REAL-TIME
+    // ðŸ”’ VALIDASI PENGECEKAN TANGGAL TERBLOKIR REAL-TIME
     function validateDisabledDate(input) {
         const selectedDate = input.value;
         const errorText = document.getElementById('disabledDateErrorText');
@@ -366,7 +454,8 @@
         if (isDateDisabled(selectedDate)) {
             errorText.classList.remove('hidden');
             alert('Maaf, kuota pemesanan untuk tanggal tersebut sudah PENUH atau toko sedang LIBUR. Silakan pilih tanggal lain!');
-            input.value = ''; // Kosongkan pilihan tanggal
+            input.value = ''; 
+            document.getElementById('fulfill_date_display').value = '';
         } else {
             errorText.classList.add('hidden');
         }
@@ -377,7 +466,7 @@
         document.getElementById('captchaErrorText').classList.add('hidden');
     }
 
-    // 📜 MODAL & CHECKBOX SYARAT & KETENTUAN LOGIC
+    // ðŸ“œ MODAL & CHECKBOX SYARAT & KETENTUAN LOGIC
     function openTermsModal() {
         document.getElementById('termsModal').classList.remove('hidden');
     }
@@ -427,12 +516,18 @@
         const termsError = document.getElementById('termsErrorText');
         const errorText = document.getElementById('disabledDateErrorText');
 
-        // 0. Cek kembali jika tanggal yang dipilih termasuk tanggal terblokir
+        // 0. Cek jika tanggal belum dipilih atau terblokir
+        if (!dateVal) {
+            alert('Silakan pilih tanggal terlebih dahulu!');
+            openDateModal();
+            return;
+        }
+
         if (isDateDisabled(dateVal)) {
             errorText.classList.remove('hidden');
             alert('Maaf, tanggal yang Anda pilih sedang tidak menerima pesanan. Silakan ganti tanggal.');
             dateInput.value = '';
-            dateInput.focus();
+            document.getElementById('fulfill_date_display').value = '';
             return;
         }
 
@@ -472,12 +567,11 @@
         const dateInput = document.getElementById('fulfill_date');
         const dateVal = dateInput.value;
 
-        // 🚨 PROTEKSI KETAT SEBELUM SUBMIT PAYMENT GATEWAY
         if (isDateDisabled(dateVal)) {
             alert('Maaf, tanggal yang Anda pilih sudah PENUH/LIBUR. Silakan ganti tanggal.');
             closePaymentModal();
             dateInput.value = '';
-            dateInput.focus();
+            document.getElementById('fulfill_date_display').value = '';
             return;
         }
 
@@ -485,17 +579,16 @@
         document.getElementById('mainCheckoutForm').submit();
     }
 
-    // 🟢 SCRIPT WHATSAPP BERSIH TANPA EMOJI (MENCEGAH KARAKTER TANDA TANYA / CORRUPT)
+    // ðŸŸ¢ SCRIPT WHATSAPP BERSIH TANPA EMOJI (MENCEGAH KARAKTER TANDA TANYA / CORRUPT)
     function submitViaWhatsApp() {
         const dateInput = document.getElementById('fulfill_date');
         const dateVal = dateInput.value;
 
-        // 🚨 PROTEKSI KETAT SEBELUM PROSES WA & SUBMIT MANUAL
         if (isDateDisabled(dateVal)) {
             alert('Maaf, kuota pemesanan untuk tanggal tersebut sudah PENUH atau toko sedang LIBUR. Pesanan tidak dapat dilanjutkan.');
             closePaymentModal();
             dateInput.value = '';
-            dateInput.focus();
+            document.getElementById('fulfill_date_display').value = '';
             return;
         }
 
@@ -523,7 +616,7 @@
         const grandTotal = subtotal + taxAmount;
         const payNow = paymentPlan === 'dp' ? Math.round(grandTotal * 0.5) : grandTotal;
 
-        // Format Pesan WhatsApp Standar Polos (Tanpa Emoji)
+        // Format Pesan WhatsApp Standar Polos
         let waMessage = `Halo Admin Edelweiss Bakery!\n`;
         waMessage += `Saya ingin memesan kue/roti secara *TRANSFER MANUAL*.\n\n`;
         
@@ -556,10 +649,7 @@
 
         const waUrl = `https://wa.me/${ADMIN_WA}?text=${encodeURIComponent(waMessage)}`;
 
-        // 2. Submit Form ke Backend Laravel (Menyimpan Data Order)
         const form = document.getElementById('mainCheckoutForm');
-        
-        // Buka WhatsApp di tab baru lalu submit form
         window.open(waUrl, '_blank');
         form.submit();
     }
@@ -570,9 +660,6 @@
         
         container.innerHTML = '';
         hiddenField.value = JSON.stringify(checkoutCart);
-
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('fulfill_date').setAttribute('min', today);
 
         checkoutCart.forEach(item => {
             const el = document.createElement('div');
@@ -617,6 +704,107 @@
         } else {
             dpRow.classList.add('hidden');
         }
+    }
+
+    // =========================================================================
+    // ðŸ“… LOGIKA CUSTOM MODAL KALENDER (NATIVE JAVASCRIPT)
+    // =========================================================================
+    let currentCalDate = new Date();
+    let selectedDateStr = '';
+
+    function openDateModal() {
+        document.getElementById('customDateModal').classList.remove('hidden');
+        renderCustomCalendar();
+    }
+
+    function closeDateModal() {
+        document.getElementById('customDateModal').classList.add('hidden');
+    }
+
+    function changeCalendarMonth(delta) {
+        currentCalDate.setMonth(currentCalDate.getMonth() + delta);
+        renderCustomCalendar();
+    }
+
+    function renderCustomCalendar() {
+        const year = currentCalDate.getFullYear();
+        const month = currentCalDate.getMonth();
+        
+        const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        document.getElementById('calendarMonthYearTitle').innerText = `${monthNames[month]} ${year}`;
+
+        const grid = document.getElementById('calendarDaysGrid');
+        grid.innerHTML = '';
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        // Format String Hari Ini (YYYY-MM-DD)
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+        // Empty slots sebelum tanggal 1
+        for (let i = 0; i < firstDay; i++) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = "h-11 rounded-xl bg-gray-50/50";
+            grid.appendChild(emptyDiv);
+        }
+
+        // Render tanggal 1 s/d selesai
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dayFormatted = String(day).padStart(2, '0');
+            const monthFormatted = String(month + 1).padStart(2, '0');
+            const dateStr = `${year}-${monthFormatted}-${dayFormatted}`;
+            
+            const isPast = dateStr < todayStr;
+            const isLocked = isDateDisabled(dateStr);
+            const isSelected = dateStr === selectedDateStr;
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+
+            let classes = "h-11 rounded-xl font-bold text-xs flex flex-col items-center justify-center transition p-1 relative ";
+
+            if (isPast) {
+                // Tanggal Sudah Lewat
+                classes += "bg-gray-100 text-gray-300 cursor-not-allowed";
+                btn.disabled = true;
+                btn.innerHTML = `<span>${day}</span>`;
+            } else if (isLocked) {
+                // ðŸ”´ TANGGAL FULL / LIBUR (TIDAK BISA DIKLIK + WARNA MERAH)
+                classes += "bg-rose-500 text-white shadow-sm cursor-not-allowed border border-rose-600";
+                btn.disabled = true;
+                btn.title = disabledDatesMap[dateStr] || 'Penuh / Libur';
+                btn.innerHTML = `<span class="leading-none">${day}</span><span class="text-[8px] font-black uppercase mt-0.5 text-rose-100">FULL</span>`;
+            } else if (isSelected) {
+                // Tanggal Sedang Dipilih
+                classes += "bg-[#3e2723] text-white ring-2 ring-[#c8a97e] shadow-md";
+                btn.onclick = () => selectDateFromCalendar(dateStr);
+                btn.innerHTML = `<span>${day}</span>`;
+            } else {
+                // Tanggal Normal Tersedia
+                classes += "bg-white border border-gray-200 text-[#3e2723] hover:bg-[#c8a97e]/20 hover:border-[#c8a97e]";
+                btn.onclick = () => selectDateFromCalendar(dateStr);
+                btn.innerHTML = `<span>${day}</span>`;
+            }
+
+            btn.className = classes;
+            grid.appendChild(btn);
+        }
+    }
+
+    function selectDateFromCalendar(dateStr) {
+        selectedDateStr = dateStr;
+        
+        // Simpan nilai ke Hidden Input & Tampilan Visual
+        document.getElementById('fulfill_date').value = dateStr;
+        
+        const dateObj = new Date(dateStr + 'T00:00:00');
+        const formattedDisplay = dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        document.getElementById('fulfill_date_display').value = formattedDisplay;
+
+        document.getElementById('disabledDateErrorText').classList.add('hidden');
+        closeDateModal();
     }
 
     document.addEventListener('DOMContentLoaded', renderCheckoutSummary);

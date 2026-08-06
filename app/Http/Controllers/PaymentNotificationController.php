@@ -50,7 +50,6 @@ class PaymentNotificationController extends Controller
         Log::info('📥 Webhook Midtrans Valid Diterima', $payload);
 
         // 3. 🔍 PARSING ORDER NUMBER ASLI DENGAN AMAN
-        // Menangani berbagai format suffix seperti: EDL-20260721-0011-1721548800, EDL-xxx-LUNAS-xxx, EDL-xxx-REPAY-xxx
         $orderNumber = $orderIdParam;
         if (Str::contains($orderNumber, '-LUNAS-')) {
             $orderNumber = Str::before($orderNumber, '-LUNAS-');
@@ -59,7 +58,6 @@ class PaymentNotificationController extends Controller
         } elseif (Str::contains($orderNumber, '-PAY-')) {
             $orderNumber = Str::before($orderNumber, '-PAY-');
         } else {
-            // Mengambil 3 segmen pertama untuk format standar EDL-YYYYMMDD-XXXX
             $parts = explode('-', $orderNumber);
             if (count($parts) >= 3) {
                 $orderNumber = $parts[0].'-'.$parts[1].'-'.$parts[2];
@@ -84,7 +82,6 @@ class PaymentNotificationController extends Controller
         } elseif ($transactionStatus == 'settlement') {
             $isSuccess = true;
         } elseif (in_array($transactionStatus, ['cancel', 'deny', 'expire'])) {
-            // Jika transaksi gagal/kadaluarsa, update status menjadi cancelled
             $order->update([
                 'payment_status' => 'unpaid',
                 'status' => 'cancelled',
@@ -94,18 +91,16 @@ class PaymentNotificationController extends Controller
 
             return response()->json(['message' => 'Payment Failed/Expired Handled'], 200);
         } elseif ($transactionStatus == 'pending') {
-            // Jika masih menunggu pembayaran di kasir/ATM/QRIS
             Log::info("⏳ Pesanan {$orderNumber} masih menunggu pembayaran (Pending).");
 
             return response()->json(['message' => 'Payment Pending Handled'], 200);
         }
 
-        // Jika transaksi tidak sukses, hentikan eksekusi di sini
         if (! $isSuccess) {
             return response()->json(['message' => 'Transaction Status Ignored'], 200);
         }
 
-        // 6. 🛡️ IDEMPOTENSI: Cek apakah referensi transaksi SUKSES ini sudah pernah dicatat sebelumnya
+        // 6. 🛡️ IDEMPOTENSI: Cek duplikasi
         $alreadyProcessed = DB::table('payments')
             ->where('reference', $midtransTxId)
             ->whereIn('status', ['settlement', 'paid'])
@@ -118,7 +113,7 @@ class PaymentNotificationController extends Controller
         }
 
         try {
-            // 7. Simpan / update data pembayaran via PaymentService
+            // 7. Simpan / update data pembayaran
             $this->paymentService->processPayment($order, [
                 'amount' => (float) $grossAmount,
                 'transaction_status' => 'settlement',
@@ -127,7 +122,7 @@ class PaymentNotificationController extends Controller
                 'raw_payload' => $payload,
             ]);
 
-            // 8. Hitung ulang total amount_paid & panggil method sinkronisasi status di Model Order
+            // 8. Hitung ulang status
             if (method_exists($order, 'recalculatePaymentStatus')) {
                 $order->recalculatePaymentStatus();
             } else {
@@ -155,14 +150,28 @@ class PaymentNotificationController extends Controller
      */
     public function handleDoku(Request $request)
     {
+        // 🟢 1. Penanganan Ping Verifikasi / Tes Akses URL via Method GET
+        if ($request->isMethod('get')) {
+            return response()->json([
+                'status' => 'ACTIVE',
+                'message' => 'DOKU Webhook Endpoint Ready',
+            ], 200);
+        }
+
         $payload = $request->all();
         Log::info('📥 Webhook DOKU Diterima:', $payload);
 
-        // 1. Parsing Parameter Utama dari Payload DOKU
+        // 2. Parsing Parameter Utama dari Payload DOKU
         $invoiceNumber = $payload['order']['invoice_number'] ?? null;
-        $transactionStatus = strtoupper($payload['transaction']['status'] ?? '');
-        $amount = $payload['order']['amount'] ?? 0;
-        $dokuTxId = $payload['transaction']['id'] ?? ($payload['order']['invoice_number'] ?? null);
+
+        $rawStatus = $payload['transaction']['status'] ?? ($payload['statustype'] ?? '');
+        $transactionStatus = strtoupper($rawStatus);
+
+        $paidAmount = (float) ($payload['order']['amount'] ?? 0);
+
+        $dokuTxId = $payload['transaction']['id']
+            ?? $payload['acquirer']['id']
+            ?? ($invoiceNumber.'-'.time());
 
         if (! $invoiceNumber) {
             Log::error('❌ Webhook DOKU Gagal: Invoice number tidak ditemukan.');
@@ -170,12 +179,14 @@ class PaymentNotificationController extends Controller
             return response()->json(['message' => 'Invoice number missing'], 400);
         }
 
-        // 2. Parsing Order Number Asli
+        // 3. Parsing Order Number Asli
         $cleanOrderNumber = $invoiceNumber;
         if (Str::contains($cleanOrderNumber, '-LUNAS-')) {
             $cleanOrderNumber = Str::before($cleanOrderNumber, '-LUNAS-');
         } elseif (Str::contains($cleanOrderNumber, '-REPAY-')) {
             $cleanOrderNumber = Str::before($cleanOrderNumber, '-REPAY-');
+        } elseif (Str::contains($cleanOrderNumber, '-PAY-')) {
+            $cleanOrderNumber = Str::before($cleanOrderNumber, '-PAY-');
         }
 
         $order = Order::where('order_number', $cleanOrderNumber)->first();
@@ -186,57 +197,46 @@ class PaymentNotificationController extends Controller
             return response()->json(['message' => 'Order Not Found'], 404);
         }
 
-        // 3. 🟢 PEMBAYARAN SUKSES (SUCCESS)
+        // 4. 🟢 PEMBAYARAN SUKSES (SUCCESS)
         if ($transactionStatus === 'SUCCESS') {
-
-            // Cek Idempotensi Pembayaran
-            $alreadyProcessed = DB::table('payments')
-                ->where('reference', $dokuTxId)
-                ->whereIn('status', ['settlement', 'paid'])
-                ->exists();
-
-            if ($alreadyProcessed) {
-                Log::info('🛑 Webhook DOKU duplikat diabaikan: '.$dokuTxId);
-
-                return response()->json(['status' => 'SUCCESS', 'message' => 'Duplicate webhook ignored']);
-            }
 
             try {
                 // Simpan transaksi via PaymentService jika tersedia
                 if (method_exists($this->paymentService, 'processPayment')) {
                     $this->paymentService->processPayment($order, [
-                        'amount' => (float) $amount,
+                        'amount' => $paidAmount > 0 ? $paidAmount : (float) $order->total_amount,
                         'transaction_status' => 'settlement',
-                        'payment_type' => $payload['channel']['id'] ?? 'doku',
+                        'payment_type' => $payload['service']['id'] ?? ($payload['channel']['id'] ?? 'doku'),
                         'reference' => $dokuTxId,
                         'raw_payload' => $payload,
                     ]);
                 }
 
-                // Update status pembayaran & status pesanan
-                $paymentPlan = is_object($order->payment_plan)
+                // Ambil skema pembayaran (DP / Full)
+                $paymentPlanVal = is_object($order->payment_plan)
                     ? ($order->payment_plan->value ?? $order->payment_plan->name)
                     : $order->payment_plan;
 
-                if (strtolower((string) $paymentPlan) === 'dp' && $order->amount_paid == 0) {
-                    $order->update([
-                        'payment_status' => 'partial',
-                        'amount_paid' => $order->dp_amount ?? ($order->total_amount / 2),
-                        'status' => 'confirmed', // Lanjut ke dapur
-                    ]);
+                // Hitung akumulasi pembayaran baru
+                $incomingPaid = $paidAmount > 0 ? $paidAmount : ($order->dp_amount ?? ((float) $order->total_amount / 2));
+                $newAmountPaid = (float) $order->amount_paid + $incomingPaid;
+
+                // Penentuan status pembayaran mutlak
+                if (strtolower((string) $paymentPlanVal) === 'dp' && $newAmountPaid < (float) $order->total_amount) {
+                    $finalPaymentStatus = 'partial';
+                    $targetAmountPaid = $order->dp_amount ?? ($order->total_amount / 2);
                 } else {
-                    $order->update([
-                        'payment_status' => 'paid',
-                        'amount_paid' => $order->total_amount,
-                        'status' => 'confirmed', // Lanjut ke dapur
-                    ]);
+                    $finalPaymentStatus = 'paid';
+                    $targetAmountPaid = $order->total_amount;
                 }
 
-                if (method_exists($order, 'recalculatePaymentStatus')) {
-                    $order->recalculatePaymentStatus();
-                }
+                // Update data order secara langsung
+                $order->payment_status = $finalPaymentStatus;
+                $order->amount_paid = $targetAmountPaid;
+                $order->status = 'confirmed';
+                $order->save();
 
-                Log::info("✅ Webhook DOKU Sukses Diproses! Order {$order->order_number} terbayar Rp {$amount}");
+                Log::info("✅ Webhook DOKU Sukses Diproses! Order {$order->order_number} ditandai [{$finalPaymentStatus}]. Nominal Terbayar: Rp {$targetAmountPaid}");
 
                 return response()->json(['status' => 'SUCCESS']);
 
@@ -247,11 +247,11 @@ class PaymentNotificationController extends Controller
             }
         }
 
-        // 4. 🔴 PEMBAYARAN KEDALUWARSA / BATAL / GAGAL (EXPIRED, FAILED, CANCELLED)
+        // 5. 🔴 PEMBAYARAN KEDALUWARSA / BATAL / GAGAL
         elseif (in_array($transactionStatus, ['EXPIRED', 'FAILED', 'CANCELLED'])) {
             $order->update([
                 'payment_status' => 'unpaid',
-                'status' => 'cancelled', // Otomatis ubah status pesanan menjadi BATAL di admin
+                'status' => 'cancelled',
             ]);
 
             Log::info("⚠️ Pesanan DOKU {$order->order_number} telah dibatalkan otomatis karena status: {$transactionStatus}");

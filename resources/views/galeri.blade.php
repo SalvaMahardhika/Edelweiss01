@@ -89,7 +89,16 @@ use Illuminate\Support\Facades\File;
 
         @foreach($galeri as $album)
         @php
-            $folderPath = public_path('img/galeri/' . $album->album);
+            // PENGECEKAN PATH DYNAMIC UNTUK PUBLIC_HTML HOSTING DAN LOCALHOST
+            $publicHtmlFolder = base_path('../public_html/img/galeri/' . $album->album);
+            $localFolder = public_path('img/galeri/' . $album->album);
+
+            if (File::exists($publicHtmlFolder)) {
+                $folderPath = $publicHtmlFolder;
+            } else {
+                $folderPath = $localFolder;
+            }
+
             $files = [];
 
             if(File::exists($folderPath)){
@@ -133,7 +142,7 @@ use Illuminate\Support\Facades\File;
 
                     @forelse($files as $file)
                     @php
-                        $filename = basename($file);
+                        $filename = $file->getFilename();
                     @endphp
 
                     <div class="mb-3 md:mb-5 break-inside-avoid">

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\File;
 
 class Order extends Model
 {
@@ -25,7 +26,7 @@ class Order extends Model
         'order_type',
         'delivery_address',
         'status',
-        'payment_method', // 🟢 DITAMBAHKAN AGAR BISA DIISI SAAT CHECKOUT (payment_gateway | manual_wa)
+        'payment_method', // ðŸŸ¢ DITAMBAHKAN AGAR BISA DIISI SAAT CHECKOUT (payment_gateway | manual_wa)
         'payment_plan',
         'payment_status',
         'payment_proof',
@@ -79,12 +80,93 @@ class Order extends Model
                     $min = bcmul((string) $order->total_amount, '0.10', 2);
                     $max = bcmul((string) $order->total_amount, '0.90', 2);
                     if (bccomp((string) $order->dp_amount, $min, 2) < 0 || bccomp((string) $order->dp_amount, $max, 2) > 0) {
-                        throw new \DomainException('Down‑payment amount must be between 10% and 90% of total amount.');
+                        throw new \DomainException('Downâ€‘payment amount must be between 10% and 90% of total amount.');
                     }
                 }
             }
         });
     }
+
+    // ==========================================
+    // HELPER & ACCESSOR BUKTI TRANSFER FISIK
+    // ==========================================
+
+    /**
+     * Menentukan path folder fisik tempat menyimpan bukti transfer.
+     * Mendukung cPanel (public_html) & Localhost (public_path).
+     */
+    public static function getBuktiTfPath(): string
+    {
+        $publicHtmlPath = base_path('../public_html');
+
+        if (file_exists($publicHtmlPath)) {
+            return $publicHtmlPath.'/img/buktitf';
+        }
+
+        return public_path('img/buktitf');
+    }
+
+    /**
+     * Accessor Virtual: Memindai seluruh riwayat foto bukti transfer fisik berawalan No. Order.
+     * Dipanggil otomatis via $order->payment_proof_history
+     */
+    public function getPaymentProofHistoryAttribute(): array
+    {
+        $targetFolder = static::getBuktiTfPath();
+
+        if (! file_exists($targetFolder) || empty($this->order_number)) {
+            return [];
+        }
+
+        // Scan seluruh file dengan pola prefix No. Order (misal: EDL-20260805-0007-*.*)
+        $pattern = $targetFolder.'/'.$this->order_number.'-*.*';
+        $files = glob($pattern);
+
+        if (empty($files) || ! is_array($files)) {
+            return [];
+        }
+
+        // Urutkan file secara ascending berdasarkan nama file (-001, -002, dst.)
+        sort($files);
+
+        $historyFormatted = [];
+        foreach ($files as $index => $filePath) {
+            $fileName = basename($filePath);
+            $historyFormatted[] = [
+                'url' => asset('img/buktitf/'.$fileName),
+                'file' => $fileName,
+                'sequence' => $index + 1,
+                'uploaded_at' => date('d M Y, H:i', filemtime($filePath)).' WIB',
+            ];
+        }
+
+        return $historyFormatted;
+    }
+
+    /**
+     * Accessor Virtual: Mendapatkan URL bukti transfer paling baru (urutan tertinggi)
+     * Dipanggil via $order->latest_payment_proof_url
+     */
+    public function getLatestPaymentProofUrlAttribute(): ?string
+    {
+        $history = $this->payment_proof_history;
+
+        if (! empty($history)) {
+            $latest = end($history);
+
+            return $latest['url'];
+        }
+
+        if (! empty($this->payment_proof)) {
+            return asset('img/buktitf/'.$this->payment_proof);
+        }
+
+        return null;
+    }
+
+    // ==========================================
+    // RELASI DATABASE
+    // ==========================================
 
     public function user()
     {
@@ -101,7 +183,7 @@ class Order extends Model
         return $this->hasMany(Payment::class);
     }
 
-    // Helper turunan — sisa tagihan TIDAK disimpan, dihitung
+    // Helper turunan â€” sisa tagihan TIDAK disimpan, dihitung
     public function remaining(): string
     {
         return bcsub((string) $this->total_amount, (string) $this->amount_paid, 2);

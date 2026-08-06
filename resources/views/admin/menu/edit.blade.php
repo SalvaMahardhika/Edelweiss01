@@ -18,7 +18,16 @@
             <h4 class="text-xs font-bold text-[#3e2723]/80 uppercase tracking-wide">Album Foto Produk</h4>
             
             @php
-                $folder = public_path('img/menu/' . $produk->gambar);
+                // PENGECEKAN PATH DYNAMIC UNTUK PUBLIC_HTML HOSTING DAN LOCALHOST
+                $publicHtmlFolder = base_path('../public_html/img/menu/' . $produk->gambar);
+                $localFolder = public_path('img/menu/' . $produk->gambar);
+
+                if (file_exists($publicHtmlFolder)) {
+                    $folder = $publicHtmlFolder;
+                } else {
+                    $folder = $localFolder;
+                }
+
                 $files = file_exists($folder) ? array_values(array_diff(scandir($folder), ['.', '..'])) : [];
             @endphp
 

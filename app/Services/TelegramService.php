@@ -13,8 +13,14 @@ class TelegramService
 
     public function __construct()
     {
-        $this->token = env('TELEGRAM_BOT_TOKEN', '');
-        $this->chatId = env('TELEGRAM_CHAT_ID', '');
+        // Gunakan config() terlebih dahulu (standar Laravel production-safe),
+        // dengan fallback ke env() jika config belum di-cache.
+        $this->token = (string) (config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN', ''));
+        $this->chatId = (string) (config('services.telegram.chat_id') ?? env('TELEGRAM_CHAT_ID', ''));
+
+        // Trim spasi atau tanda petik yang mungkin terbawa dari file .env
+        $this->token = trim($this->token, " \t\n\r\0\x0B\"'");
+        $this->chatId = trim($this->chatId, " \t\n\r\0\x0B\"'");
     }
 
     /**
@@ -23,7 +29,7 @@ class TelegramService
     public function sendMessage(string $message, ?string $topicId = null)
     {
         if (empty($this->token) || empty($this->chatId)) {
-            Log::warning('Telegram Bot Token atau Chat ID belum dikonfigurasi di .env');
+            Log::warning('Telegram Bot Token atau Chat ID belum dikonfigurasi di .env / config');
 
             return false;
         }
@@ -36,11 +42,15 @@ class TelegramService
         ];
 
         if ($topicId) {
-            $payload['message_thread_id'] = $topicId;
+            $payload['message_thread_id'] = trim((string) $topicId, " \t\n\r\0\x0B\"'");
         }
 
         try {
             $response = Http::post("https://api.telegram.org/bot{$this->token}/sendMessage", $payload);
+
+            if (! $response->successful()) {
+                Log::error('Response gagal dari Telegram API: '.$response->body());
+            }
 
             return $response->successful();
         } catch (\Exception $e) {
@@ -112,9 +122,10 @@ class TelegramService
             $message .= "📝 <b>Catatan:</b> <i>{$order->notes}</i>\n";
         }
 
-        $topicId = env('TELEGRAM_TOPIC_ORDERS');
+        // Ambil Topic ID via config() dengan fallback ke env()
+        $topicId = config('services.telegram.topics.orders') ?? env('TELEGRAM_TOPIC_ORDERS');
 
-        return $this->sendMessage($message, $topicId);
+        return $this->sendMessage($message, $topicId ? (string) $topicId : null);
     }
 
     /**
@@ -130,8 +141,9 @@ class TelegramService
         $message .= '<b>URL:</b> '.request()->fullUrl()."\n";
         $message .= '<b>IP:</b> '.request()->ip()."\n";
 
-        $topicId = env('TELEGRAM_TOPIC_ERRORS');
+        // Ambil Topic ID via config() dengan fallback ke env()
+        $topicId = config('services.telegram.topics.errors') ?? env('TELEGRAM_TOPIC_ERRORS');
 
-        return $this->sendMessage($message, $topicId);
+        return $this->sendMessage($message, $topicId ? (string) $topicId : null);
     }
 }
