@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\OrderUpdated;
 use App\Models\DisabledDate;
 use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Produk;
 use App\Models\User;
 use App\Services\DokuService;
+use App\Services\OrderService;
 use App\Services\TelegramService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -20,6 +20,13 @@ use Illuminate\Support\Str;
 class CheckoutController extends Controller
 {
     /**
+     * Inject OrderService ke dalam Controller
+     */
+    public function __construct(
+        protected OrderService $orderService
+    ) {}
+
+    /**
      * Tampilkan halaman formulir checkout.
      * Bisa diakses oleh User yang sudah login maupun Guest.
      */
@@ -28,8 +35,7 @@ class CheckoutController extends Controller
         // Ambil data user jika terautentikasi (null jika guest)
         $user = Auth::user();
 
-        // ðŸ”´ FIX: Memformat tanggal secara eksplisit menjadi string 'YYYY-MM-DD'
-        // agar terhindar dari casting ISO Carbon string ("YYYY-MM-DDT00:00:00Z") di JavaScript JSON
+        // Memformat tanggal secara eksplisit menjadi string 'YYYY-MM-DD'
         $disabledDates = DisabledDate::where('date', '>=', now()->toDateString())
             ->orderBy('date', 'asc')
             ->get()
@@ -54,7 +60,7 @@ class CheckoutController extends Controller
             'customer_email' => 'required|email|max:255', // Wajib diisi agar data tracing & account linking bekerja
             'order_type' => 'required|in:pickup,delivery',
             'delivery_address' => 'required_if:order_type,delivery|nullable|string',
-            'payment_method' => 'nullable|in:payment_gateway,manual_wa', // ðŸŸ¢ Validasi metode pembayaran
+            'payment_method' => 'nullable|in:payment_gateway,manual_wa',
             'payment_plan' => 'required|in:full,dp',
             // Waktu kesiapan minimal 2 jam ke depan (now + 2 hours)
             'fulfill_at' => 'required|date|after_or_equal:'.now()->addHours(2)->format('Y-m-d H:i:s'),
@@ -65,7 +71,7 @@ class CheckoutController extends Controller
             'fulfill_at.after_or_equal' => 'Waktu kesiapan pesanan minimal 2 jam dari sekarang.',
         ]);
 
-        // ðŸ”’ 0. VALIDASI PENGECEKAN TANGGAL TERBLOKIR / LOCK TANGGAL (BACKEND SECURITY)
+        // 0. VALIDASI PENGECEKAN TANGGAL TERBLOKIR / LOCK TANGGAL (BACKEND SECURITY)
         $fulfillDateOnly = null;
         if ($request->filled('fulfill_at')) {
             $fulfillDateOnly = Carbon::parse($request->fulfill_at)->format('Y-m-d');
@@ -111,35 +117,17 @@ class CheckoutController extends Controller
                 $userId = $user->id;
             }
 
-            // 2. Hitung finansial order berdasarkan data database asli (aman dari manipulasi client-side)
-            $subtotal = 0;
-            $itemsToSave = [];
-
+            // 2. Format item belanjaan dari payload keranjang
+            $itemsData = [];
             foreach ($cartData as $item) {
-                // Validasi produk ada di database
-                $product = Produk::findOrFail($item['id']);
-
-                $itemSubtotal = $product->harga * $item['quantity'];
-                $subtotal += $itemSubtotal;
-
-                $itemsToSave[] = [
-                    'product_id' => $product->id,
-                    'product_name' => $product->nama_produk,
-                    'unit_price' => $product->harga,
+                $itemsData[] = [
+                    'product_id' => $item['id'],
                     'quantity' => $item['quantity'],
-                    'subtotal' => $itemSubtotal,
                     'notes' => $item['notes'] ?? null,
                 ];
             }
 
-            // 3. Hitung Pajak/PPN 11% secara presisi
-            $taxAmount = bcmul((string) $subtotal, '0.11', 2);
-            $totalAmount = bcadd((string) $subtotal, (string) $taxAmount, 2);
-
-            // Atur skema uang muka (DP 50%)
-            $dpAmount = ($request->payment_plan === 'dp') ? ($totalAmount * 0.5) : 0;
-
-            // 4. Generate Nomor Order Unik (cth: EDL-20260717-0001)
+            // 3. Generate Nomor Order Unik (cth: EDL-20260807-0001)
             $dateString = now()->format('Ymd');
             $latestOrder = Order::where('order_number', 'LIKE', "EDL-{$dateString}-%")->latest()->first();
             $nextSequence = $latestOrder ? ((int) Str::afterLast($latestOrder->order_number, '-') + 1) : 1;
@@ -148,8 +136,8 @@ class CheckoutController extends Controller
             // Ambil metode pembayaran (Default ke 'payment_gateway' jika kosong)
             $paymentMethod = $request->input('payment_method', 'payment_gateway');
 
-            // 5. Simpan ke tabel orders (user_id & payment_method terisi secara konsisten)
-            $order = Order::create([
+            // 4. Susun data order yang akan dikirim ke OrderService
+            $orderData = [
                 'order_number' => $orderNumber,
                 'user_id' => $userId,
                 'customer_name' => $request->customer_name,
@@ -157,30 +145,23 @@ class CheckoutController extends Controller
                 'customer_email' => $request->customer_email,
                 'order_type' => $request->order_type,
                 'delivery_address' => $request->delivery_address,
-                'status' => 'pending',
-                'payment_method' => $paymentMethod, // ðŸŸ¢ SIMPAN NILAI PAYMENT METHOD
+                'payment_method' => $paymentMethod,
                 'payment_plan' => $request->payment_plan,
-                'payment_status' => 'unpaid',
-                'subtotal' => $subtotal,
-                'tax_amount' => $taxAmount,
-                'total_amount' => $totalAmount,
-                'dp_amount' => $dpAmount,
-                'amount_paid' => 0,
                 'fulfill_at' => $request->fulfill_at,
                 'settlement_due_at' => $request->payment_plan === 'dp' ? Carbon::parse($request->fulfill_at)->subDays(1) : null,
                 'notes' => $request->notes,
                 'placed_at' => now(),
-            ]);
+            ];
 
-            // 6. Simpan ke tabel order_items
-            foreach ($itemsToSave as $itemData) {
-                $itemData['order_id'] = $order->id;
-                OrderItem::create($itemData);
-            }
+            // 5. Eksekusi pembuatan order & item lewat OrderService (Terisolasi dalam DB Transaction)
+            $order = $this->orderService->createOrder($orderData, $itemsData);
 
             DB::commit();
 
-            // ðŸ”” 7. KIRIM NOTIFIKASI REAL-TIME KE TELEGRAM GRUP PESANAN
+            // 📣 6. EVENT PENANDAAAN SYSTEM (Disimpan ke Log)
+            event(new OrderUpdated);
+
+            // 🔔 7. KIRIM NOTIFIKASI REAL-TIME KE TELEGRAM GRUP PESANAN
             try {
                 $telegramService = new TelegramService;
                 $telegramService->sendOrderNotification($order->load('items'));
@@ -189,7 +170,7 @@ class CheckoutController extends Controller
                 Log::error('Telegram notification error: '.$telegramEx->getMessage());
             }
 
-            // ðŸŸ¢ 8. PEMBERCABANGAN REDIRECT
+            // 8. PEMBERCABANGAN REDIRECT
             // Jika memilih Manual WA, langsung arahkan ke halaman Lacak Pesanan / Detail Pesanan
             if ($paymentMethod === 'manual_wa') {
                 return redirect()->to('/pesanan/'.$order->order_number)
@@ -256,6 +237,9 @@ class CheckoutController extends Controller
                 ]);
             }
 
+            // 📣 EVENT PENANDAAAN SYSTEM (Disimpan ke Log)
+            event(new OrderUpdated);
+
             // Kirim notifikasi pesanan ke Telegram jika TelegramService tersedia
             try {
                 if (class_exists(TelegramService::class)) {
@@ -272,7 +256,7 @@ class CheckoutController extends Controller
     }
 
     /**
-     * ðŸ”” Halaman Publik Lacak Pesanan & Riwayat Pre-Order
+     * 🔔 Halaman Publik Lacak Pesanan & Riwayat Pre-Order
      * Rute: /pesanan/{order_number?}
      */
     public function track(Request $request, $order_number = null)
@@ -287,10 +271,10 @@ class CheckoutController extends Controller
 
         $orders = collect();
 
-        // ðŸ”’ HANYA TAMPILKAN PESANAN JIKA USER SUDAH MEMASUKKAN NOMOR HP / EMAIL / ORDER LENGKAP
+        // HANYA TAMPILKAN PESANAN JIKA USER SUDAH MEMASUKKAN NOMOR HP / EMAIL / ORDER LENGKAP
         if (! empty($search)) {
             $orders = Order::with(['items', 'payments'])
-                ->where('customer_phone', $search)  // Match nomor HP
+                ->where('customer_phone', $search)   // Match nomor HP
                 ->orWhere('customer_email', $search) // Match email
                 ->orWhere('order_number', $search)   // Match nomor order
                 ->latest()

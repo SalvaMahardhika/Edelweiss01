@@ -4,22 +4,37 @@ namespace App\Events;
 
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class OrderUpdated implements ShouldBroadcast
+class OrderUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
+    /**
+     * Create a new event instance.
+     */
     public function __construct()
     {
-        // Cukup trigger sinyal agar DataTables melakukan refresh
+        // Event ini dipanggil saat order/bukti transfer diperbarui
     }
 
-    public function broadcastOn(): Channel
+    /**
+     * Get the channels the event should broadcast on.
+     */
+    public function broadcastOn(): array
     {
-        return new PrivateChannel('admin.orders');
+        return [
+            new Channel('orders'),
+        ];
+    }
+
+    /**
+     * The event's broadcast name.
+     */
+    public function broadcastAs(): string
+    {
+        return 'OrderUpdated';
     }
 }

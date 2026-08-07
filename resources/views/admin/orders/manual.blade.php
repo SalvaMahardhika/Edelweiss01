@@ -3,6 +3,14 @@
 @section('page_title', 'Order Manual & Konfirmasi WA')
 
 @section('content')
+{{-- Style khusus untuk memastikan area scroll DataTables presisi dan responsif --}}
+<style>
+    .dataTables_scrollBody {
+        min-height: 380px !important;
+        max-height: calc(100vh - 22rem) !important;
+    }
+</style>
+
 <div x-data="{ 
     // State Modal Alamat
     showAddressModal: false, 
@@ -63,7 +71,7 @@
         this.selectedHistoryImgUrl = this.modalProofUrl;
         this.showHistoryModal = true;
     }
-}" class="max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 space-y-6">
+}" class="min-h-full flex flex-col space-y-6 pb-8 overflow-y-auto pr-2">
 
     {{-- ALERT SUCCESS FLASHDATA --}}
     @if(session('success'))
@@ -82,12 +90,12 @@
     @php
         $rawOrders = $orders->getCollection();
     @endphp
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-shrink-0">
         {{-- Menunggu Verifikasi --}}
         <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
             <div>
                 <p class="text-xs font-bold text-amber-900/60 uppercase tracking-wider">Perlu Dikonfirmasi</p>
-                <h3 class="text-2xl font-black text-amber-950 mt-1">
+                <h3 class="text-2xl font-black text-amber-950 mt-1" id="stat-unverified-count">
                     {{ $rawOrders->filter(function($o) {
                         $st = strtolower(is_object($o->payment_status) ? ($o->payment_status->value ?? $o->payment_status->name ?? '') : (string)$o->payment_status);
                         return in_array($st, ['unpaid', 'pending', '']);
@@ -103,7 +111,7 @@
         <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
             <div>
                 <p class="text-xs font-bold text-emerald-800/60 uppercase tracking-wider">Terverifikasi (DP / Paid)</p>
-                <h3 class="text-2xl font-black text-emerald-900 mt-1">
+                <h3 class="text-2xl font-black text-emerald-900 mt-1" id="stat-verified-count">
                     {{ $rawOrders->filter(function($o) {
                         $st = strtolower(is_object($o->payment_status) ? ($o->payment_status->value ?? $o->payment_status->name ?? '') : (string)$o->payment_status);
                         return in_array($st, ['paid', 'lunas', 'dp', 'partial']);
@@ -119,7 +127,7 @@
         <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[1.5rem] p-5 shadow-xl flex items-center justify-between">
             <div>
                 <p class="text-xs font-bold text-[#3e2723]/60 uppercase tracking-wider">Total Order Manual</p>
-                <h3 class="text-2xl font-black text-[#3e2723] mt-1">
+                <h3 class="text-2xl font-black text-[#3e2723] mt-1" id="stat-total-count">
                     {{ $orders->total() }} Transaksi
                 </h3>
             </div>
@@ -130,7 +138,7 @@
     </div>
 
     {{-- 2. BAR PENCARIAN & LIVE AUTO-FILTER (DATATABLES AJAX) --}}
-    <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-5 flex flex-col md:flex-row gap-4 items-center justify-between">
+    <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-5 flex-shrink-0 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto flex-1 flex-wrap">
             <div class="relative flex-1 min-w-[200px]">
                 <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
@@ -161,19 +169,25 @@
             </select>
 
             <button type="button" id="resetManualFilterBtn" class="px-4 py-2.5 bg-white/60 text-[#3e2723] text-xs font-bold rounded-xl border border-white/50 hover:bg-white transition flex items-center justify-center gap-1 shadow-sm">
-                <i class="fa-solid fa-rotate-left"></i> Reset
+                <i class="fa-solid fa-rotate-left"></i> Reset Filter
             </button>
         </div>
     </div>
 
     {{-- 3. TABEL DATA ORDER MANUAL (DATATABLES SERVER-SIDE AJAX) --}}
-    <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 overflow-hidden space-y-4">
-        <h3 class="text-base font-bold text-[#3e2723] flex items-center gap-2">
-            <i class="fa-brands fa-whatsapp text-emerald-600 text-lg"></i> Daftar Pesanan Transfer Manual (WhatsApp)
-        </h3>
+    <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-5 flex-1 flex flex-col">
+        {{-- Header Bar Atas Tabel: Tombol Reset Urutan Tabel --}}
+        <div class="flex justify-between items-center mb-3 px-1 flex-wrap gap-2">
+            <h3 class="text-base font-bold text-[#3e2723] flex items-center gap-2">
+                <i class="fa-brands fa-whatsapp text-emerald-600 text-lg"></i> Daftar Pesanan Transfer Manual (WhatsApp)
+            </h3>
+            <button type="button" id="btnResetManualSort" onclick="resetManualTableOrder()" class="px-3 py-1.5 bg-white/80 border border-white/60 hover:bg-[#3e2723] hover:text-white text-[#3e2723] text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5">
+                <i class="fa-solid fa-arrow-down-short-wide"></i> Reset Urutan Tabel
+            </button>
+        </div>
 
-        <div class="overflow-x-auto rounded-2xl border border-white/40 bg-white/20 p-2 shadow-inner">
-            <table id="manualOrdersTable" class="w-full text-left border-collapse">
+        <div class="overflow-x-auto rounded-2xl border border-white/40 bg-white/20 p-2 shadow-inner flex-1 flex flex-col">
+            <table id="manualOrdersTable" class="w-full min-w-[800px] text-left border-collapse">
                 <thead>
                     <tr class="bg-white/40 text-xs font-bold uppercase tracking-wider text-[#3e2723]/70">
                         <th class="px-4 py-3.5">No. Order & Pelanggan</th>
@@ -409,6 +423,8 @@
     let activeFormId = null;
     let originalValue = null;
     let targetStatusVal = null;
+    let manualOrderTable = null;
+    let autoRefreshTimer = null;
 
     function triggerAlpineAddress(name, number, address) {
         if (window.alpineScope) {
@@ -435,13 +451,19 @@
 
         $.fn.dataTable.ext.errMode = 'throw';
 
-        let table = $('#manualOrdersTable').DataTable({
+        manualOrderTable = $('#manualOrdersTable').DataTable({
             processing: true,
             serverSide: true,
             destroy: true,
+            autoWidth: false,
+            dom: 'rtip', // Menghilangkan searchbox bawaan DataTables
+            scrollY: 'calc(100vh - 22rem)', // Mengatur area scroll vertikal
+            scrollCollapse: true,
+            order: [[0, 'desc']], // Default urutkan dari No. Order & Pelanggan / Waktu Pemesanan Terbaru (Kolom Index 0)
             ajax: {
                 url: "{{ route('admin.orders.manual') }}",
                 type: "GET",
+                global: false, // 🛑 PENTING: Mencegah trigger spinner/loading overlay global pada master layout
                 data: function (d) {
                     d.search = $('#filter_search').val();
                     d.status = $('#filter_status_produksi').val();
@@ -453,6 +475,7 @@
                 {
                     data: 'order_number',
                     name: 'order_number',
+                    className: 'whitespace-nowrap',
                     render: function (data, type, row) {
                         let cleanPhone = row.customer_phone ? String(row.customer_phone).replace(/[^0-9]/g, '') : '';
                         if (cleanPhone.startsWith('0')) {
@@ -479,6 +502,7 @@
                 {
                     data: 'fulfill_at',
                     name: 'fulfill_at',
+                    className: 'whitespace-nowrap',
                     render: function (data, type, row) {
                         let orderTypeVal = row.order_type && typeof row.order_type === 'object' ? (row.order_type.value || row.order_type.name) : row.order_type;
                         let isDelivery = String(orderTypeVal).toLowerCase() === 'delivery';
@@ -522,7 +546,7 @@
                 {
                     data: 'status',
                     name: 'status',
-                    className: 'text-center',
+                    className: 'text-center whitespace-nowrap',
                     orderable: false,
                     render: function (data, type, row) {
                         let statusVal = row.status && typeof row.status === 'object' ? (row.status.value || row.status.name) : row.status;
@@ -559,7 +583,7 @@
                 {
                     data: 'total_amount',
                     name: 'total_amount',
-                    className: 'text-center',
+                    className: 'text-center whitespace-nowrap',
                     render: function (data, type, row) {
                         let payPlan = row.payment_plan && typeof row.payment_plan === 'object' ? (row.payment_plan.value || row.payment_plan.name) : row.payment_plan;
                         let isDp = String(payPlan).toLowerCase() === 'dp';
@@ -579,7 +603,7 @@
                 {
                     data: 'payment_status',
                     name: 'payment_status',
-                    className: 'text-center space-y-1.5',
+                    className: 'text-center space-y-1.5 whitespace-nowrap',
                     render: function (data, type, row) {
                         let payStatus = row.payment_status && typeof row.payment_status === 'object' ? (row.payment_status.value || row.payment_status.name) : row.payment_status;
                         payStatus = String(payStatus || 'unpaid').toLowerCase();
@@ -615,7 +639,7 @@
                 {
                     data: 'id',
                     name: 'action',
-                    className: 'text-center',
+                    className: 'text-center whitespace-nowrap',
                     orderable: false,
                     searchable: false,
                     render: function (data, type, row) {
@@ -641,7 +665,7 @@
                 }
             ],
             language: {
-                search: "Cari Pesanan:",
+                search: "", // Menghilangkan label "Cari Pesanan:" bawaan
                 lengthMenu: "Tampilkan _MENU_ data",
                 info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ pesanan",
                 paginate: {
@@ -651,16 +675,31 @@
             }
         });
 
+        // ⚡ UPDATE REALTIME KARTU STATISTIK SETIAP KALI AJAX DATATABLES REFRESH
+        $('#manualOrdersTable').off('xhr.dt').on('xhr.dt', function (e, settings, json, xhr) {
+            if (json) {
+                if (typeof json.stat_unverified !== 'undefined') {
+                    $('#stat-unverified-count').text(json.stat_unverified + ' Transaksi');
+                }
+                if (typeof json.stat_verified !== 'undefined') {
+                    $('#stat-verified-count').text(json.stat_verified + ' Transaksi');
+                }
+                if (typeof json.stat_total !== 'undefined') {
+                    $('#stat-total-count').text(json.stat_total + ' Transaksi');
+                }
+            }
+        });
+
         let searchTimer;
         $('#filter_search').off('keyup').on('keyup', function() {
             clearTimeout(searchTimer);
             searchTimer = setTimeout(function() {
-                table.draw();
+                manualOrderTable.draw();
             }, 400);
         });
 
         $('#filter_status_produksi, #filter_status_bayar, #filter_has_proof').off('change').on('change', function() {
-            table.draw();
+            manualOrderTable.draw();
         });
 
         $('#resetManualFilterBtn').off('click').on('click', function() {
@@ -668,8 +707,38 @@
             $('#filter_status_produksi').val('ALL');
             $('#filter_status_bayar').val('ALL');
             $('#filter_has_proof').val('');
-            table.draw();
+            manualOrderTable.draw();
         });
+
+        // 🔄 AUTO POLLING DATATABLES REALTIME (SETIAP 5 DETIK - SILENT & TERKONTROL)
+        if (autoRefreshTimer) {
+            clearInterval(autoRefreshTimer);
+        }
+
+        autoRefreshTimer = setInterval(function() {
+            if (manualOrderTable && typeof manualOrderTable.ajax !== 'undefined') {
+                // 🛑 CEK: Jika ada request AJAX DataTables yang masih berlangsung, jangan kirim request baru
+                let settings = manualOrderTable.settings()[0];
+                if (settings.jqXHR && settings.jqXHR.readyState !== 4) {
+                    return;
+                }
+
+                // 🛑 SILENT POLLING: Sembunyikan indikator loading DataTables khusus saat background refresh
+                let oldProcessing = settings.oFeatures.bProcessing;
+                settings.oFeatures.bProcessing = false;
+
+                manualOrderTable.ajax.reload(function() {
+                    settings.oFeatures.bProcessing = oldProcessing; // Kembalikan ke semula setelah reload selesai
+                }, false);
+            }
+        }, 5000); // 5000ms = 5 detik
+    }
+
+    // 🔄 FUNGSI MENGEMBALIKAN URUTAN TABEL MANUAL KE POSISI AWAL
+    function resetManualTableOrder() {
+        if (manualOrderTable) {
+            manualOrderTable.order([[0, 'desc']]).draw();
+        }
     }
 
     if (document.readyState === 'loading') {
@@ -677,19 +746,6 @@
     } else {
         initManualOrdersDataTable();
     }
-
-    // 🔴 LISTEN EVENT REALTIME DARI LARAVEL REVERB VIA LARAVEL ECHO
-    document.addEventListener('DOMContentLoaded', function() {
-        if (typeof window.Echo !== 'undefined') {
-            window.Echo.private('admin.orders')
-                .listen('OrderUpdated', (e) => {
-                    console.log('Perubahan order terdeteksi via Reverb. Memperbarui tabel...');
-                    if ($.fn.DataTable.isDataTable('#manualOrdersTable')) {
-                        $('#manualOrdersTable').DataTable().ajax.reload(null, false);
-                    }
-                });
-        }
-    });
 
     function escapeHtml(text) {
         if (!text) return '';
