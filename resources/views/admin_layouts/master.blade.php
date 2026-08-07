@@ -11,20 +11,45 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    {{-- 🔴 JQUERY & DATATABLES DEPENDENCIES (DIBUTUHKAN UNTUK SEMUA TABEL) --}}
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        /* Custom Scrollbar for sleek look */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+        /* Custom Styling agar DataTables menyatu dengan Glassmorphism Tailwind */
+        .dataTables_wrapper .dataTables_length, 
+        .dataTables_wrapper .dataTables_filter, 
+        .dataTables_wrapper .dataTables_info, 
+        .dataTables_wrapper .dataTables_processing, 
+        .dataTables_wrapper .dataTables_paginate {
+            color: #3e2723 !important;
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        table.dataTable tbody tr {
+            background-color: transparent !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+            background: #3e2723 !important;
+            color: white !important;
+            border-radius: 0.5rem !important;
+            border: none !important;
+        }
     </style>
 </head>
 <body class="bg-[#fafafa] text-[#3e2723] min-h-screen relative overflow-x-hidden">
 
     {{-- BACKGROUND ART & BLUR GLOW --}}
     <div class="fixed inset-0 z-0">
-        <img src="{{ asset('img/dashboard/assets/3.png') }}" class="w-full h-full object-cover opacity-15 filter grayscale">
+        <img src="{{ asset('img/dashboard/assets/3.png') }}" class="w-full h-full object-cover opacity-15 filter grayscale" onerror="this.style.display='none'">
         <div class="absolute inset-0 bg-gradient-to-br from-[#fafafa] via-[#f5efe8] to-[#ede5dc]/90"></div>
         
         <!-- Ambient Liquid Glow Tokens -->
@@ -70,7 +95,7 @@
                         <i class="fa-regular fa-images w-5 text-center text-lg"></i> Galeri Foto
                     </a>
                     
-                    {{-- 🔒 🆕 LOCK TANGGAL / KUOTA LIBUR --}}
+                    {{-- 🔒 LOCK TANGGAL / KUOTA LIBUR --}}
                     <a href="{{ route('admin.disabled_dates.index') }}" 
                        class="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition duration-300 {{ Route::is('admin.disabled_dates.*') || Request::is('admin/disabled-dates*') ? 'bg-[#3e2723] text-white font-semibold shadow-lg' : 'hover:bg-white/50 text-[#3e2723]/80 font-medium' }}">
                         <i class="fa-solid fa-calendar-xmark w-5 text-center text-lg"></i> Lock Tanggal
@@ -130,7 +155,7 @@
                     </div>
 
                     {{-- Super Admin Restricted Account Access --}}
-                    @if(auth()->user()->role === 'super_admin')
+                    @if(auth()->check() && auth()->user()->role === 'super_admin')
                     <a href="{{ route('admin.users') }}" 
                        class="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition duration-300 {{ Route::is('admin.users') ? 'bg-[#3e2723] text-white font-semibold shadow-lg' : 'hover:bg-white/50 text-[#3e2723]/80 font-medium' }}">
                         <i class="fa-solid fa-users-gear w-5 text-center text-lg"></i> Manajemen Akun
@@ -147,7 +172,7 @@
                     </div>
                     <div class="min-w-0">
                         <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wider truncate">{{ auth()->user()->role ?? 'Admin' }}</p>
-                        <p class="text-sm font-bold truncate text-[#3e2723]" title="{{ auth()->user()->name }}">{{ auth()->user()->name ?? 'Administrator' }}</p>
+                        <p class="text-sm font-bold truncate text-[#3e2723]" title="{{ auth()->user()->name ?? 'Admin' }}">{{ auth()->user()->name ?? 'Administrator' }}</p>
                     </div>
                 </div>
                 <form action="{{ route('logout') }}" method="POST" class="shrink-0">

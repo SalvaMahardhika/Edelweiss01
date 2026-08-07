@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\OrderUpdated;
 use App\Helpers\ImageHelper;
 use App\Models\Order;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
+use Yajra\DataTables\Facades\DataTables;
 
 class OrderController extends Controller
 {
@@ -14,10 +16,6 @@ class OrderController extends Controller
     // HELPER METHOD PRIVAT (DYNAMIC HOSTING PATH & PROOF HISTORY SCANNER)
     // ==========================================
 
-    /**
-     * Menentukan path folder fisik tempat menyimpan bukti transfer.
-     * Mendukung alur Live cPanel (public_html) maupun Localhost (public_path).
-     */
     private function getBuktiTfPath(): string
     {
         $publicHtmlPath = base_path('../public_html');
@@ -29,10 +27,6 @@ class OrderController extends Controller
         return public_path('img/buktitf');
     }
 
-    /**
-     * Memindai seluruh riwayat file bukti transfer fisik di folder buktitf berdasarkan nomor order.
-     * Mengembalikan array berurut dari -001, -002, dst., tanpa memerlukan kolom database baru.
-     */
     private function getProofHistoryFiles(string $orderNumber): array
     {
         $targetFolder = $this->getBuktiTfPath();
@@ -41,7 +35,6 @@ class OrderController extends Controller
             return [];
         }
 
-        // Scan seluruh file dengan pola prefix No. Order (misal: EDL-20260805-0007-*.*)
         $pattern = $targetFolder.'/'.$orderNumber.'-*.*';
         $files = glob($pattern);
 
@@ -49,7 +42,6 @@ class OrderController extends Controller
             return [];
         }
 
-        // Urutkan file secara ascending berdasarkan nama file (-001, -002, dst.)
         sort($files);
 
         $historyFormatted = [];
@@ -69,7 +61,6 @@ class OrderController extends Controller
     // 📅 Halaman Utama Jadwal PO (KHUSUS PAYMENT GATEWAY)
     public function index(Request $request)
     {
-        // 1. 🚨 OTOMATIS BATALKAN PESANAN UNPAID > 1 HARI (24 JAM)
         Order::where('payment_status', 'unpaid')
             ->whereNotIn('status', ['completed', 'cancelled'])
             ->where(function ($q) {
@@ -83,34 +74,89 @@ class OrderController extends Controller
                 'status' => 'cancelled',
             ]);
 
-        // 2. 📋 QUERY UTAMA JADWAL PO (HANYA PAYMENT GATEWAY & EXCLUDE 'completed'/'cancelled')
+        if ($request->ajax()) {
+            $query = Order::with(['items', 'payments'])
+                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->where(function ($q) {
+                    $q->where('payment_method', '!=', 'manual_wa')
+                        ->orWhereNull('payment_method');
+                })
+                ->latest();
+
+            if ($request->filled('date')) {
+                $query->whereDate('fulfill_at', $request->date);
+            }
+
+            if ($request->filled('status') && $request->status !== 'ALL') {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->filled('payment_status') && $request->payment_status !== 'ALL') {
+                $query->where('payment_status', $request->payment_status);
+            }
+
+            return DataTables::of($query)
+                ->addIndexColumn()
+                ->editColumn('status', function ($row) {
+                    $statusVal = is_object($row->status) ? ($row->status->value ?? (string) $row->status) : (string) $row->status;
+                    $statusClasses = [
+                        'pending' => 'bg-amber-100 text-amber-800',
+                        'confirmed' => 'bg-blue-100 text-blue-800',
+                        'preparing' => 'bg-purple-100 text-purple-800',
+                        'ready' => 'bg-emerald-100 text-emerald-800',
+                    ];
+                    $cls = $statusClasses[$statusVal] ?? 'bg-gray-100 text-gray-800';
+                    return '<span class="px-2.5 py-1 text-xs font-bold rounded-lg '.$cls.'">'.ucfirst($statusVal).'</span>';
+                })
+                ->editColumn('payment_status', function ($row) {
+                    $payVal = is_object($row->payment_status) ? ($row->payment_status->value ?? (string) $row->payment_status) : (string) $row->payment_status;
+                    $payClasses = [
+                        'unpaid' => 'bg-rose-100 text-rose-800',
+                        'partial' => 'bg-amber-100 text-amber-800',
+                        'paid' => 'bg-emerald-100 text-emerald-800',
+                        'refunded' => 'bg-gray-100 text-gray-800',
+                    ];
+                    $cls = $payClasses[$payVal] ?? 'bg-gray-100 text-gray-800';
+                    return '<span class="px-2.5 py-1 text-xs font-bold rounded-lg '.$cls.'">'.ucfirst($payVal).'</span>';
+                })
+                ->editColumn('fulfill_at', function ($row) {
+                    return $row->fulfill_at ? date('d M Y, H:i', strtotime($row->fulfill_at)).' WIB' : '-';
+                })
+                ->editColumn('total_amount', function ($row) {
+                    return 'Rp '.number_format((float)$row->total_amount, 0, ',', '.');
+                })
+                ->addColumn('action', function ($row) {
+                    return '
+                        <button type="button" onclick="viewOrderDetail('.$row->id.')" class="p-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition text-xs font-bold">
+                            <i class="fa-solid fa-eye"></i> Detail
+                        </button>
+                    ';
+                })
+                ->rawColumns(['status', 'payment_status', 'action'])
+                ->make(true);
+        }
+
         $query = Order::with(['items', 'payments'])
             ->whereNotIn('status', ['completed', 'cancelled'])
             ->where(function ($q) {
-                // Tampilkan hanya yang payment_gateway (atau null/default lama)
-                $q->where('payment_method', '!=', 'manual_wa')
-                    ->orWhereNull('payment_method');
+                $q->where('payment_method', '!=', 'manual_wa')->orWhereNull('payment_method');
             })
             ->latest();
 
-        // Filter berdasarkan tanggal Fulfill/Siap
         if ($request->filled('date')) {
             $query->whereDate('fulfill_at', $request->date);
         }
 
-        // Filter Status Order (Hanya untuk status aktif)
         if ($request->filled('status') && $request->status !== 'ALL') {
             $query->where('status', $request->status);
         }
 
-        // Filter Status Pembayaran
         if ($request->filled('payment_status') && $request->payment_status !== 'ALL') {
             $query->where('payment_status', $request->payment_status);
         }
 
         $orders = $query->paginate(15)->withQueryString();
 
-        // Rekap ringkasan pesanan aktif Payment Gateway
         $todayPO = Order::whereNotIn('status', ['completed', 'cancelled'])
             ->where(function ($q) {
                 $q->where('payment_method', '!=', 'manual_wa')->orWhereNull('payment_method');
@@ -135,15 +181,84 @@ class OrderController extends Controller
         return view('admin.po.index', compact('orders', 'todayPO', 'pendingPO', 'preparingPO'));
     }
 
-    // 💬 🆕 HALAMAN ORDER MANUAL (KHUSUS WHATSAPP / MANUAL TRANSFER)
+    // 💬 HALAMAN ORDER MANUAL (KHUSUS WHATSAPP / MANUAL TRANSFER)
     public function manualOrders(Request $request)
     {
-        $query = Order::with(['items', 'payments'])
-            ->where('payment_method', 'manual_wa')
-            ->whereNotIn('status', ['completed', 'cancelled']) // 🟢 Pesanan Selesai / Batal otomatis disembunyikan & masuk ke History
+        if ($request->ajax()) {
+            $query = Order::with(['items'])
+                ->where(function ($q) {
+                    $q->whereIn('payment_method', ['manual_wa', 'manual_bank', 'manual'])
+                        ->orWhereNull('payment_method');
+                })
+                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->latest();
+
+            if ($request->filled('search')) {
+                $search = is_array($request->search) ? ($request->search['value'] ?? '') : $request->search;
+                if (!empty($search)) {
+                    $query->where(function ($q) use ($search) {
+                        $q->where('order_number', 'like', "%{$search}%")
+                            ->orWhere('customer_name', 'like', "%{$search}%")
+                            ->orWhere('customer_phone', 'like', "%{$search}%")
+                            ->orWhere('customer_email', 'like', "%{$search}%");
+                    });
+                }
+            }
+
+            // 🟢 PERBAIKAN 1: TAMBAHKAN FILTER STATUS PRODUKSI (STATUS PESANAN) VIA AJAX
+            if ($request->filled('status') && $request->status !== 'ALL') {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->filled('status_bayar') && $request->status_bayar !== 'ALL') {
+                $query->where('payment_status', $request->status_bayar);
+            }
+
+            if ($request->filled('has_proof')) {
+                if ($request->has_proof === '1') {
+                    $query->whereNotNull('payment_proof');
+                } elseif ($request->has_proof === '0') {
+                    $query->whereNull('payment_proof');
+                }
+            }
+
+            return DataTables::of($query)
+                ->addIndexColumn()
+                ->editColumn('status', function ($row) {
+                    return is_object($row->status) ? ($row->status->value ?? (string) $row->status) : (string) $row->status;
+                })
+                ->editColumn('payment_plan', function ($row) {
+                    return is_object($row->payment_plan) ? ($row->payment_plan->value ?? (string) $row->payment_plan) : (string) $row->payment_plan;
+                })
+                ->editColumn('payment_status', function ($row) {
+                    return is_object($row->payment_status) ? ($row->payment_status->value ?? (string) $row->payment_status) : (string) $row->payment_status;
+                })
+                ->editColumn('order_type', function ($row) {
+                    return is_object($row->order_type) ? ($row->order_type->value ?? (string) $row->order_type) : (string) $row->order_type;
+                })
+                ->editColumn('created_at', function ($row) {
+                    return $row->created_at ? \Carbon\Carbon::parse($row->created_at)->translatedFormat('d M Y, H:i') : '-';
+                })
+                ->editColumn('fulfill_at', function ($row) {
+                    return $row->fulfill_at ? \Carbon\Carbon::parse($row->fulfill_at)->translatedFormat('d M Y, H:i') : '-';
+                })
+                ->editColumn('total_amount', function ($row) {
+                    return 'Rp '.number_format((float)$row->total_amount, 0, ',', '.');
+                })
+                ->addColumn('payment_proof_history', function ($row) {
+                    return $this->getProofHistoryFiles($row->order_number);
+                })
+                ->make(true);
+        }
+
+        $query = Order::with(['items'])
+            ->where(function ($q) {
+                $q->whereIn('payment_method', ['manual_wa', 'manual_bank', 'manual'])
+                    ->orWhereNull('payment_method');
+            })
+            ->whereNotIn('status', ['completed', 'cancelled'])
             ->latest();
 
-        // 🔍 Filter Pencarian Keyword (No. Order, Nama, No. HP, Email)
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -154,12 +269,15 @@ class OrderController extends Controller
             });
         }
 
-        // 💵 Filter Status Pembayaran
-        if ($request->filled('status_bayar')) {
+        // 🟢 PERBAIKAN 2: TAMBAHKAN FILTER STATUS PRODUKSI (STATUS PESANAN) UNTUK NON-AJAX / PAGE LOAD INITIAL
+        if ($request->filled('status') && $request->status !== 'ALL') {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('status_bayar') && $request->status_bayar !== 'ALL') {
             $query->where('payment_status', $request->status_bayar);
         }
 
-        // 🖼️ Filter Status Bukti Transfer (Ada / Belum Ada Upload)
         if ($request->filled('has_proof')) {
             if ($request->has_proof === '1') {
                 $query->whereNotNull('payment_proof');
@@ -170,14 +288,10 @@ class OrderController extends Controller
 
         $orders = $query->paginate(15)->withQueryString();
 
-        // 🔍 PINDAI SECARA DINAMIS SELURUH RIWAYAT FOTO BUKTI TRANSFER UNTUK TIAP ORDER
         $orders->getCollection()->transform(function ($order) {
             $historyFiles = $this->getProofHistoryFiles($order->order_number);
-
-            // Lekatkan array riwayat bukti transfer hasil scan ke objek order
             $order->payment_proof_history = $historyFiles;
 
-            // Jika di DB payment_proof belum terisi tetapi file fisik terdeteksi, ambil file fisik dengan nomor urut tertinggi
             if (empty($order->payment_proof) && ! empty($historyFiles)) {
                 $latest = end($historyFiles);
                 $order->payment_proof = $latest['file'];
@@ -189,7 +303,7 @@ class OrderController extends Controller
         return view('admin.orders.manual', compact('orders'));
     }
 
-    // 📸 🆕 MENGUNGGAH BUKTI TRANSFER DARI SISI CUSTOMER/FRONTEND (WITH WEBP CONVERSION & SEQUENTIAL HISTORY AUDIT)
+    // 📸 MENGUNGGAH BUKTI TRANSFER DARI SISI CUSTOMER/FRONTEND
     public function uploadProof(Request $request)
     {
         $request->validate([
@@ -206,47 +320,83 @@ class OrderController extends Controller
 
         if ($request->hasFile('payment_proof')) {
             $file = $request->file('payment_proof');
-
-            // Path Folder Tujuan (Dinamis cPanel public_html vs Localhost)
             $targetFolder = $this->getBuktiTfPath();
 
             if (! file_exists($targetFolder)) {
                 mkdir($targetFolder, 0755, true);
             }
 
-            // 🕒 BACA RIWAYAT FOTO FISIK EKSISTING DI FOLDER BUKTITF
             $existingHistory = $this->getProofHistoryFiles($order->order_number);
-
-            // Hitung nomor urut file berikutnya (Contoh: -001, -002, dst.)
             $nextSequence = count($existingHistory) + 1;
             $sequenceStr = str_pad($nextSequence, 3, '0', STR_PAD_LEFT);
 
-            // Penamaan File Baru: EDL-20260805-0006-001.webp
             $fileName = $order->order_number.'-'.$sequenceStr.'.webp';
             $destinationPath = $targetFolder.'/'.$fileName;
 
             try {
-                // 🚀 Konversi gambar ke format WebP menggunakan ImageHelper
                 ImageHelper::convertToWebp($file->getRealPath(), $destinationPath, 80, 1200);
             } catch (Exception $e) {
-                // Fallback: Jika konversi GD gagal, simpan file secara standar
                 $fileName = $order->order_number.'-'.$sequenceStr.'.'.$file->getClientOriginalExtension();
                 $file->move($targetFolder, $fileName);
             }
 
-            // Update record database (payment_proof menyimpan nama file terbaru)
             $order->update([
                 'payment_proof' => $fileName,
             ]);
+
+            // 🔴 BROADCAST REVERB EVENT SAAT BUKTI TF DIUNGGAH
+            broadcast(new OrderUpdated());
         }
 
         return back()->with('success', 'Bukti transfer untuk order '.$order->order_number.' berhasil diunggah. Tim kami akan segera memverifikasinya.');
     }
 
-    // 📜 🆕 HALAMAN HISTORY & ARSIP PESANAN (MENGGABUNGKAN SEMUA METODE)
+    // 📜 HALAMAN HISTORY & ARSIP PESANAN
     public function history(Request $request)
     {
-        // Query Dasar: Ambil pesanan yang berstatus 'completed' atau 'cancelled'
+        if ($request->ajax()) {
+            $query = Order::with(['items', 'payments'])->latest();
+
+            if ($request->filled('status') && $request->status !== 'ALL') {
+                $query->where('status', $request->status);
+            } else {
+                $query->whereIn('status', ['completed', 'cancelled']);
+            }
+
+            if ($request->filled('placed_date')) {
+                $query->where(function ($q) use ($request) {
+                    $q->whereDate('placed_at', $request->placed_date)
+                        ->orWhereDate('created_at', $request->placed_date);
+                });
+            }
+
+            if ($request->filled('fulfill_date')) {
+                $query->whereDate('fulfill_at', $request->fulfill_date);
+            }
+
+            return DataTables::of($query)
+                ->addIndexColumn()
+                ->editColumn('status', function ($row) {
+                    $statusVal = is_object($row->status) ? ($row->status->value ?? (string) $row->status) : (string) $row->status;
+                    $badge = $statusVal === 'completed'
+                        ? '<span class="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-100 text-emerald-800">Selesai</span>'
+                        : '<span class="px-2.5 py-1 text-xs font-bold rounded-lg bg-rose-100 text-rose-800">Batal</span>';
+                    return $badge;
+                })
+                ->editColumn('total_amount', function ($row) {
+                    return 'Rp '.number_format((float)$row->total_amount, 0, ',', '.');
+                })
+                ->addColumn('action', function ($row) {
+                    return '
+                        <button type="button" onclick="viewOrderDetail('.$row->id.')" class="p-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition text-xs font-bold">
+                            <i class="fa-solid fa-eye"></i> Detail
+                        </button>
+                    ';
+                })
+                ->rawColumns(['status', 'action'])
+                ->make(true);
+        }
+
         $query = Order::with(['items', 'payments'])->latest();
 
         if ($request->filled('status') && $request->status !== 'ALL') {
@@ -255,7 +405,6 @@ class OrderController extends Controller
             $query->whereIn('status', ['completed', 'cancelled']);
         }
 
-        // 🔍 Pencarian Keyword (No. Order, Nama, No. HP, Email)
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -266,7 +415,6 @@ class OrderController extends Controller
             });
         }
 
-        // 📅 Filter Tanggal Pemesanan (placed_at / created_at)
         if ($request->filled('placed_date')) {
             $query->where(function ($q) use ($request) {
                 $q->whereDate('placed_at', $request->placed_date)
@@ -274,22 +422,15 @@ class OrderController extends Controller
             });
         }
 
-        // 🚚 Filter Tanggal Pengambilan/Kirim (fulfill_at)
         if ($request->filled('fulfill_date')) {
             $query->whereDate('fulfill_at', $request->fulfill_date);
         }
 
-        // Pagination data history
         $orders = $query->paginate(15)->withQueryString();
 
-        // 📊 Rekap Statistik untuk Kartu Ringkasan
         $totalHistoryCount = Order::whereIn('status', ['completed', 'cancelled'])->count();
         $completedCount = Order::where('status', 'completed')->count();
         $cancelledCount = Order::where('status', 'cancelled')->count();
-
-        // 🟢 PERBAIKAN RUMUS OMZET:
-        // Hanya menghitung transaksi berstatus 'completed' (pesanan batal tidak dihitung)
-        // Dan menggunakan sum('total_amount') agar pesanan DP yang sudah completed langsung terhitung nilai penuh (100%)
         $totalRevenue = Order::where('status', 'completed')->sum('total_amount');
 
         return view('admin.orders.history', compact(
@@ -306,10 +447,8 @@ class OrderController extends Controller
     {
         $order = Order::findOrFail($id);
 
-        // Ambil string skema pembayaran (dp/full)
         $paymentPlanVal = is_object($order->payment_plan) ? ($order->payment_plan->value ?? (string) $order->payment_plan) : (string) $order->payment_plan;
 
-        // Jika skema DP 50%, ubah status ke 'partial' (DP Terbayar, Menunggu Pelunasan Offline)
         if (strtolower($paymentPlanVal) === 'dp') {
             $order->update([
                 'payment_status' => 'partial',
@@ -323,6 +462,9 @@ class OrderController extends Controller
                 'status' => 'confirmed',
             ]);
         }
+
+        // 🔴 BROADCAST REVERB EVENT
+        broadcast(new OrderUpdated());
 
         return back()->with('success', 'Pembayaran order '.$order->order_number.' berhasil diverifikasi & dikonfirmasi.');
     }
@@ -338,7 +480,6 @@ class OrderController extends Controller
 
         $updateData = ['status' => $request->status];
 
-        // 🟢 Otomatis tandai pembayaran sebagai 'paid' (Lunas) bila pesanan diselesaikan (completed)
         if ($request->status === 'completed') {
             $updateData['payment_status'] = 'paid';
             $updateData['amount_paid'] = $order->total_amount;
@@ -346,10 +487,13 @@ class OrderController extends Controller
 
         $order->update($updateData);
 
+        // 🔴 BROADCAST REVERB EVENT
+        broadcast(new OrderUpdated());
+
         return back()->with('success', 'Status pesanan '.$order->order_number.' berhasil diperbarui.');
     }
 
-    // 💵 Update Status Pelunasan Offline (Melayani pelunasan sisa DP secara tunai/offline saat pickup atau delivery)
+    // 💵 Update Status Pelunasan Offline
     public function updatePaymentStatus(Request $request, $id)
     {
         $request->validate([
@@ -361,12 +505,10 @@ class OrderController extends Controller
         $amountPaid = $order->amount_paid;
 
         if ($request->payment_status === 'paid') {
-            // Ketika diubah ke Lunas, anggap sisa pelunasan tunai/offline sudah diterima penuh
             $amountPaid = $order->total_amount;
         } elseif ($request->payment_status === 'unpaid') {
             $amountPaid = 0;
         } elseif ($request->payment_status === 'partial') {
-            // Jika dikembalikan ke DP (Sebagian), set amount_paid kembali ke nominal DP awal
             $amountPaid = $order->dp_amount ?? ($order->total_amount * 0.5);
         }
 
@@ -374,6 +516,9 @@ class OrderController extends Controller
             'payment_status' => $request->payment_status,
             'amount_paid' => $amountPaid,
         ]);
+
+        // 🔴 BROADCAST REVERB EVENT
+        broadcast(new OrderUpdated());
 
         return back()->with('success', 'Status pembayaran '.$order->order_number.' berhasil diperbarui.');
     }
