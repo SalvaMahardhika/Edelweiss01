@@ -64,7 +64,7 @@
                 </div>
 
                 <div class="pt-2 border-t border-white/30">
-                    <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Tambahkan Gambar Baru</label>
+                    <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Tambahkan Gambar Baru (Opsional)</label>
                     <input type="file" name="gambar[]" multiple class="w-full mt-1.5 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#3e2723] file:text-white file:cursor-pointer">
                 </div>
 
@@ -98,21 +98,6 @@
 </div>
 
 <script>
-    // --- PERSIST DRAFT ---
-    const albumId = "{{ $galeri->id }}";
-    const editJudul = document.getElementById('edit_judul');
-    const editDeskripsi = document.getElementById('edit_deskripsi');
-
-    if(localStorage.getItem('edit_galeri_judul_' + albumId)) editJudul.value = localStorage.getItem('edit_galeri_judul_' + albumId);
-    if(localStorage.getItem('edit_galeri_deskripsi_' + albumId)) editDeskripsi.value = localStorage.getItem('edit_galeri_deskripsi_' + albumId);
-
-    editJudul.addEventListener('input', () => localStorage.setItem('edit_galeri_judul_' + albumId, editJudul.value));
-    editDeskripsi.addEventListener('input', () => localStorage.setItem('edit_galeri_deskripsi_' + albumId, editDeskripsi.value));
-    document.getElementById('editAlbumForm').onsubmit = () => {
-        localStorage.removeItem('edit_galeri_judul_' + albumId);
-        localStorage.removeItem('edit_galeri_deskripsi_' + albumId);
-    };
-
     // --- ALERT MODAL ---
     function openSystemAlert(title, message, type, confirmAction = null) {
         document.getElementById('systemAlertModal').classList.remove('hidden');
@@ -130,6 +115,10 @@
             area.innerHTML = `<button onclick="closeSystemAlert()" class="flex-1 py-2.5 text-sm font-bold rounded-xl bg-white/60 border border-white text-[#3e2723]">Batal</button>
                              <button id="confirmBtn" class="flex-1 py-2.5 text-sm font-bold rounded-xl bg-red-600 text-white">Hapus</button>`;
             document.getElementById('confirmBtn').onclick = confirmAction;
+        } else if(type === 'error') {
+            iconC.classList.add('bg-red-100', 'text-red-600');
+            icon.className = "fa-solid fa-triangle-exclamation";
+            area.innerHTML = `<button onclick="closeSystemAlert()" class="w-full py-2.5 text-sm font-bold rounded-xl bg-red-600 text-white">Tutup</button>`;
         } else {
             iconC.classList.add('bg-green-100', 'text-green-600');
             icon.className = "fa-solid fa-circle-check";
@@ -137,15 +126,30 @@
         }
     }
 
-    function closeSystemAlert() { document.getElementById('systemAlertModal').classList.add('hidden'); }
+    function closeSystemAlert() { 
+        document.getElementById('systemAlertModal').classList.add('hidden'); 
+    }
 
     function triggerDeletePhoto(url, filename) {
-        openSystemAlert('Hapus Foto', 'Yakin ingin menghapus foto ini?', 'confirm', () => {
+        openSystemAlert('Hapus Foto', 'Yakin ingin menghapus foto ini dari album?', 'confirm', () => {
             document.getElementById('delete_image_input').value = filename;
             const form = document.getElementById('deletePhotoForm');
             form.action = url;
             form.submit();
         });
     }
+
+    // Intersepsi Flash Session Notification
+    document.addEventListener("DOMContentLoaded", function() {
+        @if(session('success'))
+            openSystemAlert('Berhasil!', "{{ session('success') }}", 'success');
+        @endif
+        @if(session('error'))
+            openSystemAlert('Gagal!', "{{ session('error') }}", 'error');
+        @endif
+        @if($errors->any())
+            openSystemAlert('Validasi Gagal', "{{ $errors->first() }}", 'error');
+        @endif
+    });
 </script>
 @endsection

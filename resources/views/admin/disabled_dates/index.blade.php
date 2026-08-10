@@ -3,6 +3,7 @@
 @section('page_title', 'Manajemen Lock Tanggal')
 
 @section('content')
+{{-- ⚡ PERBAIKAN 1: Tambahkan @close-delete-modal.window="showDeleteModal = false" --}}
 <div x-data="{ 
     // State Modal Delete / Open Lock
     showDeleteModal: false,
@@ -14,7 +15,20 @@
         this.deleteFormattedDate = formattedDate;
         this.showDeleteModal = true;
     }
-}" class="max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 space-y-6">
+}" 
+@close-delete-modal.window="showDeleteModal = false" 
+class="max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 space-y-6">
+
+    {{-- DYNAMIC JS TOAST ALERT CONTAINER --}}
+    <div id="jsToastAlert" class="hidden p-4 rounded-2xl border text-xs font-bold flex items-center justify-between shadow-lg transition duration-300">
+        <div class="flex items-center gap-2">
+            <i id="jsToastIcon" class="fa-solid text-base"></i>
+            <span id="jsToastMessage"></span>
+        </div>
+        <button onclick="document.getElementById('jsToastAlert').classList.add('hidden')" class="hover:opacity-75">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
 
     {{-- ALERT SUCCESS FLASHDATA --}}
     @if(session('success'))
@@ -55,119 +69,121 @@
         </div>
         <div class="px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-900 text-xs font-bold shrink-0 flex items-center gap-2">
             <i class="fa-solid fa-circle-info text-amber-600"></i>
-            <span>{{ $disabledDates->total() }} Tanggal Terkunci</span>
+            <span id="totalLockedBadge">{{ $disabledDates->total() }} Tanggal Terkunci</span>
         </div>
     </div>
 
     {{-- ========================================================================= --}}
-    {{-- KALENDER VISUAL TANGGAL TERKUNCI --}}
+    {{-- KALENDER VISUAL TANGGAL TERKUNCI (TARGET SYNC 1) --}}
     {{-- ========================================================================= --}}
-    @php
-        $calMonth = request('cal_month', date('n'));
-        $calYear = request('cal_year', date('Y'));
+    <div id="calendarVisualContainer">
+        @php
+            $calMonth = request('cal_month', date('n'));
+            $calYear = request('cal_year', date('Y'));
 
-        $firstDayOfMonth = \Carbon\Carbon::createFromDate($calYear, $calMonth, 1);
-        $daysInMonth = $firstDayOfMonth->daysInMonth;
-        $startDayOfWeek = $firstDayOfMonth->dayOfWeek;
+            $firstDayOfMonth = \Carbon\Carbon::createFromDate($calYear, $calMonth, 1);
+            $daysInMonth = $firstDayOfMonth->daysInMonth;
+            $startDayOfWeek = $firstDayOfMonth->dayOfWeek;
 
-        $lockedMap = collect($allDisabledDates ?? $disabledDates->items())->keyBy(function($item) {
-            return \Carbon\Carbon::parse($item->date)->format('Y-m-d');
-        });
+            $lockedMap = collect($allDisabledDates ?? $disabledDates->items())->keyBy(function($item) {
+                return \Carbon\Carbon::parse($item->date)->format('Y-m-d');
+            });
 
-        $prevMonthDate = $firstDayOfMonth->copy()->subMonth();
-        $nextMonthDate = $firstDayOfMonth->copy()->addMonth();
-    @endphp
+            $prevMonthDate = $firstDayOfMonth->copy()->subMonth();
+            $nextMonthDate = $firstDayOfMonth->copy()->addMonth();
+        @endphp
 
-    <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 space-y-4">
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 border-b border-[#3e2723]/10 pb-4">
-            <h4 class="text-sm font-bold text-[#3e2723] flex items-center gap-2">
-                <i class="fa-regular fa-calendar-days text-rose-600"></i> Visualisasi Kalender Libur / Lock
-            </h4>
+        <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 border-b border-[#3e2723]/10 pb-4">
+                <h4 class="text-sm font-bold text-[#3e2723] flex items-center gap-2">
+                    <i class="fa-regular fa-calendar-days text-rose-600"></i> Visualisasi Kalender Libur / Lock
+                </h4>
 
-            {{-- Navigasi Bulan & Tahun --}}
-            <div class="flex items-center gap-3">
-                <a href="{{ route('admin.disabled_dates.index', array_merge(request()->query(), ['cal_month' => $prevMonthDate->month, 'cal_year' => $prevMonthDate->year])) }}" 
-                   class="w-8 h-8 rounded-xl bg-white/60 border border-white/50 hover:bg-white flex items-center justify-center text-[#3e2723] transition shadow-sm"
-                   title="Bulan Sebelumnya">
-                    <i class="fa-solid fa-chevron-left text-xs"></i>
-                </a>
+                {{-- Navigasi Bulan & Tahun --}}
+                <div class="flex items-center gap-3">
+                    <a href="{{ route('admin.disabled_dates.index', array_merge(request()->query(), ['cal_month' => $prevMonthDate->month, 'cal_year' => $prevMonthDate->year])) }}" 
+                       class="w-8 h-8 rounded-xl bg-white/60 border border-white/50 hover:bg-white flex items-center justify-center text-[#3e2723] transition shadow-sm"
+                       title="Bulan Sebelumnya">
+                        <i class="fa-solid fa-chevron-left text-xs"></i>
+                    </a>
 
-                <span class="text-xs font-black text-[#3e2723] uppercase tracking-wider min-w-[120px] text-center">
-                    {{ $firstDayOfMonth->translatedFormat('F Y') }}
-                </span>
+                    <span class="text-xs font-black text-[#3e2723] uppercase tracking-wider min-w-[120px] text-center">
+                        {{ $firstDayOfMonth->translatedFormat('F Y') }}
+                    </span>
 
-                <a href="{{ route('admin.disabled_dates.index', array_merge(request()->query(), ['cal_month' => $nextMonthDate->month, 'cal_year' => $nextMonthDate->year])) }}" 
-                   class="w-8 h-8 rounded-xl bg-white/60 border border-white/50 hover:bg-white flex items-center justify-center text-[#3e2723] transition shadow-sm"
-                   title="Bulan Selanjutnya">
-                    <i class="fa-solid fa-chevron-right text-xs"></i>
-                </a>
+                    <a href="{{ route('admin.disabled_dates.index', array_merge(request()->query(), ['cal_month' => $nextMonthDate->month, 'cal_year' => $nextMonthDate->year])) }}" 
+                       class="w-8 h-8 rounded-xl bg-white/60 border border-white/50 hover:bg-white flex items-center justify-center text-[#3e2723] transition shadow-sm"
+                       title="Bulan Selanjutnya">
+                        <i class="fa-solid fa-chevron-right text-xs"></i>
+                    </a>
+                </div>
             </div>
-        </div>
 
-        {{-- Legend Indicator --}}
-        <div class="flex items-center gap-4 text-[11px] font-bold text-gray-600 pt-1">
-            <div class="flex items-center gap-1.5">
-                <span class="w-3 h-3 rounded-md bg-rose-500 shadow-sm inline-block"></span>
-                <span>Terkunci / Libur (Merah)</span>
+            {{-- Legend Indicator --}}
+            <div class="flex items-center gap-4 text-[11px] font-bold text-gray-600 pt-1">
+                <div class="flex items-center gap-1.5">
+                    <span class="w-3 h-3 rounded-md bg-rose-500 shadow-sm inline-block"></span>
+                    <span>Terkunci / Libur (Merah)</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="w-3 h-3 rounded-md bg-white/80 border border-gray-300 inline-block"></span>
+                    <span>Buka / Normal</span>
+                </div>
             </div>
-            <div class="flex items-center gap-1.5">
-                <span class="w-3 h-3 rounded-md bg-white/80 border border-gray-300 inline-block"></span>
-                <span>Buka / Normal</span>
-            </div>
-        </div>
 
-        {{-- Grid Kalender --}}
-        <div class="grid grid-cols-7 gap-1.5 text-center">
-            @foreach(['Ming', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'] as $dayName)
-            <div class="py-2 text-[10px] font-black uppercase text-[#3e2723]/60 tracking-wider">
-                {{ $dayName }}
-            </div>
-            @endforeach
+            {{-- Grid Kalender --}}
+            <div class="grid grid-cols-7 gap-1.5 text-center">
+                @foreach(['Ming', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'] as $dayName)
+                <div class="py-2 text-[10px] font-black uppercase text-[#3e2723]/60 tracking-wider">
+                    {{ $dayName }}
+                </div>
+                @endforeach
 
-            @for ($i = 0; $i < $startDayOfWeek; $i++)
-            <div class="h-14 sm:h-16 rounded-2xl bg-gray-100/30 border border-transparent"></div>
-            @endfor
+                @for ($i = 0; $i < $startDayOfWeek; $i++)
+                <div class="h-14 sm:h-16 rounded-2xl bg-gray-100/30 border border-transparent"></div>
+                @endfor
 
-            @for ($day = 1; $day <= $daysInMonth; $day++)
-                @php
-                    $currentDateString = sprintf('%04d-%02d-%02d', $calYear, $calMonth, $day);
-                    $isLocked = $lockedMap->has($currentDateString);
-                    $lockInfo = $isLocked ? $lockedMap->get($currentDateString) : null;
-                    $isToday = $currentDateString === date('Y-m-d');
-                @endphp
+                @for ($day = 1; $day <= $daysInMonth; $day++)
+                    @php
+                        $currentDateString = sprintf('%04d-%02d-%02d', $calYear, $calMonth, $day);
+                        $isLocked = $lockedMap->has($currentDateString);
+                        $lockInfo = $isLocked ? $lockedMap->get($currentDateString) : null;
+                        $isToday = $currentDateString === date('Y-m-d');
+                    @endphp
 
-                <div class="relative group h-14 sm:h-16 p-1.5 rounded-2xl border transition flex flex-col justify-between
-                    {{ $isLocked ? 'bg-rose-500 text-white border-rose-600 shadow-md' : 'bg-white/60 border-white/50 text-[#3e2723] hover:bg-white/90' }}
-                    {{ $isToday && !$isLocked ? 'ring-2 ring-[#c8a97e] font-black' : '' }}">
-                    
-                    <div class="flex justify-between items-center w-full">
-                        <span class="text-xs font-black">{{ $day }}</span>
+                    <div class="relative group h-14 sm:h-16 p-1.5 rounded-2xl border transition flex flex-col justify-between
+                        {{ $isLocked ? 'bg-rose-500 text-white border-rose-600 shadow-md' : 'bg-white/60 border-white/50 text-[#3e2723] hover:bg-white/90' }}
+                        {{ $isToday && !$isLocked ? 'ring-2 ring-[#c8a97e] font-black' : '' }}">
+                        
+                        <div class="flex justify-between items-center w-full">
+                            <span class="text-xs font-black">{{ $day }}</span>
+                            @if($isLocked)
+                                <i class="fa-solid fa-lock text-[9px] text-white/80"></i>
+                            @elseif($isToday)
+                                <span class="text-[8px] px-1 bg-[#c8a97e] text-white font-bold rounded">Hari Ini</span>
+                            @endif
+                        </div>
+
                         @if($isLocked)
-                            <i class="fa-solid fa-lock text-[9px] text-white/80"></i>
-                        @elseif($isToday)
-                            <span class="text-[8px] px-1 bg-[#c8a97e] text-white font-bold rounded">Hari Ini</span>
+                            <p class="text-[9px] font-bold truncate text-left text-white/90 px-0.5" title="{{ $lockInfo->reason ?? 'Kuota Penuh / Toko Libur' }}">
+                                {{ $lockInfo->reason ?? 'Kuota Penuh' }}
+                            </p>
+
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-30 w-40 p-2 bg-[#3e2723] text-white text-[10px] rounded-xl shadow-2xl pointer-events-none text-left space-y-0.5">
+                                <p class="font-bold text-amber-300">{{ \Carbon\Carbon::parse($currentDateString)->translatedFormat('d F Y') }}</p>
+                                <p class="text-gray-200">Keterangan: {{ $lockInfo->reason ?? 'Kuota Penuh / Toko Libur' }}</p>
+                            </div>
                         @endif
                     </div>
-
-                    @if($isLocked)
-                        <p class="text-[9px] font-bold truncate text-left text-white/90 px-0.5" title="{{ $lockInfo->reason ?? 'Kuota Penuh / Toko Libur' }}">
-                            {{ $lockInfo->reason ?? 'Kuota Penuh' }}
-                        </p>
-
-                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-30 w-40 p-2 bg-[#3e2723] text-white text-[10px] rounded-xl shadow-2xl pointer-events-none text-left space-y-0.5">
-                            <p class="font-bold text-amber-300">{{ \Carbon\Carbon::parse($currentDateString)->translatedFormat('d F Y') }}</p>
-                            <p class="text-gray-200">Keterangan: {{ $lockInfo->reason ?? 'Kuota Penuh / Toko Libur' }}</p>
-                        </div>
-                    @endif
-                </div>
-            @endfor
+                @endfor
+            </div>
         </div>
     </div>
 
-    {{-- MAIN CONTENT GRID (FORM INPUT + TABEL DATA) --}}
+    {{-- MAIN CONTENT GRID (FORM INPUT TERISOLASI + TABEL DATA) --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {{-- KOLOM KIRI: FORM KUNCI TANGGAL BARU (SINGLE & RENTANG TANGGAL) --}}
+        {{-- KOLOM KIRI: FORM KUNCI TANGGAL BARU (TIDAK TERSENTUH REALTIME SYNC) --}}
         <div class="lg:col-span-1" x-data="{ mode: 'single', startDate: '{{ date('Y-m-d') }}' }">
             <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] p-6 shadow-xl space-y-4 sticky top-0">
                 <div class="flex items-center justify-between border-b border-[#3e2723]/10 pb-3">
@@ -176,7 +192,7 @@
                     </h4>
                 </div>
 
-                {{-- SWITCH MODE: TUNGGAL VS RENTANG TANGGAL --}}
+                {{-- SWITCH MODE --}}
                 <div class="p-1 bg-white/60 border border-white/50 rounded-xl flex gap-1 text-[11px] font-bold text-[#3e2723]">
                     <button type="button" 
                             @click="mode = 'single'" 
@@ -192,11 +208,11 @@
                     </button>
                 </div>
 
-                <form action="{{ route('admin.disabled_dates.store') }}" method="POST" class="space-y-4">
+                <form id="lockDateForm" action="{{ route('admin.disabled_dates.store') }}" method="POST" class="space-y-4">
                     @csrf
                     <input type="hidden" name="input_mode" :value="mode">
 
-                    {{-- MODE 1: SINGLE TANGGAL (SEMULA) --}}
+                    {{-- MODE 1: SINGLE TANGGAL --}}
                     <div x-show="mode === 'single'" x-transition>
                         <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">
                             Pilih Tanggal <span class="text-red-500">*</span>
@@ -212,7 +228,7 @@
                         @enderror
                     </div>
 
-                    {{-- MODE 2: RENTANG TANGGAL (NEW FEATURE) --}}
+                    {{-- MODE 2: RENTANG TANGGAL --}}
                     <div x-show="mode === 'range'" x-transition class="space-y-3">
                         <div>
                             <label class="block text-xs font-bold uppercase tracking-wider mb-1.5 text-gray-600">
@@ -265,7 +281,7 @@
                         @enderror
                     </div>
 
-                    <button type="submit" class="w-full py-3.5 bg-[#3e2723] text-white text-xs font-bold rounded-xl shadow-lg hover:bg-[#2c1b18] transition flex items-center justify-center gap-2">
+                    <button type="submit" id="btnSubmitLock" class="w-full py-3.5 bg-[#3e2723] text-white text-xs font-bold rounded-xl shadow-lg hover:bg-[#2c1b18] transition flex items-center justify-center gap-2">
                         <i class="fa-solid fa-lock"></i> 
                         <span x-text="mode === 'range' ? 'Kunci Rentang Tanggal' : 'Kunci Tanggal'"></span>
                     </button>
@@ -273,9 +289,9 @@
             </div>
         </div>
 
-        {{-- KOLOM KANAN: TABEL DAFTAR TANGGAL TERKUNCI --}}
+        {{-- KOLOM KANAN: TABEL DAFTAR TANGGAL TERKUNCI (TARGET SYNC 2) --}}
         <div class="lg:col-span-2 space-y-4">
-            <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 space-y-4">
+            <div id="disabledTableContainer" class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 space-y-4">
                 
                 {{-- BAR PENCARIAN --}}
                 <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -312,7 +328,6 @@
                                 $carbonDate = \Carbon\Carbon::parse($item->date);
                             @endphp
                             <tr class="hover:bg-white/30 transition">
-                                {{-- TANGGAL --}}
                                 <td class="px-4 py-3.5 font-black text-[#3e2723]">
                                     <div class="flex items-center gap-2">
                                         <i class="fa-regular fa-calendar text-rose-600"></i>
@@ -320,19 +335,16 @@
                                     </div>
                                 </td>
 
-                                {{-- HARI --}}
                                 <td class="px-4 py-3.5 text-gray-600 font-bold">
                                     {{ $carbonDate->translatedFormat('l') }}
                                 </td>
 
-                                {{-- ALASAN --}}
                                 <td class="px-4 py-3.5">
                                     <span class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-rose-50 text-rose-800 border border-rose-200/60 inline-block">
                                         {{ $item->reason }}
                                     </span>
                                 </td>
 
-                                {{-- AKSI BUKA KUNCI --}}
                                 <td class="px-4 py-3.5 text-center">
                                     <button type="button" 
                                             @click="openDeleteModal('{{ route('admin.disabled_dates.destroy', $item->id) }}', '{{ $carbonDate->translatedFormat('d F Y') }}')"
@@ -363,9 +375,7 @@
 
     </div>
 
-    {{-- ========================================================================= --}}
     {{-- MODAL KONFIRMASI BUKA KUNCI TANGGAL --}}
-    {{-- ========================================================================= --}}
     <div x-show="showDeleteModal" 
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="opacity-0"
@@ -389,13 +399,13 @@
                 </p>
             </div>
 
-            <form :action="deleteFormAction" method="POST" class="pt-2 flex gap-3 justify-center">
+            <form id="unlockDateForm" :action="deleteFormAction" method="POST" class="pt-2 flex gap-3 justify-center">
                 @csrf
                 @method('DELETE')
                 <button type="button" @click="showDeleteModal = false" class="px-5 py-2.5 bg-gray-200 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-300 transition w-1/2">
                     Batal
                 </button>
-                <button type="submit" class="px-5 py-2.5 bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-lg hover:bg-emerald-800 transition w-1/2">
+                <button type="submit" id="btnSubmitUnlock" class="px-5 py-2.5 bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-lg hover:bg-emerald-800 transition w-1/2">
                     Ya, Buka Kunci
                 </button>
             </form>
@@ -403,4 +413,146 @@
     </div>
 
 </div>
+
+{{-- ⚡ SCRIPT LOGIK REALTIME SYNC & AJAX SUBMIT BERSIH --}}
+<script>
+    let disabledDatesTimer = null;
+
+    function showJsToast(message, isSuccess = true) {
+        const toast = document.getElementById('jsToastAlert');
+        const icon = document.getElementById('jsToastIcon');
+        const msg = document.getElementById('jsToastMessage');
+
+        if (!toast) return;
+
+        msg.innerText = message;
+        if (isSuccess) {
+            toast.className = "p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-900 text-xs font-bold flex items-center justify-between shadow-lg";
+            icon.className = "fa-solid fa-circle-check text-emerald-600 text-base";
+        } else {
+            toast.className = "p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-900 text-xs font-bold flex items-center justify-between shadow-lg";
+            icon.className = "fa-solid fa-triangle-exclamation text-rose-600 text-base";
+        }
+
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+        }, 3500);
+    }
+
+    // SYNC KHUSUS BAGIAN KALENDER VISUAL & TABEL (SAMA SEKALI TIDAK MENYENTUH FORM INPUT)
+    function syncRealtimeDisabledDates() {
+        fetch(window.location.href, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            const newCal = doc.getElementById('calendarVisualContainer');
+            const currentCal = document.getElementById('calendarVisualContainer');
+            const newTable = doc.getElementById('disabledTableContainer');
+            const currentTable = document.getElementById('disabledTableContainer');
+            const newBadge = doc.getElementById('totalLockedBadge');
+            const currentBadge = document.getElementById('totalLockedBadge');
+
+            if (newBadge && currentBadge) {
+                currentBadge.innerText = newBadge.innerText;
+            }
+
+            if (newCal && currentCal && newCal.innerHTML.trim() !== currentCal.innerHTML.trim()) {
+                currentCal.innerHTML = newCal.innerHTML;
+            }
+
+            if (newTable && currentTable && newTable.innerHTML.trim() !== currentTable.innerHTML.trim()) {
+                currentTable.innerHTML = newTable.innerHTML;
+            }
+        })
+        .catch(err => console.error("Realtime Disabled Dates Sync Error:", err));
+    }
+
+    // EVENT DELEGATION GLOBAL AGAR KUNCI & BUKA KUNCI BEKERJA KONSISTEN
+    document.addEventListener('submit', function(e) {
+        // Handle Submit Kunci Tanggal Baru
+        if (e.target && e.target.id === 'lockDateForm') {
+            e.preventDefault();
+            const form = e.target;
+            const btn = document.getElementById('btnSubmitLock');
+            if (btn) btn.disabled = true;
+
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (btn) btn.disabled = false;
+                if (res.success) {
+                    showJsToast(res.message, true);
+                    form.reset();
+                    syncRealtimeDisabledDates();
+                } else {
+                    showJsToast(res.message || 'Gagal mengunci tanggal.', false);
+                }
+            })
+            .catch(err => {
+                if (btn) btn.disabled = false;
+                showJsToast('Terjadi kesalahan sistem.', false);
+            });
+        }
+
+        // Handle Submit Buka Kunci (Unlock)
+        if (e.target && e.target.id === 'unlockDateForm') {
+            e.preventDefault();
+            const form = e.target;
+            const btn = document.getElementById('btnSubmitUnlock');
+            if (btn) btn.disabled = true;
+
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (btn) btn.disabled = false;
+                
+                // ⚡ PERBAIKAN 2: Tutup Modal via Custom Event (Dijamin 100% jalan)
+                window.dispatchEvent(new CustomEvent('close-delete-modal'));
+
+                if (res.success) {
+                    showJsToast(res.message, true);
+                    syncRealtimeDisabledDates();
+                } else {
+                    showJsToast(res.message || 'Gagal membuka kunci tanggal.', false);
+                }
+            })
+            .catch(err => {
+                if (btn) btn.disabled = false;
+                showJsToast('Terjadi kesalahan sistem.', false);
+            });
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Background Auto-Polling Realtime Sync (3 Detik)
+        if (disabledDatesTimer) clearInterval(disabledDatesTimer);
+        disabledDatesTimer = setInterval(function() {
+            const rootDiv = document.querySelector('[x-data]');
+            const isModalOpen = rootDiv && window.Alpine ? Alpine.$data(rootDiv)?.showDeleteModal : false;
+            
+            if (document.visibilityState === 'visible' && !isModalOpen) {
+                syncRealtimeDisabledDates();
+            }
+        }, 3000);
+    });
+</script>
 @endsection

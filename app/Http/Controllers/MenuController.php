@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MenuUpdated;
 use App\Helpers\ImageHelper;
 use App\Models\Category;
 use App\Models\Produk;
@@ -148,7 +149,7 @@ class MenuController extends Controller
             'gambar.*' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
-        // ðŸŸ¢ Generate Unique Slug & Path Folder Safe Hosting (public_html / public_path)
+        // Generate Unique Slug & Path Folder Safe Hosting (public_html / public_path)
         $slug = $this->generateUniqueSlug($request->nama_produk);
         $folderName = time().'_'.$slug;
         $folderPath = $this->getFolderPath($folderName);
@@ -179,13 +180,15 @@ class MenuController extends Controller
                 $destinationPath = $folderPath.'/'.$fileName;
 
                 try {
-                    // Kualitas 75 (Rekomendasi Google), Lebar maksimum dipangkas ke 800px untuk menghemat storage
                     ImageHelper::convertToWebp($file->getRealPath(), $destinationPath, 75, 800);
                 } catch (\Exception $e) {
                     return back()->with('error', 'Gagal memproses gambar GD WebP: '.$e->getMessage());
                 }
             }
         }
+
+        // 📣 SIARKAN EVENT REALTIME KE CLIENT
+        event(new MenuUpdated('created', $produk));
 
         return back()->with('success', 'Produk kue Pre-Order baru berhasil ditambahkan.');
     }
@@ -212,6 +215,9 @@ class MenuController extends Controller
                 File::delete($filePath);
             }
 
+            // 📣 SIARKAN EVENT REALTIME KE CLIENT
+            event(new MenuUpdated('image_deleted', $produk));
+
             return back()->with('success', 'Gambar album berhasil dihapus.');
         }
 
@@ -224,7 +230,7 @@ class MenuController extends Controller
             'gambar.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
-        // ðŸŸ¢ Generate Unique Slug (mengabaikan ID produk ini sendiri)
+        // Generate Unique Slug (mengabaikan ID produk ini sendiri)
         $slug = $this->generateUniqueSlug($request->nama_produk, $produk->id);
 
         // 3. Update Data Teks
@@ -255,9 +261,10 @@ class MenuController extends Controller
                     return back()->with('error', 'Gagal memproses gambar tambahan: '.$e->getMessage());
                 }
             }
-
-            return redirect()->route('produk.index')->with('success', 'Produk dan foto tambahan berhasil diperbarui.');
         }
+
+        // 📣 SIARKAN EVENT REALTIME KE CLIENT
+        event(new MenuUpdated('updated', $produk));
 
         return redirect()->route('produk.index')->with('success', 'Data produk berhasil diperbarui.');
     }
@@ -275,12 +282,18 @@ class MenuController extends Controller
             $produk->is_featured = ! $produk->is_featured;
             $produk->save();
 
+            // 📣 SIARKAN EVENT REALTIME KE CLIENT
+            event(new MenuUpdated('toggled_featured', $produk));
+
             return back()->with('success', $produk->is_featured ? 'Produk dijadikan unggulan.' : 'Produk tidak lagi unggulan.');
         }
 
         // Default: Toggle status ketersediaan/aktif
         $produk->status = ! $produk->status;
         $produk->save();
+
+        // 📣 SIARKAN EVENT REALTIME KE CLIENT
+        event(new MenuUpdated('toggled_status', $produk));
 
         return back()->with('success', 'Status menu berhasil diubah.');
     }
@@ -299,7 +312,11 @@ class MenuController extends Controller
             File::deleteDirectory($folderPath);
         }
 
+        $deletedId = $produk->id;
         $produk->delete();
+
+        // 📣 SIARKAN EVENT REALTIME KE CLIENT
+        event(new MenuUpdated('deleted', ['id' => $deletedId]));
 
         return back()->with('success', 'Produk kue berhasil dihapus permanen beserta album gambarnya.');
     }

@@ -85,7 +85,7 @@ use Illuminate\Support\Facades\File;
     </section>
 
     {{-- ================= LIST ALBUM MURNI DISPLAY ================= --}}
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 pb-24 md:pb-28 space-y-12 md:space-y-16">
+    <section id="galeriAlbumContainer" class="max-w-7xl mx-auto px-4 sm:px-6 pb-24 md:pb-28 space-y-12 md:space-y-16">
 
         @foreach($galeri as $album)
         @php
@@ -129,11 +129,9 @@ use Illuminate\Support\Facades\File;
                         </h2>
                     </div>
 
-                    {{-- DESKRIPSI --}}
+                    {{-- DESKRIPSI (Gunakan whitespace-pre-line agar Spacing / Enter Paragraf Terjaga Presisi) --}}
                     <div class="flex flex-col sm:flex-row sm:items-start gap-4">
-                        <p class="text-[#6b4f4f] leading-relaxed text-sm sm:text-base md:text-lg break-words whitespace-pre-wrap flex-1">
-                            {{ $album->deskripsi }}
-                        </p>
+                        <p class="text-[#6b4f4f] leading-relaxed text-sm sm:text-base md:text-lg break-words whitespace-pre-line flex-1">{{ $album->deskripsi }}</p>
                     </div>
                 </div>
 
@@ -183,6 +181,45 @@ use Illuminate\Support\Facades\File;
 </main>
 
 @include('layouts.footer')
+
+{{-- ⚡ SCRIPT SINKRONISASI REALTIME BACKGROUND POLLING --}}
+<script>
+    let galeriRealtimeTimer = null;
+
+    function syncRealtimeGaleri() {
+        fetch(window.location.href, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            const newContent = doc.getElementById('galeriAlbumContainer');
+            const currentContent = document.getElementById('galeriAlbumContainer');
+
+            if (newContent && currentContent) {
+                // Lakukan pembaharuan DOM hanya jika ada perbedaan data album dari Admin
+                if (newContent.innerHTML.trim() !== currentContent.innerHTML.trim()) {
+                    currentContent.innerHTML = newContent.innerHTML;
+                }
+            }
+        })
+        .catch(err => console.error("Realtime Galeri Sync Error:", err));
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (galeriRealtimeTimer) clearInterval(galeriRealtimeTimer);
+        // Lakukan background fetch setiap 3 detik ketika halaman sedang aktif
+        galeriRealtimeTimer = setInterval(function() {
+            if (document.visibilityState === 'visible') {
+                syncRealtimeGaleri();
+            }
+        }, 3000);
+    });
+</script>
 
 </body>
 </html>

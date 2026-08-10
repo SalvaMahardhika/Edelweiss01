@@ -3,7 +3,7 @@
 @section('page_title', 'Manajemen Produk Menu')
 
 @section('content')
-{{-- ðŸ’Ž AREA SCROLL MANDIRI PADA PANEL KONTEN UTAMA --}}
+{{-- AREA SCROLL MANDIRI PADA PANEL KONTEN UTAMA --}}
 <div class="max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 space-y-6">
 
     {{-- HEADER MANAGEMENT INTERFACE --}}
@@ -17,8 +17,8 @@
         </button>
     </div>
 
-    {{-- TABLE DATA KATALOG CMS --}}
-    <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 overflow-hidden">
+    {{-- TABLE DATA KATALOG CMS (SINKRONISASI TARGET CONTAINER) --}}
+    <div id="produkTableContainer" class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 overflow-hidden">
         <div class="overflow-x-auto rounded-2xl border border-white/40 bg-white/20 shadow-inner">
             <table class="w-full text-left border-collapse">
                 <thead>
@@ -55,7 +55,7 @@
                             <p class="text-xs text-gray-400 line-clamp-1 max-w-xs font-normal">{{ $item->deskripsi }}</p>
                         </td>
                         
-                        {{-- ðŸ†• TOMBOL TOGGLE UNGGULAN --}}
+                        {{-- TOMBOL TOGGLE UNGGULAN --}}
                         <td class="px-6 py-3 text-center">
                             <form method="POST" action="{{ route('produk.toggleStatus', $item->id) }}">
                                 @csrf
@@ -96,12 +96,12 @@
     </div>
 </div>
 
-{{-- ðŸ”’ COMPONENT: MODAL POPUP TAMBAH PRODUK --}}
+{{-- COMPONENT: MODAL POPUP TAMBAH PRODUK --}}
 <div id="addProductModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
     <div class="w-full max-w-lg p-6 rounded-[2rem] bg-white/40 backdrop-blur-3xl border border-white/50 shadow-2xl relative space-y-4 my-auto">
         <div class="flex justify-between items-center pb-2 border-b border-[#3e2723]/15">
             <h3 class="text-lg font-bold text-[#3e2723]"><i class="fa-solid fa-cake-candles mr-2"></i> Form Input Menu Baru</h3>
-            <button type="button" onclick="closeAddModal()" class="w-8 h-8 rounded-full bg-white/40 flex items-center justify-center font-bold text-[#3e2723] hover:bg-white/70">âœ•</button>
+            <button type="button" onclick="closeAddModal()" class="w-8 h-8 rounded-full bg-white/40 flex items-center justify-center font-bold text-[#3e2723] hover:bg-white/70">✕</button>
         </div>
 
         <form method="POST" action="{{ route('produk.store') }}" enctype="multipart/form-data" class="space-y-4">
@@ -146,7 +146,7 @@
     </div>
 </div>
 
-{{-- ðŸš¨ CUSTOM GLOBAL SYSTEM MODAL ALERT (SUCCESS / ERROR / CONFIRMATION) --}}
+{{-- CUSTOM GLOBAL SYSTEM MODAL ALERT (SUCCESS / ERROR / CONFIRMATION) --}}
 <div id="systemAlertModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center p-4">
     <div class="w-full max-w-sm p-6 rounded-[2rem] bg-white/50 backdrop-blur-3xl border border-white/60 shadow-2xl text-center space-y-4">
         {{-- Dynamic Icon Container --}}
@@ -238,6 +238,27 @@
         );
     }
 
+    // --- REALTIME POLLING SYNC UNTUK HASIL INSTAN ---
+    let menuSyncTimer = null;
+    function syncRealtimeAdminMenu() {
+        fetch(window.location.href, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            const newTable = doc.getElementById('produkTableContainer');
+            const currentTable = document.getElementById('produkTableContainer');
+
+            if (newTable && currentTable && newTable.innerHTML.trim() !== currentTable.innerHTML.trim()) {
+                currentTable.innerHTML = newTable.innerHTML;
+            }
+        })
+        .catch(err => console.error("Realtime Menu Sync Error:", err));
+    }
+
     // --- INTERSEPSI SESSION LARAVEL AUTO FLUSH ---
     document.addEventListener("DOMContentLoaded", function() {
         @if(session('success'))
@@ -247,6 +268,25 @@
         @if($errors->any())
             openSystemAlert('Gagal Validasi', "{{ $errors->first() }}", 'error');
         @endif
+
+        // Polling setiap 3 detik jika halaman sedang aktif & modal tidak sedang terbuka
+        if (menuSyncTimer) clearInterval(menuSyncTimer);
+        menuSyncTimer = setInterval(function() {
+            const isAddModalOpen = !document.getElementById('addProductModal').classList.contains('hidden');
+            const isAlertModalOpen = !document.getElementById('systemAlertModal').classList.contains('hidden');
+            
+            if (document.visibilityState === 'visible' && !isAddModalOpen && !isAlertModalOpen) {
+                syncRealtimeAdminMenu();
+            }
+        }, 3000);
+
+        // Fallback Listener Echo jika Laravel Echo dikonfigurasi
+        if (typeof Echo !== 'undefined') {
+            Echo.channel('menu-updates')
+                .listen('.menu.updated', (e) => {
+                    syncRealtimeAdminMenu();
+                });
+        }
     });
 </script>
 @endsection

@@ -27,10 +27,9 @@ class CheckoutController extends Controller
     ) {}
 
     /**
-     * Tampilkan halaman formulir checkout.
-     * Bisa diakses oleh User yang sudah login maupun Guest.
+     * Tampilkan halaman formulir checkout (Mendukung pemicu Fetch JSON Realtime).
      */
-    public function index()
+    public function index(Request $request)
     {
         // Ambil data user jika terautentikasi (null jika guest)
         $user = Auth::user();
@@ -46,7 +45,36 @@ class CheckoutController extends Controller
                 ];
             });
 
+        // ⚡ RESPON REALTIME APABILA DIPANGGIL VIA FETCH / AJAX
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'disabledDates' => $disabledDates,
+            ]);
+        }
+
         return view('orders.checkout', compact('user', 'disabledDates'));
+    }
+
+    /**
+     * API Endpoint Khusus Pembaruan Realtime Tanggal Terblokir (Lock Dates)
+     */
+    public function getDisabledDatesApi()
+    {
+        $disabledDates = DisabledDate::where('date', '>=', now()->toDateString())
+            ->orderBy('date', 'asc')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'date' => Carbon::parse($item->date)->format('Y-m-d'),
+                    'reason' => $item->reason ?? 'Kuota Penuh / Toko Libur',
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'disabledDates' => $disabledDates,
+        ]);
     }
 
     /**

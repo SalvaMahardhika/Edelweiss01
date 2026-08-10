@@ -37,13 +37,13 @@ class DisabledDateController extends Controller
     }
 
     /**
-     * Kunci / blokir tanggal baru (Mendukung Tanggal Tunggal & Rentang Tanggal).
+     * Kunci / blokir tanggal baru (Mendukung Tanggal Tunggal & Rentang Tanggal + Response AJAX).
      */
     public function store(Request $request)
     {
         $reason = $request->reason ?? 'Kuota Penuh / Toko Libur';
 
-        // ðŸŸ¢ OPSI A: INPUT RENTANG TANGGAL (RANGE MODE)
+        // 🟢 OPSI A: INPUT RENTANG TANGGAL (RANGE MODE)
         if ($request->input('input_mode') === 'range' && $request->filled('start_date') && $request->filled('end_date')) {
             $request->validate([
                 'start_date' => 'required|date|after_or_equal:today',
@@ -63,7 +63,6 @@ class DisabledDateController extends Controller
 
             $addedCount = 0;
             foreach ($period as $date) {
-                // Menggunakan firstOrCreate agar tanggal yang sudah dikunci sebelumnya tidak membuat crash/duplicate
                 $item = DisabledDate::firstOrCreate(
                     ['date' => $date->format('Y-m-d')],
                     ['reason' => $reason]
@@ -75,13 +74,22 @@ class DisabledDateController extends Controller
             }
 
             if ($addedCount === 0) {
+                if ($request->ajax()) {
+                    return response()->json(['success' => false, 'message' => 'Semua tanggal pada rentang tersebut sudah dikunci sebelumnya.'], 422);
+                }
+
                 return back()->with('error', 'Semua tanggal pada rentang tersebut sudah dikunci sebelumnya.');
             }
 
-            return back()->with('success', "Sebanyak {$addedCount} tanggal dalam rentang berhasil dikunci.");
+            $successMsg = "Sebanyak {$addedCount} tanggal dalam rentang berhasil dikunci.";
+            if ($request->ajax()) {
+                return response()->json(['success' => true, 'message' => $successMsg]);
+            }
+
+            return back()->with('success', $successMsg);
         }
 
-        // ðŸ”µ OPSI B: INPUT TANGGAL TUNGGAL (SINGLE MODE - ALUR AWAL)
+        // 🔵 OPSI B: INPUT TANGGAL TUNGGAL (SINGLE MODE)
         $request->validate([
             'date' => 'required|date|after_or_equal:today|unique:disabled_dates,date',
             'reason' => 'nullable|string|max:255',
@@ -92,24 +100,34 @@ class DisabledDateController extends Controller
             'reason.max' => 'Alasan maksimal 255 karakter.',
         ]);
 
-        DisabledDate::create([
+        $disabledDate = DisabledDate::create([
             'date' => $request->date,
             'reason' => $reason,
         ]);
 
-        return back()->with('success', 'Tanggal '.date('d M Y', strtotime($request->date)).' berhasil dikunci.');
+        $successMsg = 'Tanggal '.date('d M Y', strtotime($request->date)).' berhasil dikunci.';
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => $successMsg, 'data' => $disabledDate]);
+        }
+
+        return back()->with('success', $successMsg);
     }
 
     /**
-     * Buka kembali tanggal yang dikunci (hapus pembatasan).
+     * Buka kembali tanggal yang dikunci (hapus pembatasan + Response AJAX).
      */
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $dateRecord = DisabledDate::findOrFail($id);
         $formattedDate = date('d M Y', strtotime($dateRecord->date));
 
         $dateRecord->delete();
 
-        return back()->with('success', 'Kunci tanggal '.$formattedDate.' berhasil dibuka kembali.');
+        $successMsg = 'Kunci tanggal '.$formattedDate.' berhasil dibuka kembali.';
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => $successMsg]);
+        }
+
+        return back()->with('success', $successMsg);
     }
 }

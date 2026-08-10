@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    {{-- ðŸ”’ GOOGLE RECAPTCHA V2 API --}}
+    {{-- 🔒 GOOGLE RECAPTCHA V2 API --}}
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
     <style>
@@ -105,7 +105,7 @@
                         </select>
                     </div>
 
-                    {{-- ðŸ“… INPUT TANGGAL DENGAN TRIGGER MODAL KALENDER CUSTOM --}}
+                    {{-- 📅 INPUT TANGGAL DENGAN TRIGGER MODAL KALENDER CUSTOM --}}
                     <div class="sm:col-span-1">
                         <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-600">Pilih Tanggal</label>
                         
@@ -193,7 +193,7 @@
                     </div>
                 </div>
 
-                {{-- ðŸ“œ CHECKBOX SYARAT & KETENTUAN --}}
+                {{-- 📜 CHECKBOX SYARAT & KETENTUAN --}}
                 <div class="pt-2 border-t border-dashed border-[#3e2723]/20">
                     <label class="flex items-start gap-2.5 cursor-pointer text-xs text-gray-700 select-none">
                         <input type="checkbox" id="termsCheckbox" onchange="toggleTermsError()" class="mt-0.5 w-4 h-4 accent-[#3e2723] rounded">
@@ -210,7 +210,7 @@
                     </p>
                 </div>
 
-                {{-- ðŸ”’ RECAPTCHA V2 DI BAWAH TOTAL HARGA --}}
+                {{-- 🔒 RECAPTCHA V2 DI BAWAH TOTAL HARGA --}}
                 <div class="pt-2 flex flex-col items-center justify-center space-y-1">
                     <div class="g-recaptcha" data-sitekey="{{ config('services.recaptcha.sitekey') }}" data-callback="recaptchaSuccessCallback"></div>
                     <p id="captchaErrorText" class="text-xs text-red-600 font-semibold hidden">Silakan centang reCAPTCHA terlebih dahulu!</p>
@@ -224,7 +224,7 @@
     </form>
 </main>
 
-{{-- ðŸ“… CUSTOM MODAL KALENDER (TANGGAL TERKUNCI OTOMATIS MERAH & DISABLED) --}}
+{{-- 📅 CUSTOM MODAL KALENDER (TANGGAL TERKUNCI OTOMATIS MERAH & DISABLED) --}}
 <div id="customDateModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-white/95 backdrop-blur-2xl border border-white/80 rounded-[2.5rem] shadow-2xl p-6 space-y-4 my-auto">
         
@@ -289,7 +289,7 @@
     </div>
 </div>
 
-{{-- ðŸ’³ MODAL POPUP METODE PEMBAYARAN --}}
+{{-- 💳 MODAL POPUP METODE PEMBAYARAN --}}
 <div id="paymentModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-md flex items-center justify-center p-4">
     <div class="w-full max-w-md p-6 rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white/80 shadow-2xl space-y-6 text-center my-auto">
         
@@ -341,7 +341,7 @@
     </div>
 </div>
 
-{{-- ðŸ“œ MODAL POPUP SYARAT & KETENTUAN --}}
+{{-- 📜 MODAL POPUP SYARAT & KETENTUAN --}}
 <div id="termsModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
     <div class="w-full max-w-xl bg-white/95 backdrop-blur-2xl border border-white/80 rounded-[2.5rem] shadow-2xl p-6 md:p-8 max-h-[85vh] flex flex-col justify-between">
         <div>
@@ -352,7 +352,7 @@
                     </div>
                     <h3 class="text-lg font-bold text-[#3e2723]">Syarat & Ketentuan Pemesanan</h3>
                 </div>
-                <button type="button" onclick="closeTermsModal()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition">âœ–</button>
+                <button type="button" onclick="closeTermsModal()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition">✖</button>
             </div>
 
             <div class="overflow-y-auto max-h-[55vh] mt-4 pr-2 space-y-4 text-xs md:text-sm text-[#4a3525] leading-relaxed">
@@ -417,19 +417,26 @@
     const TAX_RATE = 0.10; // Persentase Pajak PPN (10%)
     const ADMIN_WA = '6287794082895'; // Nomor WA Admin Edelweiss Bakery
     
-    // ðŸ”’ DATA TANGGAL TERBLOKIR DARI ADMIN
+    // 🔒 DATA TANGGAL TERBLOKIR DARI ADMIN
     const rawDisabledDates = @json($disabledDates ?? []);
-    const disabledDatesMap = {};
+    let disabledDatesMap = {};
+    let realTimeSyncTimer = null;
     
-    if (Array.isArray(rawDisabledDates)) {
-        rawDisabledDates.forEach(item => {
-            if (typeof item === 'object' && item !== null) {
-                disabledDatesMap[item.date] = item.reason || 'Kuota Penuh / Toko Libur';
-            } else {
-                disabledDatesMap[item] = 'Kuota Penuh / Toko Libur';
-            }
-        });
+    function parseDisabledDates(datesArray) {
+        let newMap = {};
+        if (Array.isArray(datesArray)) {
+            datesArray.forEach(item => {
+                if (typeof item === 'object' && item !== null) {
+                    newMap[item.date] = item.reason || 'Kuota Penuh / Toko Libur';
+                } else {
+                    newMap[item] = 'Kuota Penuh / Toko Libur';
+                }
+            });
+        }
+        return newMap;
     }
+
+    disabledDatesMap = parseDisabledDates(rawDisabledDates);
 
     if (sessionStorage.getItem('bakery_cart')) {
         checkoutCart = JSON.parse(sessionStorage.getItem('bakery_cart'));
@@ -439,14 +446,46 @@
         window.location.href = "{{ route('menu') }}";
     }
 
-    // ðŸ”’ HELPER CEK TANGGAL TERBLOKIR
+    // 🔒 HELPER CEK TANGGAL TERBLOKIR
     function isDateDisabled(dateString) {
         if (!dateString) return false;
         const formattedDate = dateString.split(' ')[0];
         return Object.prototype.hasOwnProperty.call(disabledDatesMap, formattedDate);
     }
 
-    // ðŸ”’ VALIDASI PENGECEKAN TANGGAL TERBLOKIR REAL-TIME
+    // ⚡ SYNC DATA REALTIME DARI SERVER TENTANG TANGGAL TERBLOKIR
+    function fetchRealtimeDisabledDates() {
+        fetch("{{ route('checkout.index') }}", {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.success && Array.isArray(data.disabledDates)) {
+                disabledDatesMap = parseDisabledDates(data.disabledDates);
+
+                // RE-RENDER KALENDER APABILA MODAL SEDANG DIBUKA
+                const modal = document.getElementById('customDateModal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    renderCustomCalendar();
+                }
+
+                // VALDASI ULANG JIKA TANGGAL YANG SUDAH DIPILIH TIBA-TIBA DIKUNCI ADMIN
+                const currentSelectedDate = document.getElementById('fulfill_date').value;
+                if (currentSelectedDate && isDateDisabled(currentSelectedDate)) {
+                    document.getElementById('fulfill_date').value = '';
+                    document.getElementById('fulfill_date_display').value = '';
+                    document.getElementById('disabledDateErrorText').classList.remove('hidden');
+                    alert('Perhatian: Tanggal yang Anda pilih baru saja dikunci oleh Admin (Kuota Penuh/Libur). Silakan pilih tanggal lain.');
+                }
+            }
+        })
+        .catch(err => console.error("Realtime Disabled Dates Checkout Error:", err));
+    }
+
+    // 🔒 VALIDASI PENGECEKAN TANGGAL TERBLOKIR REAL-TIME
     function validateDisabledDate(input) {
         const selectedDate = input.value;
         const errorText = document.getElementById('disabledDateErrorText');
@@ -466,7 +505,7 @@
         document.getElementById('captchaErrorText').classList.add('hidden');
     }
 
-    // ðŸ“œ MODAL & CHECKBOX SYARAT & KETENTUAN LOGIC
+    // 📜 MODAL & CHECKBOX SYARAT & KETENTUAN LOGIC
     function openTermsModal() {
         document.getElementById('termsModal').classList.remove('hidden');
     }
@@ -579,7 +618,7 @@
         document.getElementById('mainCheckoutForm').submit();
     }
 
-    // ðŸŸ¢ SCRIPT WHATSAPP BERSIH TANPA EMOJI (MENCEGAH KARAKTER TANDA TANYA / CORRUPT)
+    // 🟢 SCRIPT WHATSAPP BERSIH TANPA EMOJI
     function submitViaWhatsApp() {
         const dateInput = document.getElementById('fulfill_date');
         const dateVal = dateInput.value;
@@ -707,13 +746,14 @@
     }
 
     // =========================================================================
-    // ðŸ“… LOGIKA CUSTOM MODAL KALENDER (NATIVE JAVASCRIPT)
+    // 📅 LOGIKA CUSTOM MODAL KALENDER (NATIVE JAVASCRIPT)
     // =========================================================================
     let currentCalDate = new Date();
     let selectedDateStr = '';
 
     function openDateModal() {
         document.getElementById('customDateModal').classList.remove('hidden');
+        fetchRealtimeDisabledDates(); // Tarik data terbaru saat modal dibuka
         renderCustomCalendar();
     }
 
@@ -771,7 +811,7 @@
                 btn.disabled = true;
                 btn.innerHTML = `<span>${day}</span>`;
             } else if (isLocked) {
-                // ðŸ”´ TANGGAL FULL / LIBUR (TIDAK BISA DIKLIK + WARNA MERAH)
+                // 🔴 TANGGAL FULL / LIBUR (TIDAK BISA DIKLIK + WARNA MERAH)
                 classes += "bg-rose-500 text-white shadow-sm cursor-not-allowed border border-rose-600";
                 btn.disabled = true;
                 btn.title = disabledDatesMap[dateStr] || 'Penuh / Libur';
@@ -807,7 +847,17 @@
         closeDateModal();
     }
 
-    document.addEventListener('DOMContentLoaded', renderCheckoutSummary);
+    document.addEventListener('DOMContentLoaded', function() {
+        renderCheckoutSummary();
+
+        // ⚡ BACKGROUND POLLING REALTIME UNTUK AUTO-UPDATE TANGGAL TERBLOKIR (TIAP 3 DETIK)
+        if (realTimeSyncTimer) clearInterval(realTimeSyncTimer);
+        realTimeSyncTimer = setInterval(function() {
+            if (document.visibilityState === 'visible') {
+                fetchRealtimeDisabledDates();
+            }
+        }, 3000);
+    });
 </script>
 </body>
 </html>

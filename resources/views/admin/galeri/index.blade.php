@@ -3,7 +3,14 @@
 @section('page_title', 'Manajemen Galeri Portofolio')
 
 @section('content')
-{{-- ðŸ’Ž AREA SCROLL MANDIRI PANEL UTAMA CMS --}}
+<style>
+    .dataTables_scrollBody {
+        min-height: 280px !important;
+        max-height: calc(100vh - 24rem) !important;
+    }
+</style>
+
+{{-- AREA SCROLL MANDIRI PANEL UTAMA CMS --}}
 <div class="max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 space-y-6">
 
     {{-- HEADER MANAGEMENT INTERFACE --}}
@@ -19,8 +26,8 @@
 
     {{-- TABLE DATA PUSAT GALERI CMS --}}
     <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 overflow-hidden">
-        <div class="overflow-x-auto rounded-2xl border border-white/40 bg-white/20 shadow-inner">
-            <table class="w-full text-left border-collapse">
+        <div class="overflow-x-auto rounded-2xl border border-white/40 bg-white/20 p-2 shadow-inner">
+            <table id="galeriTable" class="w-full text-left border-collapse min-w-[700px]">
                 <thead>
                     <tr class="bg-white/40 text-xs font-bold uppercase tracking-wider text-[#3e2723]/70">
                         <th class="px-6 py-4 w-24 text-center">Sampul</th>
@@ -31,88 +38,48 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-white/30 text-sm font-medium">
-                    @foreach($galeri as $album)
-                    @php
-                        // PENGECEKAN PATH DYNAMIC UNTUK PUBLIC_HTML HOSTING DAN LOCALHOST
-                        $publicHtmlFolder = base_path('../public_html/img/galeri/' . $album->album);
-                        $localFolder = public_path('img/galeri/' . $album->album);
-
-                        if (file_exists($publicHtmlFolder)) {
-                            $folder = $publicHtmlFolder;
-                        } else {
-                            $folder = $localFolder;
-                        }
-
-                        $files = file_exists($folder) ? array_values(array_diff(scandir($folder), ['.', '..'])) : [];
-                    @endphp
-                    <tr class="hover:bg-white/30 transition">
-                        <td class="px-6 py-3 text-center">
-                            <img src="{{ count($files) > 0 ? asset('img/galeri/' . $album->album . '/' . $files[0]) : asset('img/logo/logo2.png') }}" 
-                                 class="w-12 h-12 object-cover rounded-xl border border-white bg-gray-100 mx-auto shadow-sm">
-                        </td>
-                        <td class="px-6 py-3">
-                            <p class="font-bold text-[#2d1f1b]">{{ $album->judul }}</p>
-                            <p class="text-[11px] text-amber-800 font-mono mt-0.5">dir: {{ $album->album }}</p>
-                        </td>
-                        <td class="px-6 py-3">
-                            <p class="text-xs text-gray-500 line-clamp-2 max-w-sm font-normal">{{ $album->deskripsi }}</p>
-                        </td>
-                        <td class="px-6 py-3 text-center text-[#3e2723] font-bold">
-                            {{ count($files) }} Foto
-                        </td>
-                        <td class="px-6 py-3 text-center">
-                            <div class="flex items-center justify-center gap-2">
-                                <a href="{{ route('galeri.edit', $album->id) }}" class="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition shadow-sm bg-white/60 border border-white" title="Kelola Isi Album">
-                                    <i class="fa-regular fa-pen-to-square"></i>
-                                </a>
-                                <button type="button" onclick="triggerDelete('{{ route('galeri.destroy', $album->id) }}')" class="p-2 text-red-600 hover:bg-red-50 rounded-xl transition shadow-sm bg-white/60 border border-white" title="Hapus Album">
-                                    <i class="fa-regular fa-trash-can"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    @endforeach
+                    {{-- Data dimuat dinamis via DataTables AJAX --}}
                 </tbody>
             </table>
         </div>
     </div>
 </div>
 
-{{-- ðŸ”’ COMPONENT: MODAL POPUP INPUT ALBUM BARU --}}
+{{-- COMPONENT: MODAL POPUP INPUT ALBUM BARU --}}
 <div id="addAlbumModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-    <div class="w-full max-w-lg p-6 rounded-[2rem] bg-white/40 backdrop-blur-3xl border border-white/50 shadow-2xl relative space-y-4 my-auto">
+    <div class="w-full max-w-lg p-6 rounded-[2rem] bg-white/60 backdrop-blur-3xl border border-white/50 shadow-2xl relative space-y-4 my-auto">
         <div class="flex justify-between items-center pb-2 border-b border-[#3e2723]/15">
             <h3 class="text-lg font-bold text-[#3e2723]"><i class="fa-regular fa-images mr-2"></i> Form Pembuatan Album Baru</h3>
-            <button type="button" onclick="closeAddModal()" class="w-8 h-8 rounded-full bg-white/40 flex items-center justify-center font-bold text-[#3e2723] hover:bg-white/70">âœ•</button>
+            <button type="button" onclick="closeAddModal()" class="w-8 h-8 rounded-full bg-white/40 flex items-center justify-center font-bold text-[#3e2723] hover:bg-white/70">✕</button>
         </div>
 
-        <form id="addAlbumForm" method="POST" action="{{ route('galeri.store') }}" enctype="multipart/form-data" class="space-y-4">
+        <form id="addAlbumForm" enctype="multipart/form-data" class="space-y-4">
             @csrf
             <div>
                 <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Judul Portofolio Album</label>
-                <input type="text" id="draft_judul" name="judul" required class="w-full mt-1 px-4 py-2.5 text-sm rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
+                <input type="text" id="draft_judul" name="judul" required class="w-full mt-1 px-4 py-2.5 text-sm rounded-xl bg-white/70 border border-white/50 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition">
             </div>
 
             <div>
                 <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Deskripsi / Cerita Album Kue</label>
-                <textarea id="draft_deskripsi" name="deskripsi" rows="4" required class="w-full mt-1 px-4 py-2.5 text-sm rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition"></textarea>
+                <textarea id="draft_deskripsi" name="deskripsi" rows="4" required class="w-full mt-1 px-4 py-2.5 text-sm rounded-xl bg-white/70 border border-white/50 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] transition"></textarea>
             </div>
 
             <div>
                 <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Unggah Berkas Gambar (Bisa Banyak Sekaligus)</label>
-                <input type="file" name="gambar[]" multiple required class="w-full mt-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#3e2723] file:text-white file:cursor-pointer">
-                <p class="text-[10px] text-gray-400 mt-1">*Sistem otomatis mengonversi gambar ke WebP dan merampingkan resolusi.</p>
+                <input type="file" id="draft_gambar" name="gambar[]" multiple required class="w-full mt-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#3e2723] file:text-white file:cursor-pointer">
+                <p class="text-[10px] text-gray-500 mt-1">*Sistem otomatis mengonversi gambar ke WebP dan merampingkan resolusi.</p>
             </div>
 
             <div class="flex gap-3 pt-2">
                 <button type="button" onclick="closeAddModal()" class="flex-1 py-3 text-sm font-semibold rounded-xl bg-white/60 border border-white/40 text-[#3e2723] hover:bg-white/80 transition">Batal</button>
-                <button type="submit" class="flex-1 py-3 text-sm font-semibold rounded-xl bg-[#3e2723] text-white shadow-md hover:bg-[#2c1b18] transition">Terbitkan Album</button>
+                <button type="submit" id="btnSubmitAlbum" class="flex-1 py-3 text-sm font-semibold rounded-xl bg-[#3e2723] text-white shadow-md hover:bg-[#2c1b18] transition">Terbitkan Album</button>
             </div>
         </form>
     </div>
 </div>
 
-{{-- ðŸš¨ CUSTOM GLOBAL SYSTEM MODAL ALERT --}}
+{{-- CUSTOM GLOBAL SYSTEM MODAL ALERT --}}
 <div id="systemAlertModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center p-4">
     <div class="w-full max-w-sm p-6 rounded-[2rem] bg-white/50 backdrop-blur-3xl border border-white/60 shadow-2xl text-center space-y-4">
         <div id="alertIconContainer" class="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-2xl shadow-md">
@@ -128,13 +95,11 @@
     </div>
 </div>
 
-{{-- Hidden Form Action Delete --}}
-<form id="globalDeleteForm" method="POST" class="hidden">
-    @csrf
-    @method('DELETE')
-</form>
-
 <script>
+    let galeriTable = null;
+    let pendingDeleteUrl = null;
+    let galeriPollingTimer = null;
+
     // --- CONTROL MODAL TAMBAH ---
     function openAddModal() {
         document.getElementById('addAlbumModal').classList.remove('hidden');
@@ -148,19 +113,11 @@
     const inputJudul = document.getElementById('draft_judul');
     const inputDeskripsi = document.getElementById('draft_deskripsi');
 
-    // Load data lama jika tidak sengaja ter-refresh
     if (localStorage.getItem('cms_galeri_judul')) inputJudul.value = localStorage.getItem('cms_galeri_judul');
     if (localStorage.getItem('cms_galeri_deskripsi')) inputDeskripsi.value = localStorage.getItem('cms_galeri_deskripsi');
 
-    // Dengar ketukan masukan user
     inputJudul.addEventListener('input', () => localStorage.setItem('cms_galeri_judul', inputJudul.value));
     inputDeskripsi.addEventListener('input', () => localStorage.setItem('cms_galeri_deskripsi', inputDeskripsi.value));
-
-    // Bersihkan penampung draf lokal saat formulir sukses dikirim
-    document.getElementById('addAlbumForm').onsubmit = function() {
-        localStorage.removeItem('cms_galeri_judul');
-        localStorage.removeItem('cms_galeri_deskripsi');
-    };
 
     // --- WEB SYSTEM ALERT ENGINE ---
     function openSystemAlert(title, message, type = 'success', confirmAction = null) {
@@ -200,20 +157,116 @@
     }
 
     function triggerDelete(actionUrl) {
+        pendingDeleteUrl = actionUrl;
         openSystemAlert(
             'Hapus Album Permanen',
             'Apakah Anda yakin ingin menghapus album portofolio ini beserta seluruh aset foto fisik di dalamnya?',
             'confirm',
             function() {
-                const form = document.getElementById('globalDeleteForm');
-                form.action = actionUrl;
-                form.submit();
+                if (!pendingDeleteUrl) return;
+                
+                $.ajax({
+                    url: pendingDeleteUrl,
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        _method: 'DELETE'
+                    },
+                    success: function(res) {
+                        closeSystemAlert();
+                        openSystemAlert('Berhasil!', res.message || 'Album berhasil dihapus.', 'success');
+                        if (galeriTable) galeriTable.ajax.reload(null, false);
+                    },
+                    error: function(xhr) {
+                        closeSystemAlert();
+                        openSystemAlert('Gagal Hapus', 'Terjadi kesalahan saat menghapus album.', 'error');
+                    }
+                });
             }
         );
     }
 
-    // Intersepsi Flash Session Laravel
     document.addEventListener("DOMContentLoaded", function() {
+        // 1. INITIALIZE DATATABLES AJAX SERVER-SIDE
+        if (typeof $ !== 'undefined' && $.fn.DataTable) {
+            galeriTable = $('#galeriTable').DataTable({
+                processing: true,
+                serverSide: true,
+                destroy: true,
+                autoWidth: false,
+                dom: 'rtip',
+                scrollY: 'calc(100vh - 24rem)',
+                scrollCollapse: true,
+                ajax: {
+                    url: "{{ route('galeri.index') }}",
+                    type: "GET"
+                },
+                columns: [
+                    { data: 'cover', name: 'cover', className: 'text-center', orderable: false, searchable: false },
+                    { data: 'judul', name: 'judul' },
+                    { data: 'deskripsi', name: 'deskripsi' },
+                    { data: 'total_photos', name: 'total_photos', className: 'text-center', orderable: false, searchable: false },
+                    { data: 'action', name: 'action', className: 'text-center', orderable: false, searchable: false }
+                ],
+                language: {
+                    search: "",
+                    lengthMenu: "Tampilkan _MENU_ data",
+                    info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ album",
+                    paginate: {
+                        previous: "<i class='fa-solid fa-chevron-left'></i>",
+                        next: "<i class='fa-solid fa-chevron-right'></i>"
+                    }
+                }
+            });
+
+            // 2. AUTO-POLLING REALTIME SYNC (3 Detik)
+            if (galeriPollingTimer) clearInterval(galeriPollingTimer);
+            galeriPollingTimer = setInterval(function () {
+                const isModalOpen = !$('#addAlbumModal').hasClass('hidden') || !$('#systemAlertModal').hasClass('hidden');
+                if (galeriTable && document.visibilityState === 'visible' && !isModalOpen) {
+                    galeriTable.ajax.reload(null, false);
+                }
+            }, 3000);
+        }
+
+        // 3. UPLOAD / TAMBAH ALBUM VIA AJAX
+        $('#addAlbumForm').on('submit', function(e) {
+            e.preventDefault();
+            const btn = $('#btnSubmitAlbum');
+            btn.prop('disabled', true).text('Menerbitkan...');
+
+            const formData = new FormData(this);
+
+            $.ajax({
+                url: "{{ route('galeri.store') }}",
+                type: "POST",
+                data: formData,
+                contentType: false,
+                processData: false,
+                success: function(res) {
+                    btn.prop('disabled', false).text('Terbitkan Album');
+                    closeAddModal();
+                    
+                    // Clear Draft LocalStorage
+                    localStorage.removeItem('cms_galeri_judul');
+                    localStorage.removeItem('cms_galeri_deskripsi');
+                    $('#addAlbumForm')[0].reset();
+
+                    openSystemAlert('Berhasil!', res.message || 'Album portofolio berhasil diterbitkan.', 'success');
+                    if (galeriTable) galeriTable.ajax.reload(null, false);
+                },
+                error: function(xhr) {
+                    btn.prop('disabled', false).text('Terbitkan Album');
+                    let msg = 'Gagal menerbitkan album baru.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        msg = xhr.responseJSON.message;
+                    }
+                    openSystemAlert('Validasi Gagal', msg, 'error');
+                }
+            });
+        });
+
+        // Intersepsi Flash Session Standard
         @if(session('success'))
             openSystemAlert('Berhasil!', "{{ session('success') }}", 'success');
         @endif

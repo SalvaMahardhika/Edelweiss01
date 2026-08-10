@@ -71,7 +71,7 @@
 
 @include('layouts.navbar')
 
-{{-- 🔔 TOAST NOTIFICATION POPUP (SAMPLING DISAMPING) --}}
+{{-- 🔔 TOAST NOTIFICATION POPUP --}}
 <div id="cartToast" class="fixed top-24 right-4 z-50 transform translate-x-full opacity-0 transition-all duration-500 ease-in-out pointer-events-none">
     <div class="flex items-center gap-3 px-4 py-3 bg-[#3e2723]/95 backdrop-blur-xl border border-[#c8a97e]/40 text-white rounded-2xl shadow-2xl max-w-xs sm:max-w-sm">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#c8a97e] to-[#a67c52] flex items-center justify-center text-white shrink-0 shadow-inner">
@@ -116,16 +116,20 @@
         </div>
 
         {{-- DYNAMIC CATEGORY FILTER TABS --}}
-        <div class="flex flex-wrap justify-center gap-2 sm:gap-3">
+        <div id="categoryTabsContainer" class="flex flex-wrap justify-center gap-2 sm:gap-3">
             <button onclick="filterCategory('all', this)" 
-                    class="category-btn px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition duration-300 bg-[#3e2723] text-white">
+                    class="category-btn px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition duration-300 bg-[#3e2723] text-white"
+                    data-cat-id="all">
                 Semua Menu
             </button>
             @foreach($categories as $cat)
+            @if($cat->is_active)
             <button onclick="filterCategory('{{ $cat->id }}', this)" 
-                    class="category-btn px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition duration-300 bg-white/40 backdrop-blur-xl border border-white/50 text-[#3e2723] hover:bg-white/70">
+                    class="category-btn px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition duration-300 bg-white/40 backdrop-blur-xl border border-white/50 text-[#3e2723] hover:bg-white/70"
+                    data-cat-id="{{ $cat->id }}">
                 {{ $cat->name }}
             </button>
+            @endif
             @endforeach
         </div>
     </section>
@@ -138,11 +142,10 @@
             <p class="text-sm text-gray-500">Menu yang Anda cari tidak ditemukan.</p>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
+        <div id="productGrid" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
             @foreach($produk->where('status', true) as $item)
 
             @php
-                // PENGECEKAN PATH DYNAMIC UNTUK PUBLIC_HTML HOSTING DAN LOCALHOST
                 $publicHtmlFolder = base_path('../public_html/img/menu/' . $item->gambar);
                 $localFolder = public_path('img/menu/' . $item->gambar);
 
@@ -232,7 +235,6 @@
         <div class="flex justify-between items-center pb-4 border-b border-[#3e2723]/20">
             <div class="flex items-center gap-3">
                 <h3 class="text-lg font-bold text-[#3e2723]"><i class="fa-solid fa-basket-shopping mr-1"></i> Keranjang Pre-Order</h3>
-                {{-- 🔴 TOMBOL MEMBUKA MODAL BERSIHKAN KERANJANG --}}
                 <button type="button" id="clearCartBtn" onclick="openClearCartModal()" class="hidden text-xs font-bold text-rose-700 bg-rose-100 hover:bg-rose-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 shadow-sm" title="Kosongkan seluruh isi keranjang">
                     <i class="fa-solid fa-trash-can text-[11px]"></i> Bersihkan
                 </button>
@@ -292,28 +294,32 @@
     let activeCategory = 'all';
     let cart = [];
     let toastTimeout = null;
+    let menuRealtimeTimer = null;
 
     // ================= SCRIPT LOGIK LIVE FILTER (SEARCH & CATEGORY) =================
     function filterCategory(catId, btnElement) {
-        activeCategory = catId;
+        activeCategory = String(catId);
         
         document.querySelectorAll('.category-btn').forEach(btn => {
             btn.className = "category-btn px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition duration-300 bg-white/40 backdrop-blur-xl border border-white/50 text-[#3e2723] hover:bg-white/70";
         });
         
-        btnElement.className = "category-btn px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition duration-300 bg-[#3e2723] text-white";
+        if(btnElement) {
+            btnElement.className = "category-btn px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition duration-300 bg-[#3e2723] text-white";
+        }
 
         filterMenu();
     }
 
     function filterMenu() {
-        const query = document.getElementById('menuSearchInput').value.toLowerCase();
+        const queryInput = document.getElementById('menuSearchInput');
+        const query = queryInput ? queryInput.value.toLowerCase() : '';
         const cards = document.querySelectorAll('.product-card');
         let visibleCount = 0;
 
         cards.forEach(card => {
-            const name = card.getAttribute('data-name');
-            const category = card.getAttribute('data-category');
+            const name = card.getAttribute('data-name') || '';
+            const category = String(card.getAttribute('data-category') || '');
 
             const matchesSearch = name.includes(query);
             const matchesCategory = (activeCategory === 'all' || category === activeCategory);
@@ -327,11 +333,59 @@
         });
 
         const notice = document.getElementById('emptySearchNotice');
-        if (visibleCount === 0) {
-            notice.classList.remove('hidden');
-        } else {
-            notice.classList.add('hidden');
+        if (notice) {
+            if (visibleCount === 0) {
+                notice.classList.remove('hidden');
+            } else {
+                notice.classList.add('hidden');
+            }
         }
+    }
+
+    // ================= ⚡ REALTIME SYNC UNTUK KATEGORI & KATALOG MENU =================
+    function syncRealtimeMenu() {
+        fetch(window.location.href, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // 1. Update Kategori Tabs secara Realtime
+            const newTabs = doc.getElementById('categoryTabsContainer');
+            const currentTabs = document.getElementById('categoryTabsContainer');
+
+            if (newTabs && currentTabs) {
+                if (newTabs.innerHTML.trim() !== currentTabs.innerHTML.trim()) {
+                    currentTabs.innerHTML = newTabs.innerHTML;
+
+                    // Pulihkan posisi tombol aktif
+                    let activeBtn = currentTabs.querySelector(`[data-cat-id="${activeCategory}"]`);
+                    if (!activeBtn) {
+                        activeCategory = 'all';
+                        activeBtn = currentTabs.querySelector('[data-cat-id="all"]');
+                    }
+                    if (activeBtn) {
+                        filterCategory(activeCategory, activeBtn);
+                    }
+                }
+            }
+
+            // 2. Update Grid Produk secara Realtime (Jika ada CRUD dari Admin)
+            const newGrid = doc.getElementById('productGrid');
+            const currentGrid = document.getElementById('productGrid');
+
+            if (newGrid && currentGrid) {
+                if (newGrid.innerHTML.trim() !== currentGrid.innerHTML.trim()) {
+                    currentGrid.innerHTML = newGrid.innerHTML;
+                    filterMenu(); // Re-apply filter pencarian & kategori yang sedang aktif
+                }
+            }
+        })
+        .catch(err => console.error("Realtime Sync Background Error:", err));
     }
 
     // ================= SCRIPT INPUT JUMLAH PADA KARTU PRODUK =================
@@ -344,7 +398,7 @@
         input.value = val;
     }
 
-    // 🟢 DITAMBAHKAN NOTIFIKASI TOAST POPUP (TANPA MEMBUKA CART DRAWER)
+    // 🟢 NOTIFIKASI TOAST POPUP (TANPA MEMBUKA CART DRAWER)
     function addToCartFromCard(id, name, price, image) {
         const input = document.getElementById(`card_qty_${id}`);
         const qtyToAdd = input ? (parseInt(input.value) || 1) : 1;
@@ -356,12 +410,9 @@
             cart.push({ id, name, price, image, quantity: qtyToAdd });
         }
 
-        // Reset input jumlah kartu kembali ke 1
         if (input) input.value = 1;
 
         updateCartUI();
-
-        // 🟢 Munculkan Notifikasi Toast Melayang disamping tanpa membuka drawer
         showCartToast(`${qtyToAdd}x ${name} ditambahkan`);
     }
 
@@ -404,7 +455,6 @@
         drawer.classList.toggle('translate-x-full');
     }
 
-    // 🗑️ MODAL MANDIRI LOGIKA BERSIHKAN KERANJANG
     function openClearCartModal() {
         if (cart.length === 0) return;
         document.getElementById('clearCartModal').classList.remove('hidden');
@@ -421,7 +471,6 @@
         closeClearCartModal();
     }
 
-    // Mengubah jumlah item langsung dari input teks keranjang
     function setItemQuantity(id, newQty) {
         let val = parseInt(newQty);
         if (isNaN(val) || val <= 0) {
@@ -444,17 +493,12 @@
         updateCartUI();
     }
 
-    // 🟢 SUBMIT CHECKOUT (MENJAGA KERANJANG TETAP ADA SAAT PINDAH HALAMAN)
     function handleCheckoutSubmit(event) {
         if (cart.length === 0) {
             event.preventDefault();
             return false;
         }
-
-        // Simpan versi data keranjang terbaru ke sessionStorage agar dibaca di halaman checkout.blade
         sessionStorage.setItem('bakery_cart', JSON.stringify(cart));
-
-        // IZINKAN FORM SUBMIT TANPA MENGHAPUS STORAGE AGAR TIDAK MEMUTUSKAN ISI KERANJANG
         return true;
     }
 
@@ -465,15 +509,17 @@
         const checkoutBtn = document.getElementById('checkoutBtn');
         const clearCartBtn = document.getElementById('clearCartBtn');
 
+        if (!listContainer) return;
+
         listContainer.innerHTML = '';
         sessionStorage.setItem('bakery_cart', JSON.stringify(cart));
         
         if (cart.length === 0) {
             listContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-8">Keranjang belanja Anda kosong.</p>';
-            badge.classList.add('hidden');
+            if (badge) badge.classList.add('hidden');
             if (clearCartBtn) clearCartBtn.classList.add('hidden');
-            totalContainer.innerText = 'Rp 0';
-            checkoutBtn.disabled = true;
+            if (totalContainer) totalContainer.innerText = 'Rp 0';
+            if (checkoutBtn) checkoutBtn.disabled = true;
             return;
         }
 
@@ -501,13 +547,33 @@
             listContainer.appendChild(row);
         });
 
-        badge.innerText = totalItems;
-        badge.classList.remove('hidden');
+        if (badge) {
+            badge.innerText = totalItems;
+            badge.classList.remove('hidden');
+        }
         if (clearCartBtn) clearCartBtn.classList.remove('hidden');
-        totalContainer.innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(totalPrice);
-        
-        checkoutBtn.disabled = false;
+        if (totalContainer) totalContainer.innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(totalPrice);
+        if (checkoutBtn) checkoutBtn.disabled = false;
     }
+
+    // ⚡ JALANKAN BACKGROUND POLLING UNTUK SINKRONISASI REALTIME & EVENT LISTENER
+    document.addEventListener('DOMContentLoaded', function() {
+        // Polling setiap 3 detik saat halaman sedang aktif
+        if (menuRealtimeTimer) clearInterval(menuRealtimeTimer);
+        menuRealtimeTimer = setInterval(function() {
+            if (document.visibilityState === 'visible') {
+                syncRealtimeMenu();
+            }
+        }, 3000);
+
+        // Broadcast Listener (Laravel Echo)
+        if (typeof Echo !== 'undefined') {
+            Echo.channel('menu-updates')
+                .listen('.menu.updated', (e) => {
+                    syncRealtimeMenu();
+                });
+        }
+    });
 </script>
 
 </body>
