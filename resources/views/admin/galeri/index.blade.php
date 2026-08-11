@@ -8,6 +8,9 @@
         min-height: 280px !important;
         max-height: calc(100vh - 24rem) !important;
     }
+    .dataTables_processing {
+        display: none !important;
+    }
 </style>
 
 {{-- AREA SCROLL MANDIRI PANEL UTAMA CMS --}}
@@ -22,6 +25,43 @@
         <button onclick="openAddModal()" class="px-5 py-2.5 bg-[#3e2723] text-white font-semibold rounded-xl text-sm shadow-md hover:bg-[#2c1b18] transition duration-300 inline-flex items-center gap-2">
             <i class="fa-solid fa-plus"></i> Buat Album Baru
         </button>
+    </div>
+
+    {{-- BARISAN FILTER UI & SEARCH REALTIME --}}
+    <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-5 space-y-4">
+        {{-- INPUT PENCARIAN REALTIME --}}
+        <div class="relative w-full">
+            <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+            <input type="text" id="filter_search" placeholder="Cari Judul Album atau Deskripsi..." class="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] font-medium text-[#3e2723]">
+        </div>
+
+        {{-- FILTER DROPDOWN --}}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
+            <div>
+                <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Kepadatan Foto Album</label>
+                <select id="filter_photo_count" class="w-full mt-1 px-4 py-2.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-[#3e2723] font-medium">
+                    <option value="ALL">Semua Album</option>
+                    <option value="empty">Kosong (0 Foto)</option>
+                    <option value="compact">Ringkas (1 - 5 Foto)</option>
+                    <option value="full">Lengkap (> 5 Foto)</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Urutan Tanggal Terbit</label>
+                <select id="filter_date_sort" class="w-full mt-1 px-4 py-2.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-[#3e2723] font-medium">
+                    <option value="latest">Terbaru</option>
+                    <option value="oldest">Terlama</option>
+                    <option value="this_month">Diterbitkan Bulan Ini</option>
+                </select>
+            </div>
+
+            <div>
+                <button type="button" id="resetGaleriFilterBtn" class="w-full py-2.5 px-3 bg-white/60 border border-white text-xs font-bold rounded-xl text-[#3e2723] hover:bg-white transition text-center shadow-sm flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-rotate-left"></i> Reset Filter
+                </button>
+            </div>
+        </div>
     </div>
 
     {{-- TABLE DATA PUSAT GALERI CMS --}}
@@ -99,8 +139,8 @@
     let galeriTable = null;
     let pendingDeleteUrl = null;
     let galeriPollingTimer = null;
+    let galeriSearchTimer = null;
 
-    // --- CONTROL MODAL TAMBAH ---
     function openAddModal() {
         document.getElementById('addAlbumModal').classList.remove('hidden');
     }
@@ -109,7 +149,6 @@
         document.getElementById('addAlbumModal').classList.add('hidden');
     }
 
-    // --- ANTI-LOSS DRAFT AUTO SAVE SYSTEM (LOCALSTORAGE) ---
     const inputJudul = document.getElementById('draft_judul');
     const inputDeskripsi = document.getElementById('draft_deskripsi');
 
@@ -119,7 +158,6 @@
     inputJudul.addEventListener('input', () => localStorage.setItem('cms_galeri_judul', inputJudul.value));
     inputDeskripsi.addEventListener('input', () => localStorage.setItem('cms_galeri_deskripsi', inputDeskripsi.value));
 
-    // --- WEB SYSTEM ALERT ENGINE ---
     function openSystemAlert(title, message, type = 'success', confirmAction = null) {
         const modal = document.getElementById('systemAlertModal');
         const iconContainer = document.getElementById('alertIconContainer');
@@ -187,10 +225,9 @@
     }
 
     document.addEventListener("DOMContentLoaded", function() {
-        // 1. INITIALIZE DATATABLES AJAX SERVER-SIDE
         if (typeof $ !== 'undefined' && $.fn.DataTable) {
             galeriTable = $('#galeriTable').DataTable({
-                processing: true,
+                processing: false,
                 serverSide: true,
                 destroy: true,
                 autoWidth: false,
@@ -199,7 +236,13 @@
                 scrollCollapse: true,
                 ajax: {
                     url: "{{ route('galeri.index') }}",
-                    type: "GET"
+                    type: "GET",
+                    global: false,
+                    data: function (d) {
+                        d.custom_search = $('#filter_search').val();
+                        d.date_sort = $('#filter_date_sort').val();
+                        d.photo_filter = $('#filter_photo_count').val();
+                    }
                 },
                 columns: [
                     { data: 'cover', name: 'cover', className: 'text-center', orderable: false, searchable: false },
@@ -219,17 +262,43 @@
                 }
             });
 
-            // 2. AUTO-POLLING REALTIME SYNC (3 Detik)
+            $('#filter_search').off('keyup').on('keyup', function() {
+                clearTimeout(galeriSearchTimer);
+                galeriSearchTimer = setTimeout(function() {
+                    galeriTable.draw();
+                }, 400);
+            });
+
+            $('#filter_date_sort, #filter_photo_count').off('change').on('change', function() {
+                galeriTable.draw();
+            });
+
+            $('#resetGaleriFilterBtn').off('click').on('click', function() {
+                $('#filter_search').val('');
+                $('#filter_photo_count').val('ALL');
+                $('#filter_date_sort').val('latest');
+                galeriTable.draw();
+            });
+
             if (galeriPollingTimer) clearInterval(galeriPollingTimer);
             galeriPollingTimer = setInterval(function () {
                 const isModalOpen = !$('#addAlbumModal').hasClass('hidden') || !$('#systemAlertModal').hasClass('hidden');
-                if (galeriTable && document.visibilityState === 'visible' && !isModalOpen) {
-                    galeriTable.ajax.reload(null, false);
+                const isUserFocusInput = $('#filter_search').is(':focus');
+                
+                if (galeriTable && document.visibilityState === 'visible' && !isModalOpen && !isUserFocusInput) {
+                    let settings = galeriTable.settings()[0];
+                    if (settings.jqXHR && settings.jqXHR.readyState !== 4) return;
+
+                    let oldProcessing = settings.oFeatures.bProcessing;
+                    settings.oFeatures.bProcessing = false;
+
+                    galeriTable.ajax.reload(function() {
+                        settings.oFeatures.bProcessing = oldProcessing;
+                    }, false);
                 }
             }, 3000);
         }
 
-        // 3. UPLOAD / TAMBAH ALBUM VIA AJAX
         $('#addAlbumForm').on('submit', function(e) {
             e.preventDefault();
             const btn = $('#btnSubmitAlbum');
@@ -247,7 +316,6 @@
                     btn.prop('disabled', false).text('Terbitkan Album');
                     closeAddModal();
                     
-                    // Clear Draft LocalStorage
                     localStorage.removeItem('cms_galeri_judul');
                     localStorage.removeItem('cms_galeri_deskripsi');
                     $('#addAlbumForm')[0].reset();
@@ -266,7 +334,6 @@
             });
         });
 
-        // Intersepsi Flash Session Standard
         @if(session('success'))
             openSystemAlert('Berhasil!', "{{ session('success') }}", 'success');
         @endif

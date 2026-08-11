@@ -87,28 +87,11 @@ class OrderController extends Controller
             return DataTables::of($query)
                 ->addIndexColumn()
                 ->editColumn('status', function ($row) {
-                    $statusVal = is_object($row->status) ? ($row->status->value ?? (string) $row->status) : (string) $row->status;
-                    $statusClasses = [
-                        'pending' => 'bg-amber-100 text-amber-800',
-                        'confirmed' => 'bg-blue-100 text-blue-800',
-                        'preparing' => 'bg-purple-100 text-purple-800',
-                        'ready' => 'bg-emerald-100 text-emerald-800',
-                    ];
-                    $cls = $statusClasses[$statusVal] ?? 'bg-gray-100 text-gray-800';
-
-                    return '<span class="px-2.5 py-1 text-xs font-bold rounded-lg '.$cls.'">'.ucfirst($statusVal).'</span>';
+                    return is_object($row->status) ? ($row->status->value ?? (string) $row->status) : (string) $row->status;
                 })
                 ->editColumn('payment_status', function ($row) {
-                    $payVal = is_object($row->payment_status) ? ($row->payment_status->value ?? (string) $row->payment_status) : (string) $row->payment_status;
-                    $payClasses = [
-                        'unpaid' => 'bg-rose-100 text-rose-800',
-                        'partial' => 'bg-amber-100 text-amber-800',
-                        'paid' => 'bg-emerald-100 text-emerald-800',
-                        'refunded' => 'bg-gray-100 text-gray-800',
-                    ];
-                    $cls = $payClasses[$payVal] ?? 'bg-gray-100 text-gray-800';
-
-                    return '<span class="px-2.5 py-1 text-xs font-bold rounded-lg '.$cls.'">'.ucfirst($payVal).'</span>';
+                    // 🟢 KEMBALIKAN STRING MURNI (agar JS DataTables di Blade bisa memproses badge & lock status dengan presisi)
+                    return is_object($row->payment_status) ? ($row->payment_status->value ?? (string) $row->payment_status) : (string) $row->payment_status;
                 })
                 ->editColumn('fulfill_at', fn ($row) => $row->fulfill_at ? date('d M Y, H:i', strtotime($row->fulfill_at)).' WIB' : '-')
                 ->editColumn('total_amount', fn ($row) => 'Rp '.number_format((float) $row->total_amount, 0, ',', '.'))
@@ -117,7 +100,7 @@ class OrderController extends Controller
                         <i class="fa-solid fa-eye"></i> Detail
                     </button>
                 ')
-                ->rawColumns(['status', 'payment_status', 'action'])
+                ->rawColumns(['action'])
                 ->with(['stats' => $stats])
                 // 🔄 MEMUNGKINKAN YAJRA DATATABLES MENG-HANDLE SORTING BAWAAN DATATABLES (ORDER BY COLUMN)
                 ->order(function ($query) use ($request) {

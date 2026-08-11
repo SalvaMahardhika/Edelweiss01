@@ -12,7 +12,38 @@ class CategoryController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $categories = Category::query()->orderBy('sort_order');
+            $categories = Category::query();
+
+            // 1. FILTER SEARCH REALTIME (Nama atau Deskripsi)
+            if ($request->filled('custom_search')) {
+                $keyword = $request->custom_search;
+                $categories->where(function ($q) use ($keyword) {
+                    $q->where('name', 'like', "%{$keyword}%")
+                        ->orWhere('description', 'like', "%{$keyword}%");
+                });
+            }
+
+            // 2. FILTER STATUS VISIBILITAS (Aktif / Non-Aktif)
+            if ($request->filled('status_filter') && $request->status_filter !== 'ALL') {
+                $categories->where('is_active', $request->status_filter === '1');
+            }
+
+            // 3. FILTER URUTAN TAMPILAN (Sort Order / Alphabet / Terbaru)
+            if ($request->filled('sort_filter')) {
+                switch ($request->sort_filter) {
+                    case 'name_asc':
+                        $categories->orderBy('name', 'asc');
+                        break;
+                    case 'latest':
+                        $categories->latest();
+                        break;
+                    default:
+                        $categories->orderBy('sort_order', 'asc');
+                        break;
+                }
+            } else {
+                $categories->orderBy('sort_order', 'asc');
+            }
 
             return DataTables::of($categories)
                 ->addIndexColumn()

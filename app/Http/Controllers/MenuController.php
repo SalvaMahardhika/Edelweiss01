@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Yajra\DataTables\Facades\DataTables;
 
 class MenuController extends Controller
 {
@@ -106,12 +107,65 @@ class MenuController extends Controller
     // ==========================================
 
     /**
-     * Menampilkan dashboard utama CMS produk admin
+     * Menampilkan dashboard utama CMS produk admin (Mendukung Datatables AJAX & Filter Realtime)
      */
-    public function adminIndex()
+    public function adminIndex(Request $request)
     {
         if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
             abort(403);
+        }
+
+        if ($request->ajax()) {
+            $query = Produk::with('category');
+
+            // 1. FILTER SEARCH (Nama Produk / Deskripsi)
+            $searchValue = null;
+            if ($request->filled('search')) {
+                $searchValue = is_array($request->search) ? ($request->search['value'] ?? null) : $request->search;
+            }
+
+            if (! empty($searchValue)) {
+                $query->where(function ($q) use ($searchValue) {
+                    $q->where('nama_produk', 'like', "%{$searchValue}%")
+                        ->orWhere('deskripsi', 'like', "%{$searchValue}%");
+                });
+            }
+
+            // 2. FILTER KATEGORI
+            if ($request->filled('category_id') && $request->category_id !== 'ALL') {
+                $query->where('category_id', $request->category_id);
+            }
+
+            // 3. FILTER STATUS AKTIF
+            if ($request->filled('status') && $request->status !== 'ALL') {
+                $query->where('status', $request->status == '1');
+            }
+
+            // 4. FILTER UNGGULAN (IS_FEATURED)
+            if ($request->filled('is_featured') && $request->is_featured !== 'ALL') {
+                $query->where('is_featured', $request->is_featured == '1');
+            }
+
+            return DataTables::of($query)
+                ->addIndexColumn()
+                ->addColumn('image_url', function ($item) {
+                    $publicHtmlFolder = base_path('../public_html/img/menu/'.$item->gambar);
+                    $localFolder = public_path('img/menu/'.$item->gambar);
+
+                    $folder = file_exists($publicHtmlFolder) ? $publicHtmlFolder : $localFolder;
+                    $files = file_exists($folder) ? array_values(array_diff(scandir($folder), ['.', '..'])) : [];
+
+                    return count($files) > 0
+                        ? asset('img/menu/'.$item->gambar.'/'.$files[0])
+                        : asset('img/logo/logo2.png');
+                })
+                ->editColumn('harga_formatted', function ($item) {
+                    return 'Rp '.number_format((float) $item->harga, 0, ',', '.');
+                })
+                ->addColumn('category_name', function ($item) {
+                    return $item->category ? $item->category->name : 'Uncategorized';
+                })
+                ->make(true);
         }
 
         $produk = Produk::with('category')->latest()->get();

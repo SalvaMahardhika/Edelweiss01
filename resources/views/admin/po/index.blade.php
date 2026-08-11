@@ -395,7 +395,7 @@
                     render: function (data, type, row) {
                         if (!row) return '-';
                         let orderTypeVal = row.order_type && typeof row.order_type === 'object' ? (row.order_type.value || row.order_type.name) : row.order_type;
-                        let isPickup = String(orderTypeVal).toLowerCase() === 'pickup';
+                        let isPickup = String(orderTypeVal || '').toLowerCase() === 'pickup';
                         
                         let typeBadge = isPickup 
                             ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800 inline-block"><i class="fa-solid fa-store text-[9px]"></i> PICKUP</span>`
@@ -457,9 +457,12 @@
                     render: function (data, type, row) {
                         if (!row) return '-';
                         let payPlan = row.payment_plan && typeof row.payment_plan === 'object' ? (row.payment_plan.value || row.payment_plan.name) : row.payment_plan;
-                        let isDp = String(payPlan).toLowerCase() === 'dp';
-                        let payStatus = row.payment_status && typeof row.payment_status === 'object' ? (row.payment_status.value || row.payment_status.name) : row.payment_status;
-                        payStatus = String(payStatus || 'unpaid').toLowerCase();
+                        let isDp = String(payPlan || '').toLowerCase() === 'dp';
+                        
+                        // Clean status string murni dari tag HTML atau objek
+                        let rawStatus = data && typeof data === 'object' ? (data.value || data.name) : data;
+                        if (!rawStatus) rawStatus = row.payment_status;
+                        let payStatus = String(rawStatus || 'unpaid').replace(/<[^>]*>?/gm, '').toLowerCase().trim();
 
                         let schemeBadge = isDp 
                             ? `<span class="text-[10px] text-purple-800 font-bold bg-purple-100 px-2 py-0.5 rounded-full inline-block">DP 50%</span>`
@@ -473,7 +476,10 @@
                             amountText = `<p class="text-[11px] font-bold text-emerald-700">${row.total_amount || 'Rp 0'}</p>`;
                         } else if (['partial', 'dp'].includes(payStatus)) {
                             statusBadge = `<span class="px-2.5 py-1 rounded-xl text-[10px] font-black bg-amber-500 text-white shadow-sm inline-block">DP DITERIMA</span>`;
-                            let paidVal = row.amount_paid ? 'Rp ' + new Intl.NumberFormat('id-ID').format(row.amount_paid) : 'Rp 0';
+                            let paidAmountNum = parseFloat(row.amount_paid || 0);
+                            let paidVal = paidAmountNum > 0 
+                                ? 'Rp ' + new Intl.NumberFormat('id-ID').format(paidAmountNum) 
+                                : (row.total_amount ? 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.round(parseFloat(String(row.total_amount).replace(/[^0-9]/g, '')) / 2)) : 'Rp 0');
                             amountText = `<p class="text-[11px] font-bold text-amber-700">DP: ${paidVal}</p>`;
                         } else {
                             statusBadge = `<span class="px-2.5 py-1 rounded-xl text-[10px] font-black bg-rose-600 text-white shadow-sm inline-block">BELUM BAYAR</span>`;
@@ -494,14 +500,14 @@
                     orderable: false,
                     render: function (data, type, row) {
                         if (!row) return '-';
-                        let statusVal = row.status && typeof row.status === 'object' ? (row.status.value || row.status.name) : row.status;
-                        statusVal = String(statusVal || 'pending').toLowerCase();
+                        let statusVal = data && typeof data === 'object' ? (data.value || data.name) : data;
+                        statusVal = String(statusVal || 'pending').replace(/<[^>]*>?/gm, '').toLowerCase().trim();
 
-                        let payStatus = row.payment_status && typeof row.payment_status === 'object' ? (row.payment_status.value || row.payment_status.name) : row.payment_status;
-                        payStatus = String(payStatus || 'unpaid').toLowerCase();
+                        let rawPayStatus = row.payment_status && typeof row.payment_status === 'object' ? (row.payment_status.value || row.payment_status.name) : row.payment_status;
+                        let payStatus = String(rawPayStatus || 'unpaid').replace(/<[^>]*>?/gm, '').toLowerCase().trim();
 
-                        // 🔒 KUNCI JIKA STATUS PEMBAYARAN MASIH UNPAID
-                        let isUnpaid = ['unpaid', 'pending', ''].includes(payStatus);
+                        // 🔒 UNLOCK jika status pembayaran adalah 'paid', 'lunas', 'partial', atau 'dp'
+                        let isUnpaid = !['paid', 'lunas', 'partial', 'dp'].includes(payStatus);
 
                         if (isUnpaid) {
                             return `

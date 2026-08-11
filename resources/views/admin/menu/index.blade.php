@@ -10,86 +10,75 @@
     <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
             <h3 class="text-xl font-bold text-[#3e2723]">Daftar Produk Kue</h3>
-            <p class="text-sm text-gray-500 mt-0.5">Kelola data menu.</p>
+            <p class="text-sm text-gray-500 mt-0.5">Kelola data menu dan katalog kue.</p>
         </div>
         <button onclick="openAddModal()" class="px-5 py-2.5 bg-[#3e2723] text-white font-semibold rounded-xl text-sm shadow-md hover:bg-[#2c1b18] transition duration-300 inline-flex items-center gap-2">
             <i class="fa-solid fa-plus"></i> Tambah Produk Baru
         </button>
     </div>
 
-    {{-- TABLE DATA KATALOG CMS (SINKRONISASI TARGET CONTAINER) --}}
+    {{-- BARISAN FILTER UI & SEARCH REALTIME --}}
+    <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-5 space-y-4">
+        {{-- INPUT PENCARIAN REALTIME --}}
+        <div class="relative w-full">
+            <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+            <input type="text" id="filter_search" placeholder="Cari Nama Produk atau Deskripsi..." class="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] font-medium text-[#3e2723]">
+        </div>
+
+        {{-- FILTER DROPDOWN --}}
+        <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 items-end">
+            <div>
+                <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Filter Kategori</label>
+                <select id="filter_category" class="w-full mt-1 px-4 py-2.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-[#3e2723] font-medium">
+                    <option value="ALL">Semua Kategori</option>
+                    @foreach($categories as $cat)
+                        <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Filter Status PO</label>
+                <select id="filter_status" class="w-full mt-1 px-4 py-2.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-[#3e2723] font-medium">
+                    <option value="ALL">Semua Status</option>
+                    <option value="1">Aktif (Open PO)</option>
+                    <option value="0">Non-Aktif (Closed)</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Filter Unggulan</label>
+                <select id="filter_featured" class="w-full mt-1 px-4 py-2.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-[#3e2723] font-medium">
+                    <option value="ALL">Semua Produk</option>
+                    <option value="1">Unggulan</option>
+                    <option value="0">Biasa</option>
+                </select>
+            </div>
+
+            <div>
+                <button type="button" id="resetMenuFilterBtn" class="w-full py-2.5 px-3 bg-white/60 border border-white text-xs font-bold rounded-xl text-[#3e2723] hover:bg-white transition text-center shadow-sm flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-rotate-left"></i> Reset Filter
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- TABLE DATA KATALOG CMS (SERVER-SIDE DATATABLES) --}}
     <div id="produkTableContainer" class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 overflow-hidden">
-        <div class="overflow-x-auto rounded-2xl border border-white/40 bg-white/20 shadow-inner">
-            <table class="w-full text-left border-collapse">
+        <div class="overflow-x-auto rounded-2xl border border-white/40 bg-white/20 p-2 shadow-inner">
+            <table id="menuTable" class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-white/40 text-xs font-bold uppercase tracking-wider text-[#3e2723]/70">
-                        <th class="px-6 py-4 w-24 text-center">Foto</th>
-                        <th class="px-6 py-4">Nama Produk</th>
+                        <th class="px-6 py-4 w-20 text-center">Foto</th>
+                        <th class="px-6 py-4">Nama Produk & Kategori</th>
+                        <th class="px-6 py-4 text-center">Harga</th>
                         <th class="px-6 py-4 text-center">Unggulan</th>
                         <th class="px-6 py-4 text-center">Status</th>
-                        <th class="px-6 py-4 text-center">Aksi</th>
+                        <th class="px-6 py-4 text-center w-28">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-white/30 text-sm font-medium">
-                    @foreach($produk as $item)
-                    @php
-                        // PENGECEKAN PATH DYNAMIC UNTUK PUBLIC_HTML HOSTING DAN LOCALHOST
-                        $publicHtmlFolder = base_path('../public_html/img/menu/' . $item->gambar);
-                        $localFolder = public_path('img/menu/' . $item->gambar);
-
-                        if (file_exists($publicHtmlFolder)) {
-                            $folder = $publicHtmlFolder;
-                        } else {
-                            $folder = $localFolder;
-                        }
-
-                        $files = file_exists($folder) ? array_values(array_diff(scandir($folder), ['.', '..'])) : [];
-                    @endphp
-                    <tr class="hover:bg-white/30 transition">
-                        <td class="px-6 py-3 text-center">
-                            <img src="{{ count($files) > 0 ? asset('img/menu/' . $item->gambar . '/' . $files[0]) : asset('img/logo/logo2.png') }}" 
-                                 class="w-12 h-12 object-cover rounded-xl border border-white bg-gray-100 mx-auto shadow-sm">
-                        </td>
-                        <td class="px-6 py-3">
-                            <p class="font-bold text-[#2d1f1b]">{{ $item->nama_produk }}</p>
-                            <p class="text-xs text-gray-400 line-clamp-1 max-w-xs font-normal">{{ $item->deskripsi }}</p>
-                        </td>
-                        
-                        {{-- TOMBOL TOGGLE UNGGULAN --}}
-                        <td class="px-6 py-3 text-center">
-                            <form method="POST" action="{{ route('produk.toggleStatus', $item->id) }}">
-                                @csrf
-                                @method('PATCH')
-                                <input type="hidden" name="field" value="is_featured">
-                                <button type="submit" class="relative inline-flex items-center h-6 w-12 rounded-full transition-colors duration-300 border border-white/30 {{ $item->is_featured ? 'bg-amber-500' : 'bg-gray-300' }}">
-                                    <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-300 {{ $item->is_featured ? 'translate-x-6' : 'translate-x-1' }}"></span>
-                                </button>
-                            </form>
-                        </td>
-
-                        {{-- Slot PO (Status Aktif) --}}
-                        <td class="px-6 py-3 text-center">
-                            <form method="POST" action="{{ route('produk.toggleStatus', $item->id) }}">
-                                @csrf
-                                @method('PATCH')
-                                <button type="submit" class="relative inline-flex items-center h-6 w-12 rounded-full transition-colors duration-300 border border-white/30 {{ $item->status ? 'bg-green-500' : 'bg-red-500' }}">
-                                    <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-300 {{ $item->status ? 'translate-x-6' : 'translate-x-1' }}"></span>
-                                </button>
-                            </form>
-                        </td>
-                        
-                        <td class="px-6 py-3 text-center">
-                            <div class="flex items-center justify-center gap-2">
-                                <a href="{{ route('produk.edit', $item->id) }}" class="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition shadow-sm bg-white/60 border border-white" title="Edit Data & Album">
-                                    <i class="fa-regular fa-pen-to-square"></i>
-                                </a>
-                                <button type="button" onclick="triggerDelete('{{ route('produk.destroy', $item->id) }}')" class="p-2 text-red-600 hover:bg-red-50 rounded-xl transition shadow-sm bg-white/60 border border-white" title="Hapus Produk">
-                                    <i class="fa-regular fa-trash-can"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    @endforeach
+                    {{-- Dimuat Dinamis via DataTables AJAX --}}
                 </tbody>
             </table>
         </div>
@@ -174,6 +163,10 @@
 </form>
 
 <script>
+    let menuTable = null;
+    let autoRefreshTimer = null;
+    let searchTimer = null;
+
     // --- MODAL CONTROL FORM TAMBAH ---
     function openAddModal() {
         document.getElementById('addProductModal').classList.remove('hidden');
@@ -213,7 +206,6 @@
                 <button onclick="closeSystemAlert()" class="flex-1 py-2.5 text-sm font-bold rounded-xl bg-white/60 border border-white text-[#3e2723] hover:bg-white/80 transition">Batal</button>
                 <button id="alertConfirmSubmitBtn" class="flex-1 py-2.5 text-sm font-bold rounded-xl bg-red-600 text-white hover:bg-red-700 transition shadow-sm">Hapus</button>
             `;
-            // Pasang event ke tombol konfirmasi
             document.getElementById('alertConfirmSubmitBtn').onclick = confirmAction;
         }
 
@@ -238,25 +230,194 @@
         );
     }
 
-    // --- REALTIME POLLING SYNC UNTUK HASIL INSTAN ---
-    let menuSyncTimer = null;
-    function syncRealtimeAdminMenu() {
-        fetch(window.location.href, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
-        .then(response => response.text())
-        .then(html => {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
+    function escapeHtml(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
 
-            const newTable = doc.getElementById('produkTableContainer');
-            const currentTable = document.getElementById('produkTableContainer');
+    // --- INISIALISASI SERVER-SIDE DATATABLES YAJRA ---
+    function initMenuDataTable() {
+        if (typeof $ === 'undefined' || !$.fn.DataTable) return;
 
-            if (newTable && currentTable && newTable.innerHTML.trim() !== currentTable.innerHTML.trim()) {
-                currentTable.innerHTML = newTable.innerHTML;
+        $.fn.dataTable.ext.errMode = 'throw';
+
+        menuTable = $('#menuTable').DataTable({
+            processing: true,
+            serverSide: true,
+            destroy: true,
+            autoWidth: false,
+            dom: 'rtip',
+            order: [[1, 'asc']],
+            ajax: {
+                url: "{{ route('produk.index') }}",
+                type: "GET",
+                global: false,
+                data: function (d) {
+                    d.search = $('#filter_search').val();
+                    d.category_id = $('#filter_category').val();
+                    d.status = $('#filter_status').val();
+                    d.is_featured = $('#filter_featured').val();
+                }
+            },
+            columns: [
+                {
+                    data: 'image_url',
+                    name: 'image_url',
+                    orderable: false,
+                    searchable: false,
+                    className: 'px-6 py-3 text-center',
+                    render: function(data) {
+                        return `<img src="${data}" class="w-12 h-12 object-cover rounded-xl border border-white bg-gray-100 mx-auto shadow-sm">`;
+                    }
+                },
+                {
+                    data: 'nama_produk',
+                    name: 'nama_produk',
+                    className: 'px-6 py-3',
+                    render: function(data, type, row) {
+                        let name = escapeHtml(row.nama_produk || '-');
+                        let desc = escapeHtml(row.deskripsi || '-');
+                        let cat = escapeHtml(row.category_name || 'Uncategorized');
+                        return `
+                            <div>
+                                <p class="font-bold text-[#2d1f1b]">${name}</p>
+                                <p class="text-xs text-gray-400 line-clamp-1 max-w-xs font-normal">${desc}</p>
+                                <span class="inline-block mt-1 text-[10px] font-bold text-amber-900 bg-amber-100/80 px-2 py-0.5 rounded-md">${cat}</span>
+                            </div>
+                        `;
+                    }
+                },
+                {
+                    data: 'harga_formatted',
+                    name: 'harga',
+                    className: 'px-6 py-3 text-center whitespace-nowrap font-bold text-[#3e2723]',
+                    render: function(data, type, row) {
+                        return data || ('Rp ' + new Intl.NumberFormat('id-ID').format(row.harga || 0));
+                    }
+                },
+                {
+                    data: 'is_featured',
+                    name: 'is_featured',
+                    className: 'px-6 py-3 text-center',
+                    orderable: false,
+                    render: function(data, type, row) {
+                        let isFeatured = Boolean(row.is_featured);
+                        let toggleUrl = "{{ route('produk.toggleStatus', ':id') }}".replace(':id', row.id);
+                        let csrf = '{{ csrf_field() }}';
+
+                        return `
+                            <form method="POST" action="${toggleUrl}">
+                                ${csrf}
+                                <input type="hidden" name="_method" value="PATCH">
+                                <input type="hidden" name="field" value="is_featured">
+                                <button type="submit" class="relative inline-flex items-center h-6 w-12 rounded-full transition-colors duration-300 border border-white/30 ${isFeatured ? 'bg-amber-500' : 'bg-gray-300'}">
+                                    <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-300 ${isFeatured ? 'translate-x-6' : 'translate-x-1'}"></span>
+                                </button>
+                            </form>
+                        `;
+                    }
+                },
+                {
+                    data: 'status',
+                    name: 'status',
+                    className: 'px-6 py-3 text-center',
+                    orderable: false,
+                    render: function(data, type, row) {
+                        let isStatusActive = Boolean(row.status);
+                        let toggleUrl = "{{ route('produk.toggleStatus', ':id') }}".replace(':id', row.id);
+                        let csrf = '{{ csrf_field() }}';
+
+                        return `
+                            <form method="POST" action="${toggleUrl}">
+                                ${csrf}
+                                <input type="hidden" name="_method" value="PATCH">
+                                <button type="submit" class="relative inline-flex items-center h-6 w-12 rounded-full transition-colors duration-300 border border-white/30 ${isStatusActive ? 'bg-green-500' : 'bg-red-500'}">
+                                    <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-300 ${isStatusActive ? 'translate-x-6' : 'translate-x-1'}"></span>
+                                </button>
+                            </form>
+                        `;
+                    }
+                },
+                {
+                    data: 'id',
+                    name: 'action',
+                    className: 'px-6 py-3 text-center',
+                    orderable: false,
+                    searchable: false,
+                    render: function(data, type, row) {
+                        let editUrl = "{{ route('produk.edit', ':id') }}".replace(':id', row.id);
+                        let destroyUrl = "{{ route('produk.destroy', ':id') }}".replace(':id', row.id);
+
+                        return `
+                            <div class="flex items-center justify-center gap-2">
+                                <a href="${editUrl}" class="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition shadow-sm bg-white/60 border border-white" title="Edit Data & Album">
+                                    <i class="fa-regular fa-pen-to-square"></i>
+                                </a>
+                                <button type="button" onclick="triggerDelete('${destroyUrl}')" class="p-2 text-red-600 hover:bg-red-50 rounded-xl transition shadow-sm bg-white/60 border border-white" title="Hapus Produk">
+                                    <i class="fa-regular fa-trash-can"></i>
+                                </button>
+                            </div>
+                        `;
+                    }
+                }
+            ],
+            language: {
+                search: "",
+                lengthMenu: "Tampilkan _MENU_ data",
+                info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ produk",
+                paginate: {
+                    previous: "<i class='fa-solid fa-chevron-left'></i>",
+                    next: "<i class='fa-solid fa-chevron-right'></i>"
+                }
             }
-        })
-        .catch(err => console.error("Realtime Menu Sync Error:", err));
+        });
+
+        // 🔍 LISTENERS FILTER & SEARCH DEBOUNCE (400ms)
+        $('#filter_search').off('keyup').on('keyup', function() {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(function() {
+                menuTable.draw();
+            }, 400);
+        });
+
+        $('#filter_category, #filter_status, #filter_featured').off('change').on('change', function() {
+            menuTable.draw();
+        });
+
+        $('#resetMenuFilterBtn').off('click').on('click', function() {
+            $('#filter_search').val('');
+            $('#filter_category').val('ALL');
+            $('#filter_status').val('ALL');
+            $('#filter_featured').val('ALL');
+            menuTable.draw();
+        });
+
+        // 🔄 AUTO POLLING DATATABLES REALTIME (SETIAP 5 DETIK)
+        if (autoRefreshTimer) {
+            clearInterval(autoRefreshTimer);
+        }
+
+        autoRefreshTimer = setInterval(function() {
+            const isAddModalOpen = !document.getElementById('addProductModal').classList.contains('hidden');
+            const isAlertModalOpen = !document.getElementById('systemAlertModal').classList.contains('hidden');
+
+            if (menuTable && typeof menuTable.ajax !== 'undefined' && document.visibilityState === 'visible' && !isAddModalOpen && !isAlertModalOpen) {
+                let settings = menuTable.settings()[0];
+                if (settings.jqXHR && settings.jqXHR.readyState !== 4) return;
+
+                let oldProcessing = settings.oFeatures.bProcessing;
+                settings.oFeatures.bProcessing = false;
+
+                menuTable.ajax.reload(function() {
+                    settings.oFeatures.bProcessing = oldProcessing;
+                }, false);
+            }
+        }, 5000);
     }
 
     // --- INTERSEPSI SESSION LARAVEL AUTO FLUSH ---
@@ -269,22 +430,15 @@
             openSystemAlert('Gagal Validasi', "{{ $errors->first() }}", 'error');
         @endif
 
-        // Polling setiap 3 detik jika halaman sedang aktif & modal tidak sedang terbuka
-        if (menuSyncTimer) clearInterval(menuSyncTimer);
-        menuSyncTimer = setInterval(function() {
-            const isAddModalOpen = !document.getElementById('addProductModal').classList.contains('hidden');
-            const isAlertModalOpen = !document.getElementById('systemAlertModal').classList.contains('hidden');
-            
-            if (document.visibilityState === 'visible' && !isAddModalOpen && !isAlertModalOpen) {
-                syncRealtimeAdminMenu();
-            }
-        }, 3000);
+        initMenuDataTable();
 
-        // Fallback Listener Echo jika Laravel Echo dikonfigurasi
+        // Listener Realtime Laravel Echo
         if (typeof Echo !== 'undefined') {
             Echo.channel('menu-updates')
                 .listen('.menu.updated', (e) => {
-                    syncRealtimeAdminMenu();
+                    if (menuTable) {
+                        menuTable.ajax.reload(null, false);
+                    }
                 });
         }
     });

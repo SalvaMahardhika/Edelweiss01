@@ -8,6 +8,9 @@
         min-height: 280px !important;
         max-height: calc(100vh - 24rem) !important;
     }
+    .dataTables_processing {
+        display: none !important;
+    }
 </style>
 
 <div class="max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 space-y-6">
@@ -21,6 +24,42 @@
         <button onclick="openModal()" class="px-5 py-2.5 bg-[#3e2723] text-white font-semibold rounded-xl text-sm shadow-md hover:bg-[#2c1b18] transition inline-flex items-center gap-2">
             <i class="fa-solid fa-plus"></i> Tambah Kategori
         </button>
+    </div>
+
+    {{-- BARISAN FILTER UI & SEARCH REALTIME --}}
+    <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-5 space-y-4">
+        {{-- INPUT PENCARIAN REALTIME --}}
+        <div class="relative w-full">
+            <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+            <input type="text" id="filter_search" placeholder="Cari Nama Kategori atau Deskripsi..." class="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] font-medium text-[#3e2723]">
+        </div>
+
+        {{-- FILTER DROPDOWN --}}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
+            <div>
+                <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Status Visibilitas</label>
+                <select id="filter_status" class="w-full mt-1 px-4 py-2.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-[#3e2723] font-medium">
+                    <option value="ALL">Semua Status</option>
+                    <option value="1">Aktif</option>
+                    <option value="0">Non-Aktif</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Urutan Tampilan</label>
+                <select id="filter_sort" class="w-full mt-1 px-4 py-2.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-[#3e2723] font-medium">
+                    <option value="default">Urutan Default (Sort Order)</option>
+                    <option value="name_asc">Nama (A - Z)</option>
+                    <option value="latest">Terbaru Dibuat</option>
+                </select>
+            </div>
+
+            <div>
+                <button type="button" id="resetCategoryFilterBtn" class="w-full py-2.5 px-3 bg-white/60 border border-white text-xs font-bold rounded-xl text-[#3e2723] hover:bg-white transition text-center shadow-sm flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-rotate-left"></i> Reset Filter
+                </button>
+            </div>
+        </div>
     </div>
 
     {{-- TABEL --}}
@@ -93,6 +132,7 @@
 <script>
     let categoryTable = null;
     let pendingDeleteUrl = null;
+    let categorySearchTimer = null;
 
     function openModal() { 
         document.getElementById('addCategoryForm').reset();
@@ -209,7 +249,7 @@
         // 1. INITIALIZE DATATABLES AJAX SERVER-SIDE
         if (typeof $ !== 'undefined' && $.fn.DataTable) {
             categoryTable = $('#categoryTable').DataTable({
-                processing: true,
+                processing: false,
                 serverSide: true,
                 destroy: true,
                 autoWidth: false,
@@ -218,7 +258,13 @@
                 scrollCollapse: true,
                 ajax: {
                     url: "{{ route('kategori.index') }}",
-                    type: "GET"
+                    type: "GET",
+                    global: false,
+                    data: function (d) {
+                        d.custom_search = $('#filter_search').val();
+                        d.status_filter = $('#filter_status').val();
+                        d.sort_filter = $('#filter_sort').val();
+                    }
                 },
                 columns: [
                     { data: 'name', name: 'name', className: 'font-bold text-[#3e2723]' },
@@ -235,6 +281,25 @@
                         next: "<i class='fa-solid fa-chevron-right'></i>"
                     }
                 }
+            });
+
+            // 🔍 LISTENERS SEARCH & FILTER DEBOUNCE (400ms)
+            $('#filter_search').off('keyup').on('keyup', function() {
+                clearTimeout(categorySearchTimer);
+                categorySearchTimer = setTimeout(function() {
+                    categoryTable.draw();
+                }, 400);
+            });
+
+            $('#filter_status, #filter_sort').off('change').on('change', function() {
+                categoryTable.draw();
+            });
+
+            $('#resetCategoryFilterBtn').off('click').on('click', function() {
+                $('#filter_search').val('');
+                $('#filter_status').val('ALL');
+                $('#filter_sort').val('default');
+                categoryTable.draw();
             });
         }
 

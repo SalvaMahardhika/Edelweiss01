@@ -31,6 +31,20 @@ class GaleriController extends Controller
         return public_path('img/galeri/'.$folderName);
     }
 
+    /**
+     * Hitung berkas gambar fisik dalam folder album
+     */
+    private function countFolderFiles(string $folderName): int
+    {
+        $folderPath = $this->getFolderPath($folderName);
+        if (! File::exists($folderPath)) {
+            return 0;
+        }
+        $files = array_diff(scandir($folderPath), ['.', '..']);
+
+        return count($files);
+    }
+
     // ==========================================
     // PUBLIC METHODS (DISPLAY CUSTOMER)
     // ==========================================
@@ -39,7 +53,6 @@ class GaleriController extends Controller
     {
         $galeri = Galeri::latest()->get();
 
-        // Mengarah ke resources/views/galeri.blade.php (Halaman Publik Bersih)
         return view('galeri', compact('galeri'));
     }
 
@@ -47,9 +60,6 @@ class GaleriController extends Controller
     // CMS ADMIN CRUD METHODS (ALBUM ORIENTED)
     // ==========================================
 
-    /**
-     * Menampilkan daftar utama data galeri di CMS Admin (AJAX Server-Side & Standard Render)
-     */
     public function adminIndex(Request $request)
     {
         if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
@@ -57,7 +67,99 @@ class GaleriController extends Controller
         }
 
         if ($request->ajax()) {
-            $galeriQuery = Galeri::query()->latest();
+            $galeriQuery = Galeri::query();
+
+            // 1. FILTER SEARCH (Judul atau Deskripsi)
+            if ($request->filled('custom_search')) {
+                $keyword = $request->custom_search;
+                $galeriQuery->where(function ($q) use ($keyword) {
+                    $q->where('judul', 'like', "%{$keyword}%")
+                        ->orWhere('deskripsi', 'like', "%{$keyword}%");
+                });
+            }
+
+            // 2. FILTER URUTAN TANGGAL
+            if ($request->filled('date_sort')) {
+                switch ($request->date_sort) {
+                    case 'oldest':
+                        $galeriQuery->oldest();
+                        break;
+                    case 'this_month':
+                        $galeriQuery->whereMonth('created_at', now()->month)
+                            ->whereYear('created_at', now()->year)
+                            ->latest();
+                        break;
+                    default:
+                        $galeriQuery->latest();
+                        break;
+                }
+            } else {
+                $galeriQuery->latest();
+            }
+
+            // FILTER KEPADATAN FOTO BERDASARKAN HASIL SCAN FOLDER SERVER
+            if ($request->filled('photo_filter') && $request->photo_filter !== 'ALL') {
+                $filterType = $request->photo_filter;
+                $allGaleri = $galeriQuery->get()->filter(function ($row) use ($filterType) {
+                    $count = $this->countFolderFiles($row->album);
+                    if ($filterType === 'empty') {
+                        return $count === 0;
+                    }
+                    if ($filterType === 'compact') {
+                        return $count >= 1 && $count <= 5;
+                    }
+                    if ($filterType === 'full') {
+                        return $count > 5;
+                    }
+
+                    return true;
+                });
+
+                return DataTables::of($allGaleri)
+                    ->addIndexColumn()
+                    ->addColumn('cover', function ($row) {
+                        $folderPath = $this->getFolderPath($row->album);
+                        $files = File::exists($folderPath) ? array_values(array_diff(scandir($folderPath), ['.', '..'])) : [];
+                        $imgUrl = count($files) > 0 ? asset('img/galeri/'.$row->album.'/'.$files[0]) : asset('img/logo/logo2.png');
+
+                        return '
+                            <div class="flex justify-center">
+                                <img src="'.$imgUrl.'" class="w-12 h-12 object-cover rounded-xl border border-white bg-gray-100 shadow-sm">
+                            </div>
+                        ';
+                    })
+                    ->editColumn('judul', function ($row) {
+                        return '
+                            <p class="font-bold text-[#2d1f1b]">'.e($row->judul).'</p>
+                            <p class="text-[11px] text-amber-800 font-mono mt-0.5">dir: '.e($row->album).'</p>
+                        ';
+                    })
+                    ->editColumn('deskripsi', function ($row) {
+                        return '<p class="text-xs text-gray-500 line-clamp-2 max-w-sm font-normal">'.e($row->deskripsi).'</p>';
+                    })
+                    ->addColumn('total_photos', function ($row) {
+                        $count = $this->countFolderFiles($row->album);
+
+                        return '<div class="text-center text-[#3e2723] font-bold">'.$count.' Foto</div>';
+                    })
+                    ->addColumn('action', function ($row) {
+                        $editUrl = route('galeri.edit', $row->id);
+                        $deleteUrl = route('galeri.destroy', $row->id);
+
+                        return '
+                            <div class="flex items-center justify-center gap-2">
+                                <a href="'.$editUrl.'" class="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition shadow-sm bg-white/60 border border-white" title="Kelola Isi Album">
+                                    <i class="fa-regular fa-pen-to-square"></i>
+                                </a>
+                                <button type="button" onclick="triggerDelete(\''.$deleteUrl.'\')" class="p-2 text-red-600 hover:bg-red-50 rounded-xl transition shadow-sm bg-white/60 border border-white" title="Hapus Album">
+                                    <i class="fa-regular fa-trash-can"></i>
+                                </button>
+                            </div>
+                        ';
+                    })
+                    ->rawColumns(['cover', 'judul', 'deskripsi', 'total_photos', 'action'])
+                    ->make(true);
+            }
 
             return DataTables::of($galeriQuery)
                 ->addIndexColumn()
@@ -82,10 +184,9 @@ class GaleriController extends Controller
                     return '<p class="text-xs text-gray-500 line-clamp-2 max-w-sm font-normal">'.e($row->deskripsi).'</p>';
                 })
                 ->addColumn('total_photos', function ($row) {
-                    $folderPath = $this->getFolderPath($row->album);
-                    $files = File::exists($folderPath) ? array_values(array_diff(scandir($folderPath), ['.', '..'])) : [];
+                    $count = $this->countFolderFiles($row->album);
 
-                    return '<div class="text-center text-[#3e2723] font-bold">'.count($files).' Foto</div>';
+                    return '<div class="text-center text-[#3e2723] font-bold">'.$count.' Foto</div>';
                 })
                 ->addColumn('action', function ($row) {
                     $editUrl = route('galeri.edit', $row->id);
@@ -111,9 +212,6 @@ class GaleriController extends Controller
         return view('admin.galeri.index', compact('galeri'));
     }
 
-    /**
-     * Membuka panel edit data deskripsi & kelola gambar dalam album
-     */
     public function edit($id)
     {
         if (! in_array(auth()->user()->role, ['admin', 'super_admin'])) {
@@ -189,7 +287,6 @@ class GaleriController extends Controller
         $folderName = $galeri->album;
         $folderPath = $this->getFolderPath($folderName);
 
-        // Aksi 1: Hapus File Gambar Spesifik (Satuan via AJAX / Form Terpisah)
         if ($request->has('delete_image')) {
             $filePath = $folderPath.'/'.$request->delete_image;
             if (File::exists($filePath)) {
@@ -203,20 +300,17 @@ class GaleriController extends Controller
             return back()->with('success', 'Foto berhasil dihapus dari album.');
         }
 
-        // Aksi 2: Form Edit Utama (Simpan Teks Judul & Deskripsi + Gambar Tambahan Sekaligus)
         $request->validate([
             'judul' => 'required|max:255',
             'deskripsi' => 'required',
             'gambar.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
         ]);
 
-        // 1. Simpan Pembaruan Teks ke Database
         $galeri->update([
             'judul' => $request->judul,
             'deskripsi' => $request->deskripsi,
         ]);
 
-        // 2. Simpan Gambar Tambahan (Jika Ada)
         if ($request->hasFile('gambar')) {
             if (! File::exists($folderPath)) {
                 File::makeDirectory($folderPath, 0755, true);
@@ -226,7 +320,6 @@ class GaleriController extends Controller
             $count = count($existingFiles);
 
             foreach ($request->file('gambar') as $i => $file) {
-                // Menggunakan timestamp acak untuk menghindari duplikasi penamaan berkas
                 $fileName = 'photo_'.time().'_'.($count + $i + 1).'.webp';
                 $destinationPath = $folderPath.'/'.$fileName;
 
@@ -242,7 +335,6 @@ class GaleriController extends Controller
             }
         }
 
-        // Response Sukses Tunggal Setelah Teks & Gambar Selesai Diproses
         if ($request->ajax()) {
             return response()->json(['success' => true, 'message' => 'Album galeri berhasil diperbarui.']);
         }
