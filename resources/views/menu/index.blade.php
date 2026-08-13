@@ -200,16 +200,10 @@
                         </p>
                     </div>
 
-                    {{-- 🟢 INPUT JUMLAH & TOMBOL TAMBAH KERANJANG --}}
-                    <div class="mt-3 space-y-2">
-                        <div class="flex items-center justify-center border border-white/60 bg-white/50 rounded-xl overflow-hidden shadow-inner">
-                            <button type="button" onclick="adjustProductQty({{ $item->id }}, -1)" class="px-3 py-1.5 text-sm font-bold text-[#3e2723] hover:bg-white/80 transition">-</button>
-                            <input type="number" id="card_qty_{{ $item->id }}" value="1" min="1" class="w-12 text-center text-xs sm:text-sm font-bold bg-transparent text-[#3e2723] focus:outline-none">
-                            <button type="button" onclick="adjustProductQty({{ $item->id }}, 1)" class="px-3 py-1.5 text-sm font-bold text-[#3e2723] hover:bg-white/80 transition">+</button>
-                        </div>
-
+                    {{-- 🟢 TOMBOL TAMBAH KERANJANG (LANGSUNG 1x ITEM) --}}
+                    <div class="mt-4">
                         <button onclick="addToCartFromCard({{ $item->id }}, '{{ addslashes($item->nama_produk) }}', {{ $item->harga }}, '{{ count($images) > 0 ? asset('img/menu/' . $item->gambar . '/' . $images[0]) : '' }}')"
-                                class="w-full py-2 text-xs sm:text-sm font-bold text-white bg-[#3e2723] hover:bg-[#2c1b18] rounded-xl shadow-md transition duration-300 flex items-center justify-center gap-2">
+                                class="w-full py-2.5 text-xs sm:text-sm font-bold text-white bg-[#3e2723] hover:bg-[#2c1b18] rounded-xl shadow-md transition duration-300 flex items-center justify-center gap-2">
                             <i class="fa-solid fa-basket-shopping"></i> + Keranjang
                         </button>
                     </div>
@@ -388,20 +382,9 @@
         .catch(err => console.error("Realtime Sync Background Error:", err));
     }
 
-    // ================= SCRIPT INPUT JUMLAH PADA KARTU PRODUK =================
-    function adjustProductQty(id, change) {
-        const input = document.getElementById(`card_qty_${id}`);
-        if (!input) return;
-        let val = parseInt(input.value) || 1;
-        val += change;
-        if (val < 1) val = 1;
-        input.value = val;
-    }
-
-    // 🟢 NOTIFIKASI TOAST POPUP (TANPA MEMBUKA CART DRAWER)
+    // 🟢 MENAMBAHKAN 1x ITEM KE KERANJANG DARI KATALOG
     function addToCartFromCard(id, name, price, image) {
-        const input = document.getElementById(`card_qty_${id}`);
-        const qtyToAdd = input ? (parseInt(input.value) || 1) : 1;
+        const qtyToAdd = 1;
 
         const existingItem = cart.find(item => item.id === id);
         if (existingItem) {
@@ -410,10 +393,8 @@
             cart.push({ id, name, price, image, quantity: qtyToAdd });
         }
 
-        if (input) input.value = 1;
-
         updateCartUI();
-        showCartToast(`${qtyToAdd}x ${name} ditambahkan`);
+        showCartToast(`1x ${name} ditambahkan ke keranjang`);
     }
 
     function showCartToast(msg) {

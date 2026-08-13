@@ -154,7 +154,7 @@
 
                 </div>
 
-                {{-- WHATSAPP 1 --}}
+                {{-- WHATSAPP 1 (admin website) --}}
                 <div class="flex flex-col sm:flex-row
                             sm:items-center
                             sm:justify-between
@@ -167,16 +167,16 @@
                     <div>
 
                         <p class="font-bold text-lg">
-                            WhatsApp 1
+                            WhatsApp 1 (admin website)
                         </p>
 
                         <p class="text-[#6b4f4f] text-sm sm:text-base">
-                            08xxxxxxxxxx
+                            087794082895
                         </p>
 
                     </div>
 
-                    <a href="https://wa.me/628xxxxxxxxxx"
+                    <a href="https://wa.me/6287794082895"
                        target="_blank"
                        class="w-full sm:w-auto
                               text-center
@@ -195,7 +195,7 @@
 
                 </div>
 
-                {{-- WHATSAPP 2 --}}
+                {{-- WHATSAPP 2 (Ibu Tutut) --}}
                 <div class="flex flex-col sm:flex-row
                             sm:items-center
                             sm:justify-between
@@ -208,16 +208,16 @@
                     <div>
 
                         <p class="font-bold text-lg">
-                            WhatsApp 2
+                            WhatsApp 2 (Ibu Tutut)
                         </p>
 
                         <p class="text-[#6b4f4f] text-sm sm:text-base">
-                            08xxxxxxxxxx
+                            085749509144
                         </p>
 
                     </div>
 
-                    <a href="https://wa.me/628xxxxxxxxxx"
+                    <a href="https://wa.me/62885749509144"
                        target="_blank"
                        class="w-full sm:w-auto
                               text-center
@@ -251,10 +251,8 @@
                               text-sm sm:text-base
                               mb-5">
 
-                        7P56+CFV, Jl. Dusun Beji Gg. Geneng,
-                        RT.1/RW.1, Bejigeneng, Sumbersuko,
-                        Kec. Purwosari, Pasuruan,
-                        Jawa Timur 67162
+                        Dusun Beji Geneng RT/RW 01, Desa Sumbersuko, 
+                        Kecamatan Purwosari, Kabupaten Pasuruan, 67162
 
                     </p>
 

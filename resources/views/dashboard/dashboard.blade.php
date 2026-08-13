@@ -59,11 +59,18 @@
 
                 @forelse($produk as $item)
                     @php
-                        $folderPath = public_path('img/menu/' . $item->gambar);
+                        // Deteksi Otomatis: cPanel Live Hosting (public_html) vs Localhost/Staging (public_path)
+                        $publicHtmlPath = base_path('../public_html/img/menu/' . $item->gambar);
+                        $localPath = public_path('img/menu/' . $item->gambar);
+
+                        $folderPath = file_exists($publicHtmlPath) ? $publicHtmlPath : $localPath;
                         $firstImage = null;
-                        if(File::exists($folderPath)){
+
+                        if (File::exists($folderPath)) {
                             $files = collect(File::files($folderPath))->filter(fn($f) => in_array(strtolower($f->getExtension()), ['jpg','jpeg','png','webp']));
-                            if($files->count()) $firstImage = $files->first()->getFilename();
+                            if ($files->count()) {
+                                $firstImage = $files->first()->getFilename();
+                            }
                         }
                     @endphp
 

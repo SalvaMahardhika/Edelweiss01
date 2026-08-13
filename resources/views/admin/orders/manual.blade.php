@@ -549,6 +549,10 @@
                     className: 'text-center whitespace-nowrap',
                     orderable: false,
                     render: function (data, type, row) {
+                        let payStatus = row.payment_status && typeof row.payment_status === 'object' ? (row.payment_status.value || row.payment_status.name) : row.payment_status;
+                        payStatus = String(payStatus || 'unpaid').toLowerCase();
+                        let isPaidOrVerified = ['paid', 'lunas', 'dp', 'partial'].includes(payStatus);
+
                         let statusVal = row.status && typeof row.status === 'object' ? (row.status.value || row.status.name) : row.status;
                         statusVal = String(statusVal || 'pending').toLowerCase();
                         
@@ -561,6 +565,20 @@
 
                         let updateUrl = "{{ route('admin.po.updateStatus', ':id') }}".replace(':id', row.id);
                         let csrf = '{{ csrf_field() }}';
+
+                        // 🔒 LOGIKA UNLOCK/LOCK FRONTEND DROPDOWN STATUS
+                        if (!isPaidOrVerified) {
+                            return `
+                                <div class="relative group inline-block w-full">
+                                    <select disabled class="w-full text-xs font-bold px-2 py-1.5 rounded-xl border border-gray-300 shadow-sm bg-gray-400 text-white cursor-not-allowed opacity-90">
+                                        <option value="pending" selected>Pending (Locked)</option>
+                                    </select>
+                                    <div class="hidden group-hover:block absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black/80 text-white text-[10px] font-bold rounded shadow whitespace-nowrap">
+                                        <i class="fa-solid fa-lock text-amber-400 mr-1"></i> Verifikasi bayar dulu untuk membuka
+                                    </div>
+                                </div>
+                            `;
+                        }
 
                         return `
                             <form id="status-form-${row.id}" method="POST" action="${updateUrl}">
@@ -651,11 +669,22 @@
                         let verifyUrl = "{{ route('admin.orders.verifyPayment', ':id') }}".replace(':id', row.id);
                         let waMsg = encodeURIComponent(`Halo Kak ${row.customer_name}, kami dari Admin Edelweiss Bakery ingin mengonfirmasi pesanan No. *${row.order_number}*. Apakah bukti transfer sudah dikirimkan?`);
 
+                        let payStatus = row.payment_status && typeof row.payment_status === 'object' ? (row.payment_status.value || row.payment_status.name) : row.payment_status;
+                        payStatus = String(payStatus || 'unpaid').toLowerCase();
+                        let isPaidOrVerified = ['paid', 'lunas', 'dp', 'partial'].includes(payStatus);
+
+                        // 🔑 LOGIKA SISIPAN TOMBOL VERIFIKASI VS TOMBOL HANYA WA
+                        let verifyActionBtn = !isPaidOrVerified
+                            ? `<button type="button" onclick="triggerAlpineVerify('${verifyUrl}', '${row.order_number}')" class="p-2 bg-emerald-700 text-white rounded-xl shadow hover:bg-emerald-800 transition text-xs font-bold flex items-center gap-1" title="Tandai Pembayaran Lunas/DP">
+                                    <i class="fa-solid fa-check"></i> Verifikasi
+                               </button>`
+                            : `<span class="px-2 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-[10px] font-extrabold flex items-center gap-1 shadow-sm">
+                                    <i class="fa-solid fa-shield-check text-emerald-600"></i> Terverifikasi
+                               </span>`;
+
                         return `
                             <div class="flex items-center justify-center gap-2">
-                                <button type="button" onclick="triggerAlpineVerify('${verifyUrl}', '${row.order_number}')" class="p-2 bg-emerald-700 text-white rounded-xl shadow hover:bg-emerald-800 transition text-xs font-bold flex items-center gap-1" title="Tandai Pembayaran Lunas/DP">
-                                    <i class="fa-solid fa-check"></i> Verifikasi
-                                </button>
+                                ${verifyActionBtn}
                                 <a href="https://wa.me/${cleanPhone}?text=${waMsg}" target="_blank" class="p-2 bg-emerald-500 text-white rounded-xl shadow hover:bg-emerald-600 transition text-xs font-bold" title="Chat WA Pelanggan">
                                     <i class="fa-brands fa-whatsapp text-sm"></i>
                                 </a>

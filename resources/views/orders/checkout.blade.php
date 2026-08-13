@@ -180,7 +180,7 @@
                         <span id="summarySubtotal">Rp 0</span>
                     </div>
                     <div class="flex justify-between text-gray-600">
-                        <span>Pajak & Layanan (10%)</span>
+                        <span>Pajak & Layanan (2%)</span>
                         <span id="summaryTax">Rp 0</span>
                     </div>
                     <div class="flex justify-between font-bold text-base border-t border-dashed pt-2 text-[#3e2723]">
@@ -414,7 +414,7 @@
 
 <script>
     let checkoutCart = [];
-    const TAX_RATE = 0.10; // Persentase Pajak PPN (10%)
+    const TAX_RATE = 0.02; // Persentase Pajak & Layanan (2%)
     const ADMIN_WA = '6287794082895'; // Nomor WA Admin Edelweiss Bakery
     
     // 🔒 DATA TANGGAL TERBLOKIR DARI ADMIN
@@ -675,7 +675,7 @@
 
         waMessage += `SKEMA PEMBAYARAN:\n`;
         waMessage += `- Subtotal Item: Rp ${new Intl.NumberFormat('id-ID').format(subtotal)}\n`;
-        waMessage += `- Pajak dan Layanan (10%): Rp ${new Intl.NumberFormat('id-ID').format(taxAmount)}\n`;
+        waMessage += `- Pajak dan Layanan (2%): Rp ${new Intl.NumberFormat('id-ID').format(taxAmount)}\n`;
         waMessage += `- Total Tagihan: *Rp ${new Intl.NumberFormat('id-ID').format(grandTotal)}*\n`;
         waMessage += `- Skema: *${paymentPlan === 'dp' ? 'Uang Muka (DP 50%)' : 'Bayar Lunas (Full)'}*\n`;
         waMessage += `- *Wajib Bayar Sekarang: Rp ${new Intl.NumberFormat('id-ID').format(payNow)}*\n\n`;

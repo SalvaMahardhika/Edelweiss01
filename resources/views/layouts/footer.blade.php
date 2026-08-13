@@ -34,8 +34,8 @@
 
                 <p class="text-sm text-white/70 leading-relaxed max-w-md">
 
-                    Roti rumahan dengan cita rasa hangat
-                    dan sentuhan premium khas Edelweiss.
+                    Dusun Beji Geneng RT/RW 01, Desa Sumbersuko, 
+                    Kecamatan Purwosari, Kabupaten Pasuruan, 67162
 
                 </p>
 

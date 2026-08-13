@@ -147,16 +147,8 @@
                         </div>
                     </div>
 
-                    {{-- 🟢 INPUT JUMLAH LANGSUNG & KONTROL TRANSAKSI --}}
-                    <div class="pt-4 space-y-3 border-t border-white/30">
-                        <p class="text-xs font-bold text-[#8b6f63] uppercase tracking-wider">Jumlah Pesanan</p>
-                        
-                        <div class="flex items-center w-36 border border-white/60 bg-white/50 rounded-2xl overflow-hidden shadow-inner p-1">
-                            <button type="button" onclick="adjustDetailQty(-1)" class="w-10 h-10 flex items-center justify-center text-lg font-bold text-[#3e2723] hover:bg-white/80 rounded-xl transition">-</button>
-                            <input type="number" id="detail_qty_input" value="1" min="1" class="w-16 text-center text-base font-bold bg-transparent text-[#3e2723] focus:outline-none">
-                            <button type="button" onclick="adjustDetailQty(1)" class="w-10 h-10 flex items-center justify-center text-lg font-bold text-[#3e2723] hover:bg-white/80 rounded-xl transition">+</button>
-                        </div>
-
+                    {{-- 🟢 TOMBOL LANGSUNG TAMBAH KE KERANJANG (1x ITEM) --}}
+                    <div class="pt-4 border-t border-white/30">
                         <button id="addToCartBtn"
                                 onclick="addSingleProductToCart({{ $produk->id }}, '{{ addslashes($produk->nama_produk) }}', {{ $produk->harga }}, '{{ count($images) > 0 ? asset('img/menu/' . $produk->gambar . '/' . $images[0]) : '' }}')" 
                                 class="w-full py-4 bg-[#3e2723] text-white font-bold rounded-2xl shadow-xl hover:bg-[#2c1b18] hover:scale-[1.01] transition duration-300 flex items-center justify-center gap-2 text-base">
@@ -304,17 +296,7 @@
         closeClearCartModal();
     }
 
-    // Adjust jumlah kuantitas di halaman detail
-    function adjustDetailQty(change) {
-        const input = document.getElementById('detail_qty_input');
-        if (!input) return;
-        let val = parseInt(input.value) || 1;
-        val += change;
-        if (val < 1) val = 1;
-        input.value = val;
-    }
-
-    // 🟢 TAMBAH DENGAN VALiDASI REALTIME TERHADAP STATUS PRODUK
+    // 🟢 TAMBAH DENGAN VALIDASI REALTIME TERHADAP STATUS PRODUK (SELALU 1x ITEM)
     function addSingleProductToCart(pId, pName, pPrice, pImg) {
         const container = document.getElementById('productDetailContainer');
         const isProductActive = container ? container.getAttribute('data-status') === '1' : true;
@@ -327,8 +309,7 @@
             return;
         }
 
-        const qtyInput = document.getElementById('detail_qty_input');
-        const qtyToAdd = qtyInput ? (parseInt(qtyInput.value) || 1) : 1;
+        const qtyToAdd = 1;
 
         const existingItem = cart.find(item => item.id === pId);
         if (existingItem) {
@@ -336,12 +317,9 @@
         } else {
             cart.push({ id: pId, name: pName, price: pPrice, image: pImg, quantity: qtyToAdd });
         }
-        
-        // Reset input kuantitas halaman detail kembali ke 1
-        if (qtyInput) qtyInput.value = 1;
 
         updateCartUI();
-        showCartToast(`${qtyToAdd}x ${pName} ditambahkan`, "success");
+        showCartToast(`1x ${pName} ditambahkan`, "success");
     }
 
     function showCartToast(msg, type = "success") {
@@ -477,9 +455,6 @@
 
     // ================= ⚡ REALTIME SYNC DETAIL MENU ENGINE =================
     function syncRealtimeProductDetail() {
-        const currentQtyInput = document.getElementById('detail_qty_input');
-        const savedQtyValue = currentQtyInput ? currentQtyInput.value : 1;
-
         fetch(window.location.href, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
@@ -518,12 +493,6 @@
                 
                 // Inisialisasi ulang Swiper Slider & Thumbnail Listeners
                 initSwiper();
-
-                // Kembalikan nilai input kuantitas pelanggan
-                const refreshedQtyInput = document.getElementById('detail_qty_input');
-                if (refreshedQtyInput) {
-                    refreshedQtyInput.value = savedQtyValue;
-                }
             }
         })
         .catch(err => console.error("Realtime Detail Sync Error:", err));
