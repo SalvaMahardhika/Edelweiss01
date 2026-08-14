@@ -55,7 +55,7 @@
                          class="h-14 sm:h-16 mx-auto mb-4 drop-shadow-xl">
 
                     <h1 class="text-lg sm:text-xl font-semibold text-[#3e2723] tracking-wide">
-                        Admin Edelweiss
+                        Silahkan Login
                     </h1>
                 </div>
 

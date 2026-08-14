@@ -9,9 +9,11 @@ use App\Events\OrderUpdated;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Produk;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class OrderService
 {
@@ -23,7 +25,7 @@ class OrderService
     ) {}
 
     // ==========================================
-    // 1. LOGIKA CREATION & KALKULASI PESANAN (CUSTOMER / FRONTEND)
+    // 1. LOGIKA CREATION & KALKULASI PESANAN (CUSTOMER / FRONTEND & OFFLINE REKAP)
     // ==========================================
 
     /**
@@ -97,6 +99,95 @@ class OrderService
                 $order->status = $orderData['status'];
                 $order->save();
             }
+
+            return $order;
+        });
+    }
+
+    /**
+     * 📝 Membuat Order Offline / Rekap Lampau (Direct Store Sales)
+     * 
+     * Menerima custom price per item, penanganan email dummy otomatis jika kosong, 
+     * serta mencatat transaksi langsung berstatus 'completed' & 'paid'.
+     *
+     * @param  array  $data  Payload ter-validasi dari OfflineOrderController
+     * @param  int  $adminUserId ID User Admin Kasir yang meng-input
+     */
+    public function createOfflineOrder(array $data, int $adminUserId): Order
+    {
+        return DB::transaction(function () use ($data, $adminUserId) {
+            // 1. Format Waktu Pemesanan & Pengambilan (Langsung parse string datetime 'Y-m-d H:i:s')
+            $placedAt = Carbon::parse($data['placed_at']);
+            $fulfillAt = Carbon::parse($data['fulfill_at']);
+
+            // 2. Auto Email Dummy jika input kosong
+            $customerEmail = ! empty($data['customer_email'])
+                ? $data['customer_email']
+                : 'offline.'.$placedAt->format('YmdHis').'.'.Str::random(4).'@edelweiss.internal';
+
+            // 3. Generate Order Number Unik Format OFF-
+            $orderNumber = 'OFF-'.$placedAt->format('Ymd').'-'.rand(1000, 9999);
+
+            // 4. Hitung Subtotal berdasarkan Custom Price per item dari input form
+            $subtotal = '0.00';
+            $itemsToCreate = [];
+
+            foreach ($data['items'] as $itemData) {
+                $product = Produk::findOrFail($itemData['product_id']);
+
+                $customPrice = (string) $itemData['price'];
+                $qty = (string) $itemData['quantity'];
+                $itemSubtotal = bcmul($customPrice, $qty, 2);
+
+                $subtotal = bcadd($subtotal, $itemSubtotal, 2);
+
+                $itemsToCreate[] = [
+                    'product_id' => $product->id,
+                    'product_name' => $product->nama_produk,
+                    'unit_price' => $customPrice,
+                    'quantity' => $qty,
+                    'subtotal' => $itemSubtotal,
+                    'notes' => $itemData['notes'] ?? null,
+                ];
+            }
+
+            // 5. Hitung DP Penanda jika skema DP dipilih
+            $dpAmount = ($data['payment_plan'] === 'dp')
+                ? bcmul($subtotal, '0.50', 2)
+                : '0.00';
+
+            // 6. Buat Record Order (Direct 'completed' & 'paid')
+            $order = Order::create([
+                'order_number' => $orderNumber,
+                'user_id' => $adminUserId,
+                'customer_name' => $data['customer_name'],
+                'customer_phone' => $data['customer_phone'],
+                'customer_email' => $customerEmail,
+                'order_type' => $data['order_type'],
+                'delivery_address' => $data['order_type'] === 'delivery' ? ($data['delivery_address'] ?? null) : null,
+                'status' => 'completed',
+                'payment_method' => 'offline_store',
+                'payment_plan' => $data['payment_plan'],
+                'payment_status' => 'paid',
+                'subtotal' => $subtotal,
+                'tax_amount' => '0.00',
+                'total_amount' => $subtotal,
+                'dp_amount' => $dpAmount,
+                'amount_paid' => $subtotal,
+                'placed_at' => $placedAt,
+                'fulfill_at' => $fulfillAt,
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            // 7. Simpan Order Items
+            foreach ($itemsToCreate as $item) {
+                OrderItem::create(array_merge($item, [
+                    'order_id' => $order->id,
+                ]));
+            }
+
+            // 8. Broadcast Event Realtime Update
+            broadcast(new OrderUpdated);
 
             return $order;
         });

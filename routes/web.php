@@ -8,6 +8,7 @@ use App\Http\Controllers\DisabledDateController;
 use App\Http\Controllers\GaleriController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\MenuController;
+use App\Http\Controllers\OfflineOrderController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentNotificationController;
 use App\Http\Controllers\ProfileController;
@@ -92,16 +93,25 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
             Route::delete('/{id}', 'destroy')->name('admin.disabled_dates.destroy');
         });
 
-        // 🛍️ MANAJEMEN INDUK PESANAN (ORDERS, HISTORY, VERIFIKASI / ORDER MANUAL)
-        Route::controller(OrderController::class)->prefix('orders')->group(function () {
-            Route::post('/', 'store')->name('orders.store');
+        // 🛍️ MANAJEMEN INDUK PESANAN (ORDERS, HISTORY, VERIFIKASI / ORDER MANUAL, OFFLINE ORDER)
+        Route::prefix('orders')->group(function () {
+            // 📝 Sub-Menu: Input Pesanan Offline / Rekap Direct Store
+            Route::controller(OfflineOrderController::class)->group(function () {
+                Route::get('/offline/create', 'create')->name('admin.orders.offline_create');
+                Route::post('/offline', 'store')->name('admin.orders.offline_store');
+            });
 
-            // 📜 Sub-Menu: History Pesanan
-            Route::get('/history', 'history')->name('admin.orders.history');
+            // Rute OrderController Bawaan
+            Route::controller(OrderController::class)->group(function () {
+                Route::post('/', 'store')->name('orders.store');
 
-            // 💬 Sub-Menu: Order Manual (Transfer WhatsApp / Manual Direct)
-            Route::get('/manual', 'manualOrders')->name('admin.orders.manual');
-            Route::patch('/{id}/verify', 'verifyPayment')->name('admin.orders.verifyPayment');
+                // 📜 Sub-Menu: History Pesanan
+                Route::get('/history', 'history')->name('admin.orders.history');
+
+                // 💬 Sub-Menu: Order Manual (Transfer WhatsApp / Manual Direct)
+                Route::get('/manual', 'manualOrders')->name('admin.orders.manual');
+                Route::patch('/{id}/verify', 'verifyPayment')->name('admin.orders.verifyPayment');
+            });
         });
 
         // 📅 MANAJEMEN JADWAL PO / ANTREAN PRODUKSI

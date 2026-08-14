@@ -176,6 +176,12 @@
                            class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] transition duration-200 {{ Request::is('admin/laporan*') ? 'bg-[#3e2723] text-white font-bold shadow-md' : 'text-[#3e2723]/70 hover:bg-white/60 hover:text-[#3e2723] font-semibold' }}">
                             <i class="fa-solid fa-chart-line text-xs"></i> Laporan Penjualan
                         </a>
+
+                        {{-- 📝 Sub-Menu 5: Input Pesanan Offline --}}
+                        <a href="{{ route('admin.orders.offline_create') }}" 
+                            class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] transition duration-200 {{ Request::is('admin/orders/offline*') ? 'bg-[#3e2723] text-white font-bold shadow-md' : 'text-[#3e2723]/70 hover:bg-white/60 hover:text-[#3e2723] font-semibold' }}">
+                            <i class="fa-solid fa-file-circle-plus text-xs"></i> Input Pesanan Offline
+                        </a>
                     </div>
                 </div>
 

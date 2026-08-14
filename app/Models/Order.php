@@ -26,7 +26,7 @@ class Order extends Model
         'order_type',
         'delivery_address',
         'status',
-        'payment_method', // ðŸŸ¢ DITAMBAHKAN AGAR BISA DIISI SAAT CHECKOUT (payment_gateway | manual_wa)
+        'payment_method', // 🟢 DITAMBAHKAN AGAR BISA DIISI SAAT CHECKOUT (payment_gateway | manual_wa | offline_store)
         'payment_plan',
         'payment_status',
         'payment_proof',
@@ -62,25 +62,34 @@ class Order extends Model
     protected static function booted()
     {
         static::saving(function ($order) {
+            // Evaluasi status aman (Mendukung Enum maupun Raw String)
+            $statusVal = is_object($order->status) ? ($order->status->value ?? (string) $order->status) : (string) $order->status;
+            $completedVal = is_object(OrderStatus::Completed) ? OrderStatus::Completed->value : 'completed';
+
             // Order tak boleh completed / diserahkan sebelum isFullyPaid()
-            if ($order->status === OrderStatus::Completed && ! $order->isFullyPaid()) {
+            if ($statusVal === $completedVal && ! $order->isFullyPaid()) {
                 throw new \DomainException('Order cannot be completed before it is fully paid.');
             }
 
-            // PERBAIKAN BUG: Validasi fulfill_at HANYA jalan jika data baru atau tanggalnya diedit
+            // PERBAIKAN BUG: Validasi fulfill_at HANYA jalan jika data baru/edited DAN BUKAN transaksi offline store
             if ($order->isDirty('fulfill_at') && $order->fulfill_at) {
-                if ($order->fulfill_at->lessThanOrEqualTo(Carbon::now())) {
-                    throw new \DomainException('Fulfill date must be in the future.');
+                if ($order->payment_method !== 'offline_store') {
+                    if ($order->fulfill_at->lessThanOrEqualTo(Carbon::now())) {
+                        throw new \DomainException('Fulfill date must be in the future.');
+                    }
                 }
             }
 
             // PERBAIKAN BUG: Validasi range nominal DP HANYA jalan jika ada perubahan skema/nominal uang
-            if ($order->payment_plan === PaymentPlan::Dp) {
+            $paymentPlanVal = is_object($order->payment_plan) ? ($order->payment_plan->value ?? (string) $order->payment_plan) : (string) $order->payment_plan;
+            $dpPlanVal = is_object(PaymentPlan::Dp) ? PaymentPlan::Dp->value : 'dp';
+
+            if ($paymentPlanVal === $dpPlanVal) {
                 if ($order->isDirty(['payment_plan', 'total_amount', 'dp_amount'])) {
                     $min = bcmul((string) $order->total_amount, '0.10', 2);
                     $max = bcmul((string) $order->total_amount, '0.90', 2);
                     if (bccomp((string) $order->dp_amount, $min, 2) < 0 || bccomp((string) $order->dp_amount, $max, 2) > 0) {
-                        throw new \DomainException('Downâ€‘payment amount must be between 10% and 90% of total amount.');
+                        throw new \DomainException('Down-payment amount must be between 10% and 90% of total amount.');
                     }
                 }
             }
@@ -183,7 +192,7 @@ class Order extends Model
         return $this->hasMany(Payment::class);
     }
 
-    // Helper turunan â€” sisa tagihan TIDAK disimpan, dihitung
+    // Helper turunan — sisa tagihan TIDAK disimpan, dihitung
     public function remaining(): string
     {
         return bcsub((string) $this->total_amount, (string) $this->amount_paid, 2);
@@ -225,7 +234,10 @@ class Order extends Model
         $this->tax_amount = bcmul($subtotal, '0.11', 2); // 11% tax
         $this->total_amount = bcadd($subtotal, $this->tax_amount, 2);
 
-        if ($this->payment_plan === PaymentPlan::Dp) {
+        $paymentPlanVal = is_object($this->payment_plan) ? ($this->payment_plan->value ?? (string) $this->payment_plan) : (string) $this->payment_plan;
+        $dpPlanVal = is_object(PaymentPlan::Dp) ? PaymentPlan::Dp->value : 'dp';
+
+        if ($paymentPlanVal === $dpPlanVal) {
             $this->dp_amount = bcmul($this->total_amount, '0.50', 2); // 50% DP
         } else {
             $this->dp_amount = '0.00';
@@ -241,9 +253,12 @@ class Order extends Model
             ->whereIn('status', ['settlement', 'paid'])
             ->sum('amount');
 
+        $paymentPlanVal = is_object($this->payment_plan) ? ($this->payment_plan->value ?? (string) $this->payment_plan) : (string) $this->payment_plan;
+        $dpPlanVal = is_object(PaymentPlan::Dp) ? PaymentPlan::Dp->value : 'dp';
+
         if (bccomp((string) $this->amount_paid, (string) $this->total_amount, 2) >= 0) {
             $this->payment_status = PaymentStatus::Paid;
-        } elseif ($this->payment_plan === PaymentPlan::Dp && bccomp((string) $this->amount_paid, (string) $this->dp_amount, 2) >= 0) {
+        } elseif ($paymentPlanVal === $dpPlanVal && bccomp((string) $this->amount_paid, (string) $this->dp_amount, 2) >= 0) {
             $this->payment_status = PaymentStatus::Partial;
         } else {
             $this->payment_status = PaymentStatus::Unpaid;

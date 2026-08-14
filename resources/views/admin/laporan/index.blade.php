@@ -52,20 +52,20 @@
         </div>
     </div>
 
-    {{-- 2. FILTER PERIODE & EXPORT BUTTONS --}}
+    {{-- 2. FILTER PERIODE, TIPE PESANAN, SKEMA PEMBAYARAN & EXPORT BUTTONS --}}
     <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6">
-        <form id="reportFilterForm" onsubmit="return false;" class="grid grid-cols-1 sm:grid-cols-6 gap-3 items-end">
-            <div>
+        <form id="reportFilterForm" onsubmit="return false;" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-3 items-end">
+            <div class="lg:col-span-2">
                 <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Dari Tanggal</label>
                 <input type="date" id="start_date" name="start_date" value="{{ $startDate }}" class="w-full mt-1 px-4 py-2 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-[#3e2723] font-medium">
             </div>
 
-            <div>
+            <div class="lg:col-span-2">
                 <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Sampai Tanggal</label>
                 <input type="date" id="end_date" name="end_date" value="{{ $endDate }}" class="w-full mt-1 px-4 py-2 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-[#3e2723] font-medium">
             </div>
 
-            <div>
+            <div class="lg:col-span-2">
                 <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Tipe Pesanan</label>
                 <select id="order_type" name="order_type" class="w-full mt-1 px-4 py-2 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-[#3e2723] font-medium">
                     <option value="ALL">Semua Tipe</option>
@@ -74,13 +74,23 @@
                 </select>
             </div>
 
-            <div class="flex gap-2 col-span-1 sm:col-span-3">
-                <button type="button" id="btnResetReportFilter" class="py-2 px-3 bg-white/60 border border-white text-xs font-bold rounded-xl text-[#3e2723] hover:bg-white transition text-center flex items-center justify-center gap-1">
+            {{-- FILTER SKEMA PEMBAYARAN REAL-TIME --}}
+            <div class="lg:col-span-2">
+                <label class="text-xs font-bold text-[#3e2723]/80 uppercase">Skema Pembayaran</label>
+                <select id="payment_scheme" name="payment_scheme" class="w-full mt-1 px-4 py-2 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] text-[#3e2723] font-medium">
+                    <option value="ALL">Semua Skema</option>
+                    <option value="full">Full Payment</option>
+                    <option value="dp">DP 50%</option>
+                </select>
+            </div>
+
+            <div class="flex gap-2 col-span-1 sm:col-span-2 lg:col-span-8 mt-2 justify-end">
+                <button type="button" id="btnResetReportFilter" class="py-2 px-4 bg-white/60 border border-white text-xs font-bold rounded-xl text-[#3e2723] hover:bg-white transition text-center flex items-center justify-center gap-1 shadow-sm">
                     <i class="fa-solid fa-rotate-left"></i> Reset Filter
                 </button>
                 
                 {{-- TOMBOL EXPORT EXCEL --}}
-                <a id="btnExportExcel" href="{{ route('admin.laporan.exportExcel', ['start_date' => $startDate, 'end_date' => $endDate, 'order_type' => request('order_type', 'ALL')]) }}" class="py-2 px-3 bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md hover:bg-emerald-800 transition flex items-center justify-center gap-1 ml-auto">
+                <a id="btnExportExcel" href="{{ route('admin.laporan.exportExcel', ['start_date' => $startDate, 'end_date' => $endDate, 'order_type' => request('order_type', 'ALL'), 'payment_scheme' => 'ALL']) }}" class="py-2 px-4 bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md hover:bg-emerald-800 transition flex items-center justify-center gap-1">
                     <i class="fa-solid fa-file-excel"></i> Export Excel
                 </a>
             </div>
@@ -145,75 +155,112 @@
 
     </div>
 
-    {{-- 4. GRID 2 KOLOM: TOP PRODUK TERLARIS & RINCIAN PENJUALAN --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    {{-- 4. SECTION TOP 5 PRODUK TERLARIS --}}
+    <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6">
+        <h3 class="text-sm font-black text-[#3e2723] uppercase tracking-wider mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-crown text-amber-600"></i> Top 5 Produk Terlaris
+        </h3>
         
-        {{-- KOLOM KIRI: TOP 5 PRODUK TERLARIS --}}
-        <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6">
-            <h3 class="text-sm font-black text-[#3e2723] uppercase tracking-wider mb-4 flex items-center gap-2">
-                <i class="fa-solid fa-crown text-amber-600"></i> Top 5 Produk Terlaris
-            </h3>
-            
-            <div class="space-y-3" id="topProductsContainer">
-                @forelse($topProducts as $index => $prod)
-                <div class="flex items-center justify-between p-3 rounded-2xl bg-white/50 border border-white/60 shadow-sm">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-xl bg-[#3e2723] text-white font-bold text-xs flex items-center justify-center shrink-0">
-                            #{{ $index + 1 }}
-                        </div>
-                        <div>
-                            <p class="text-xs font-bold text-[#3e2723]">{{ $prod->product_name }}</p>
-                            <p class="text-[10px] text-gray-500 font-semibold">{{ $prod->total_qty }} pcs terjual</p>
-                        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-3" id="topProductsContainer">
+            @forelse($topProducts as $index => $prod)
+            <div class="flex items-center justify-between p-3 rounded-2xl bg-white/50 border border-white/60 shadow-sm gap-2 min-w-0">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-7 h-7 rounded-xl bg-[#3e2723] text-white font-bold text-xs flex items-center justify-center shrink-0">
+                        #{{ $index + 1 }}
                     </div>
-                    <span class="text-xs font-black text-amber-900">
-                        Rp {{ number_format($prod->total_revenue, 0, ',', '.') }}
-                    </span>
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold text-[#3e2723] truncate" title="{{ $prod->product_name }}">{{ $prod->product_name }}</p>
+                        <p class="text-[10px] text-gray-500 font-semibold">{{ $prod->total_qty }} pcs terjual</p>
+                    </div>
                 </div>
-                @empty
+                <span class="text-xs font-black text-amber-900 shrink-0 ml-1">
+                    Rp {{ number_format($prod->total_revenue, 0, ',', '.') }}
+                </span>
+            </div>
+            @empty
+            <div class="col-span-full">
                 <p class="text-xs text-gray-500 italic text-center py-4">Belum ada data penjualan pada periode ini.</p>
-                @endforelse
             </div>
+            @endforelse
         </div>
+    </div>
 
-        {{-- KOLOM KANAN: TABEL RINCIAN TRANSAKSI (DATATABLES AJAX SERVER-SIDE) --}}
-        <div class="lg:col-span-2 backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 overflow-hidden flex flex-col justify-between">
-            <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
-                <h3 class="text-sm font-black text-[#3e2723] uppercase tracking-wider flex items-center gap-2">
-                    <i class="fa-solid fa-receipt text-emerald-700"></i> Rincian Transaksi Selesai
-                </h3>
+    {{-- 5. SECTION FULL BARIS: TABEL RINCIAN TRANSAKSI (DATATABLES AJAX SERVER-SIDE) --}}
+    <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-6 overflow-hidden flex flex-col justify-between">
+        <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <h3 class="text-sm font-black text-[#3e2723] uppercase tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-receipt text-emerald-700"></i> Rincian Transaksi Selesai
+            </h3>
 
-                {{-- INPUT SEARCH LIVE & TOMBOL RESET SORT --}}
-                <div class="flex items-center gap-2">
-                    <div class="relative min-w-[220px]">
-                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-                        <input type="text" id="report_search" placeholder="Cari Nama / No HP..." class="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] font-medium text-[#3e2723]">
-                    </div>
-
-                    <button type="button" onclick="resetTableSort()" title="Reset Urutan Tabel" class="p-1.5 px-2.5 bg-white/60 border border-white/50 rounded-xl text-xs font-bold text-[#3e2723] hover:bg-white transition flex items-center gap-1 shadow-sm shrink-0">
-                        <i class="fa-solid fa-arrow-rotate-left text-amber-800"></i>
-                        <span class="hidden sm:inline text-[11px]">Reset Sort</span>
-                    </button>
+            {{-- INPUT SEARCH LIVE & TOMBOL RESET SORT --}}
+            <div class="flex items-center gap-2">
+                <div class="relative min-w-[240px]">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <input type="text" id="report_search" placeholder="Cari Nama / No HP / Order..." class="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] font-medium text-[#3e2723]">
                 </div>
-            </div>
 
-            <div class="overflow-x-auto rounded-2xl border border-white/40 bg-white/20 p-2 shadow-inner flex-1">
-                <table id="reportTable" class="w-full text-left border-collapse min-w-[500px]">
-                    <thead>
-                        <tr class="bg-white/40 text-xs font-bold uppercase tracking-wider text-[#3e2723]/70">
-                            <th class="px-4 py-3 cursor-pointer">Tgl Selesai</th>
-                            <th class="px-4 py-3 cursor-pointer">No. Order & Pelanggan</th>
-                            <th class="px-4 py-3 text-center cursor-pointer">Tipe</th>
-                            <th class="px-4 py-3 text-right cursor-pointer">Total Transaksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-white/30 text-xs font-medium">
-                        {{-- Data dimuat dinamis via DataTables AJAX --}}
-                    </tbody>
-                </table>
+                <button type="button" onclick="resetTableSort()" title="Reset Urutan Tabel" class="p-1.5 px-2.5 bg-white/60 border border-white/50 rounded-xl text-xs font-bold text-[#3e2723] hover:bg-white transition flex items-center gap-1 shadow-sm shrink-0">
+                    <i class="fa-solid fa-arrow-rotate-left text-amber-800"></i>
+                    <span class="hidden sm:inline text-[11px]">Reset Sort</span>
+                </button>
             </div>
         </div>
 
+        <div class="overflow-x-auto rounded-2xl border border-white/40 bg-white/20 p-2 shadow-inner flex-1">
+            <table id="reportTable" class="w-full text-left border-collapse min-w-[750px]">
+                <thead>
+                    <tr class="bg-white/40 text-xs font-bold uppercase tracking-wider text-[#3e2723]/70">
+                        <th class="px-4 py-3 cursor-pointer">Waktu Transaksi</th>
+                        <th class="px-4 py-3 cursor-pointer">Order & Pelanggan</th>
+                        <th class="px-4 py-3 text-center cursor-pointer">Tipe & Alamat</th>
+                        <th class="px-4 py-3 text-center cursor-pointer">Skema & Metode</th>
+                        <th class="px-4 py-3 text-right cursor-pointer">Total Omzet</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/30 text-xs font-medium">
+                    {{-- Data dimuat dinamis via DataTables AJAX --}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+{{-- MODAL POPUP QUICK VIEW DETAIL ALAMAT PENGIRIMAN & CATATAN PESANAN --}}
+<div id="addressDetailModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-md hidden">
+    <div class="bg-white/95 border border-white/80 backdrop-blur-2xl rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+        <div class="flex items-center justify-between border-b border-gray-200 pb-3">
+            <div class="flex items-center gap-2 text-blue-900">
+                <i class="fa-solid fa-truck-ramp-box text-base"></i>
+                <h4 class="text-sm font-black uppercase tracking-wider">Detail Pengiriman</h4>
+            </div>
+            <button type="button" onclick="closeAddressModal()" class="text-gray-400 hover:text-gray-700">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <div class="space-y-3 text-xs">
+            <div>
+                <span class="block text-[10px] font-bold text-gray-400 uppercase">No. Order & Pelanggan</span>
+                <p id="modalOrderInfo" class="font-bold text-[#3e2723] text-xs mt-0.5"></p>
+            </div>
+
+            <div>
+                <span class="block text-[10px] font-bold text-gray-400 uppercase">Alamat Pengiriman</span>
+                <p id="modalAddressText" class="p-3 bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-800 whitespace-pre-line mt-1"></p>
+            </div>
+
+            <div>
+                <span class="block text-[10px] font-bold text-gray-400 uppercase">Catatan Pesanan</span>
+                <p id="modalNotesText" class="p-2.5 bg-amber-500/10 border border-amber-400/30 rounded-xl font-medium text-amber-950 mt-1 italic"></p>
+            </div>
+        </div>
+
+        <div class="pt-2">
+            <button type="button" onclick="closeAddressModal()" class="w-full py-2.5 bg-[#3e2723] hover:bg-[#2c1b18] text-white text-xs font-bold rounded-xl shadow transition">
+                Tutup Detail
+            </button>
+        </div>
     </div>
 </div>
 
@@ -237,6 +284,17 @@
     // ⚡ PEMBULATAN MATEMATIS DENGAN Math.round AGAR TIDAK MENCETAK DESIMAL PANJANG
     function formatRupiah(val) {
         return 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.round(val || 0));
+    }
+
+    function showAddressModal(orderNum, customerName, address, notes) {
+        document.getElementById('modalOrderInfo').innerText = orderNum + ' - ' + customerName;
+        document.getElementById('modalAddressText').innerText = address && address !== 'Alamat tidak diisi' ? address : 'Alamat tidak dicantumkan';
+        document.getElementById('modalNotesText').innerText = notes && notes !== '-' ? notes : 'Tidak ada catatan khusus';
+        document.getElementById('addressDetailModal').classList.remove('hidden');
+    }
+
+    function closeAddressModal() {
+        document.getElementById('addressDetailModal').classList.add('hidden');
     }
 
     function aggregateData(labels, cashflow, realized, type) {
@@ -305,7 +363,7 @@
         if (!container.length) return;
 
         if (!products || products.length === 0) {
-            container.html('<p class="text-xs text-gray-500 italic text-center py-4">Belum ada data penjualan pada periode ini.</p>');
+            container.html('<div class="col-span-full"><p class="text-xs text-gray-500 italic text-center py-4">Belum ada data penjualan pada periode ini.</p></div>');
             return;
         }
 
@@ -313,17 +371,17 @@
         products.forEach((prod, index) => {
             const revenueFormatted = formatRupiah(prod.total_revenue);
             html += `
-                <div class="flex items-center justify-between p-3 rounded-2xl bg-white/50 border border-white/60 shadow-sm">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-xl bg-[#3e2723] text-white font-bold text-xs flex items-center justify-center shrink-0">
+                <div class="flex items-center justify-between p-3 rounded-2xl bg-white/50 border border-white/60 shadow-sm gap-2 min-w-0">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-7 h-7 rounded-xl bg-[#3e2723] text-white font-bold text-xs flex items-center justify-center shrink-0">
                             #${index + 1}
                         </div>
-                        <div>
-                            <p class="text-xs font-bold text-[#3e2723]">${prod.product_name}</p>
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-[#3e2723] truncate" title="${prod.product_name}">${prod.product_name}</p>
                             <p class="text-[10px] text-gray-500 font-semibold">${prod.total_qty} pcs terjual</p>
                         </div>
                     </div>
-                    <span class="text-xs font-black text-amber-900">
+                    <span class="text-xs font-black text-amber-900 shrink-0 ml-1">
                         ${revenueFormatted}
                     </span>
                 </div>
@@ -402,13 +460,14 @@
                     d.start_date = $('#start_date').val();
                     d.end_date = $('#end_date').val();
                     d.order_type = $('#order_type').val();
+                    d.payment_scheme = $('#payment_scheme').val(); // Menikung filter skema ke backend
                 }
             },
             columns: [
                 {
                     data: 'fulfill_at',
                     name: 'fulfill_at',
-                    className: 'whitespace-nowrap',
+                    className: 'align-top whitespace-nowrap',
                     render: function(data) {
                         return data || '-';
                     }
@@ -416,36 +475,43 @@
                 {
                     data: 'order_number',
                     name: 'order_number',
+                    className: 'align-top',
                     render: function(data, type, row) {
-                        if (typeof data === 'string' && data.includes('<p')) {
-                            return data;
-                        }
-                        return `<p class="font-bold text-[#3e2723]">${data || row.order_number}</p><p class="text-[11px] text-gray-600">${row.customer_name || ''}</p>`;
+                        let orderNum = row.order_number || '';
+                        let custName = row.customer_name || '';
+                        let custPhone = row.customer_phone || '';
+
+                        return `
+                            <div>
+                                <p class="font-black text-[#3e2723] text-xs">${orderNum}</p>
+                                <p class="text-xs font-bold text-gray-800">${custName} <span class="text-[10px] font-normal text-gray-500">(${custPhone})</span></p>
+                            </div>
+                        `;
                     }
                 },
                 {
                     data: 'order_type',
                     name: 'order_type',
-                    className: 'text-center uppercase',
-                    render: function(data, type, row) {
-                        let typeVal = row.order_type && typeof row.order_type === 'object' 
-                            ? (row.order_type.value || row.order_type.name) 
-                            : (data || row.order_type);
-                        
-                        typeVal = String(typeVal || 'pickup').toLowerCase();
-                        const cls = typeVal === 'pickup' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800';
-                        return `<span class="uppercase px-2 py-0.5 rounded-md text-[9px] font-bold ${cls}">${typeVal}</span>`;
+                    className: 'align-top text-center',
+                    render: function(data) {
+                        return data || '-';
+                    }
+                },
+                {
+                    data: 'payment_scheme',
+                    name: 'payment_scheme',
+                    className: 'align-top text-center sm:text-left',
+                    orderable: false,
+                    render: function(data) {
+                        return data || '-';
                     }
                 },
                 {
                     data: 'total_amount',
                     name: 'total_amount',
-                    className: 'text-right font-black text-[#3e2723]',
+                    className: 'align-top text-right',
                     render: function(data, type, row) {
-                        if (typeof data === 'string' && data.startsWith('Rp')) {
-                            return data;
-                        }
-                        return formatRupiah(data || row.total_amount);
+                        return data || formatRupiah(row.total_amount);
                     }
                 }
             ],
@@ -460,7 +526,7 @@
             }
         });
 
-        // 🔍 HANDLER SEARCH LIVE REALTIME (DEBOUNCE 400ms - HANYA Nama & No HP)
+        // 🔍 HANDLER SEARCH LIVE REALTIME (DEBOUNCE 400ms - Nama, No HP, & No Order)
         $('#report_search').off('keyup input').on('keyup input', function() {
             clearTimeout(searchTimer);
             searchTimer = setTimeout(function() {
@@ -468,12 +534,13 @@
             }, 400);
         });
 
-        // 📅 HANDLER AUTO-FILTER INPUT TANGGAL & SELECT TIPE ORDER
-        $('#start_date, #end_date, #order_type').off('change').on('change', function() {
+        // 📅 HANDLER AUTO-FILTER INPUT TANGGAL, SELECT TIPE ORDER, & SKEMA PEMBAYARAN
+        $('#start_date, #end_date, #order_type, #payment_scheme').off('change').on('change', function() {
             const params = $.param({
                 start_date: $('#start_date').val(),
                 end_date: $('#end_date').val(),
-                order_type: $('#order_type').val()
+                order_type: $('#order_type').val(),
+                payment_scheme: $('#payment_scheme').val()
             });
             $('#btnExportExcel').attr('href', "{{ route('admin.laporan.exportExcel') }}?" + params);
 
@@ -493,12 +560,14 @@
             $('#start_date').val(startOfMonth);
             $('#end_date').val(today);
             $('#order_type').val('ALL');
+            $('#payment_scheme').val('ALL');
             $('#report_search').val('');
 
             const params = $.param({
                 start_date: startOfMonth,
                 end_date: today,
-                order_type: 'ALL'
+                order_type: 'ALL',
+                payment_scheme: 'ALL'
             });
             $('#btnExportExcel').attr('href', "{{ route('admin.laporan.exportExcel') }}?" + params);
 
