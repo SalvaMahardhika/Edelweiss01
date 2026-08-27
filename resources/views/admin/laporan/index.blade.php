@@ -192,13 +192,20 @@
                 <i class="fa-solid fa-receipt text-emerald-700"></i> Rincian Transaksi Selesai
             </h3>
 
-            {{-- INPUT SEARCH LIVE & TOMBOL RESET SORT --}}
+            {{-- INPUT SEARCH LIVE, TOMBOL REFRESH, & TOMBOL RESET SORT --}}
             <div class="flex items-center gap-2">
                 <div class="relative min-w-[240px]">
                     <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
                     <input type="text" id="report_search" placeholder="Cari Nama / No HP / Order..." class="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-[#c8a97e] font-medium text-[#3e2723]">
                 </div>
 
+                {{-- 🟢 TOMBOL REFRESH DATA TABEL & STATISTIK --}}
+                <button type="button" onclick="refreshReportTableData()" title="Refresh Data Laporan" class="p-1.5 px-2.5 bg-emerald-600/90 hover:bg-emerald-700 border border-emerald-500/50 rounded-xl text-xs font-bold text-white transition flex items-center gap-1 shadow-sm shrink-0">
+                    <i class="fa-solid fa-arrows-rotate text-xs"></i>
+                    <span class="hidden sm:inline text-[11px]">Refresh Data</span>
+                </button>
+
+                {{-- TOMBOL RESET SORT --}}
                 <button type="button" onclick="resetTableSort()" title="Reset Urutan Tabel" class="p-1.5 px-2.5 bg-white/60 border border-white/50 rounded-xl text-xs font-bold text-[#3e2723] hover:bg-white transition flex items-center gap-1 shadow-sm shrink-0">
                     <i class="fa-solid fa-arrow-rotate-left text-amber-800"></i>
                     <span class="hidden sm:inline text-[11px]">Reset Sort</span>
@@ -346,6 +353,13 @@
             mainRevenueChart.data.datasets[0].data = agg.cashflow.length > 0 ? agg.cashflow : [0];
             mainRevenueChart.data.datasets[1].data = agg.realized.length > 0 ? agg.realized : [0];
             mainRevenueChart.update();
+        }
+    }
+
+    // 🔄 FUNGSI REFRESH DATA TABEL, KPI, DAN GRAFIK SISI CLIENT
+    function refreshReportTableData() {
+        if (reportTable) {
+            reportTable.ajax.reload(null, false);
         }
     }
 
@@ -667,6 +681,17 @@
                 cutout: '70%'
             }
         });
+
+        // ⚡ 3. REALTIME BROADCASTING LISTENER (LARAVEL ECHO + REVERB/PUSHER)
+        if (typeof Echo !== 'undefined') {
+            Echo.channel('admin-orders')
+                .listen('.OrderUpdated', (e) => {
+                    // Memicu pencucian data/refresh otomatis pada DataTables Laporan & statistik pendukung
+                    if (typeof window.reloadReportTable === 'function') {
+                        window.reloadReportTable(false);
+                    }
+                });
+        }
     });
 </script>
 @endsection

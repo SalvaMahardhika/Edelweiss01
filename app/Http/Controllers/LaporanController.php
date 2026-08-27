@@ -23,13 +23,11 @@ class LaporanController extends Controller
             ? $request->input('end_date')
             : now()->toDateString();
 
-        $todayDate = now()->toDateString();
-
-        // 1. Base Query: Tampilkan SEMUA order yang tidak dibatalkan (non-cancelled) dalam rentang tanggal
+        // 1. Base Query: Tampilkan HANYA order yang berstatus 'completed' (berhasil/selesai)
         $query = Order::with(['items', 'payments'])
-            ->whereNotIn('status', ['cancelled'])
+            ->where('status', 'completed')
             ->where(function ($q) use ($startDate, $endDate) {
-                $q->whereBetween(DB::raw('DATE(COALESCE(placed_at, created_at))'), [$startDate, $endDate]);
+                $q->whereBetween(DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at))'), [$startDate, $endDate]);
             });
 
         // 🟢 FILTER TIPE PESANAN
@@ -71,43 +69,15 @@ class LaporanController extends Controller
                 });
             }
 
-            // 💵 Total Uang Masuk / Cashflow
-            $totalCashflowRealtime = (float) (clone $query)->sum('total_amount');
+            // 💵 Agregasi Total Omzet Terrealisasi & Pesanan Berhasil
+            $totalOmzet = (float) (clone $query)->sum('total_amount');
             $totalPesanan = (clone $query)->count();
+            $avgOrderVal = $totalPesanan > 0 ? round($totalOmzet / $totalPesanan) : 0;
 
-            // 🏆 Total Omzet Terrealisasi (Hanya Order Status Completed & Tanggal Pengambilan <= Hari Ini)
-            $realizedQuery = Order::where('status', 'completed')
-                ->where(DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at))'), '<=', $todayDate)
-                ->whereBetween(DB::raw('DATE(COALESCE(placed_at, created_at))'), [$startDate, $endDate]);
-
-            if ($request->filled('order_type') && $request->order_type !== 'ALL') {
-                $realizedQuery->where('order_type', $request->order_type);
-            }
-
-            if ($request->filled('payment_scheme') && $request->payment_scheme !== 'ALL') {
-                $scheme = strtolower($request->payment_scheme);
-                if ($scheme === 'dp') {
-                    $realizedQuery->where(function ($q) {
-                        $q->where('payment_plan', 'dp')
-                            ->orWhere('payment_plan', 'like', '%dp%');
-                    });
-                } elseif ($scheme === 'full') {
-                    $realizedQuery->where(function ($q) {
-                        $q->where('payment_plan', 'full')
-                            ->orWhere('payment_plan', 'like', '%full%')
-                            ->orWhereNull('payment_plan');
-                    });
-                }
-            }
-            $totalOmzet = (float) $realizedQuery->sum('total_amount');
-
-            // ⚡ Perbaikan: Bulatkan Rata-Rata Order ke Integer
-            $avgOrderVal = $totalPesanan > 0 ? round($totalCashflowRealtime / $totalPesanan) : 0;
-
-            // Item Terjual
+            // Item Terjual dari Order Completed
             $totalProdukTerjual = (int) OrderItem::whereHas('order', function ($q) use ($startDate, $endDate, $request) {
-                $q->whereNotIn('status', ['cancelled'])
-                    ->whereBetween(DB::raw('DATE(COALESCE(placed_at, created_at))'), [$startDate, $endDate]);
+                $q->where('status', 'completed')
+                    ->whereBetween(DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at))'), [$startDate, $endDate]);
 
                 if ($request->filled('order_type') && $request->order_type !== 'ALL') {
                     $q->where('order_type', $request->order_type);
@@ -142,16 +112,16 @@ class LaporanController extends Controller
                 'totalPesanan' => $totalPesanan,
                 'totalProdukTerjual' => $totalProdukTerjual,
                 'avgOrderVal' => $avgOrderVal,
-                'totalCashflowRealtime' => $totalCashflowRealtime,
-                'pendingRealization' => max(0, $totalCashflowRealtime - $totalOmzet),
+                'totalCashflowRealtime' => $totalOmzet,
+                'pendingRealization' => 0,
                 'dpCount' => $dpCount,
                 'fullCount' => $fullCount,
             ];
 
-            // 👑 Dynamic Top 5 Products Realtime
+            // 👑 Dynamic Top 5 Products Realtime (Hanya Completed)
             $topProducts = OrderItem::whereHas('order', function ($q) use ($startDate, $endDate, $request) {
-                $q->whereNotIn('status', ['cancelled'])
-                    ->whereBetween(DB::raw('DATE(COALESCE(placed_at, created_at))'), [$startDate, $endDate]);
+                $q->where('status', 'completed')
+                    ->whereBetween(DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at))'), [$startDate, $endDate]);
 
                 if ($request->filled('order_type') && $request->order_type !== 'ALL') {
                     $q->where('order_type', $request->order_type);
@@ -180,37 +150,8 @@ class LaporanController extends Controller
                 ->get();
 
             // 📈 Dynamic Chart Realtime
-            $rawCashflow = (clone $query)
-                ->select(DB::raw('DATE(COALESCE(placed_at, created_at)) as date'), DB::raw('SUM(total_amount) as total'))
-                ->groupBy('date')
-                ->pluck('total', 'date')
-                ->toArray();
-
-            $rawRealized = Order::where('status', 'completed')
-                ->where(DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at))'), '<=', $todayDate)
-                ->whereBetween(DB::raw('DATE(COALESCE(placed_at, created_at))'), [$startDate, $endDate])
-                ->when($request->filled('order_type') && $request->order_type !== 'ALL', function ($q) use ($request) {
-                    $q->where('order_type', $request->order_type);
-                })
-                ->when($request->filled('payment_scheme') && $request->payment_scheme !== 'ALL', function ($q) use ($request) {
-                    $scheme = strtolower($request->payment_scheme);
-                    if ($scheme === 'dp') {
-                        $q->where(function ($sub) {
-                            $sub->where('payment_plan', 'dp')
-                                ->orWhere('payment_plan', 'like', '%dp%');
-                        });
-                    } elseif ($scheme === 'full') {
-                        $q->where(function ($sub) {
-                            $sub->where('payment_plan', 'full')
-                                ->orWhere('payment_plan', 'like', '%full%')
-                                ->orWhereNull('payment_plan');
-                        });
-                    }
-                })
-                ->select(
-                    DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at)) as date'),
-                    DB::raw('SUM(total_amount) as total')
-                )
+            $rawRealized = (clone $query)
+                ->select(DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at)) as date'), DB::raw('SUM(total_amount) as total'))
                 ->groupBy('date')
                 ->pluck('total', 'date')
                 ->toArray();
@@ -224,7 +165,7 @@ class LaporanController extends Controller
                 foreach ($period as $date) {
                     $dateKey = $date->format('Y-m-d');
                     $chartLabels[] = $date->format('d M');
-                    $chartCashflow[] = (float) ($rawCashflow[$dateKey] ?? 0);
+                    $chartCashflow[] = (float) ($rawRealized[$dateKey] ?? 0);
                     $chartRealized[] = (float) ($rawRealized[$dateKey] ?? 0);
                 }
             } catch (\Exception $e) {
@@ -322,7 +263,7 @@ class LaporanController extends Controller
                     return '
                         <div class="text-right">
                             <p class="font-black text-xs text-emerald-950">Rp '.number_format((float) $row->total_amount, 0, ',', '.').'</p>
-                            <span class="text-[9px] font-bold uppercase text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Lunas 100%</span>
+                            <span class="text-[9px] font-bold uppercase text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Selesai / Lunas</span>
                         </div>
                     ';
                 })
@@ -359,40 +300,14 @@ class LaporanController extends Controller
         // Non-AJAX Initial Page Render
         $completedOrders = (clone $query)->latest('created_at')->paginate(10)->withQueryString();
 
-        $totalCashflowRealtime = (float) (clone $query)->sum('total_amount');
+        $totalOmzet = (float) (clone $query)->sum('total_amount');
         $totalPesanan = (clone $query)->count();
-
-        $realizedQuery = Order::where('status', 'completed')
-            ->where(DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at))'), '<=', $todayDate)
-            ->whereBetween(DB::raw('DATE(COALESCE(placed_at, created_at))'), [$startDate, $endDate]);
-
-        if ($request->filled('order_type') && $request->order_type !== 'ALL') {
-            $realizedQuery->where('order_type', $request->order_type);
-        }
-
-        if ($request->filled('payment_scheme') && $request->payment_scheme !== 'ALL') {
-            $scheme = strtolower($request->payment_scheme);
-            if ($scheme === 'dp') {
-                $realizedQuery->where(function ($q) {
-                    $q->where('payment_plan', 'dp')
-                        ->orWhere('payment_plan', 'like', '%dp%');
-                });
-            } elseif ($scheme === 'full') {
-                $realizedQuery->where(function ($q) {
-                    $q->where('payment_plan', 'full')
-                        ->orWhere('payment_plan', 'like', '%full%')
-                        ->orWhereNull('payment_plan');
-                });
-            }
-        }
-        $totalOmzet = (float) $realizedQuery->sum('total_amount');
-
-        // ⚡ Perbaikan: Bulatkan Rata-Rata Order ke Integer
-        $avgOrderVal = $totalPesanan > 0 ? round($totalCashflowRealtime / $totalPesanan) : 0;
+        $totalCashflowRealtime = $totalOmzet;
+        $avgOrderVal = $totalPesanan > 0 ? round($totalOmzet / $totalPesanan) : 0;
 
         $totalProdukTerjual = OrderItem::whereHas('order', function ($q) use ($startDate, $endDate, $request) {
-            $q->whereNotIn('status', ['cancelled'])
-                ->whereBetween(DB::raw('DATE(COALESCE(placed_at, created_at))'), [$startDate, $endDate]);
+            $q->where('status', 'completed')
+                ->whereBetween(DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at))'), [$startDate, $endDate]);
 
             if ($request->filled('order_type') && $request->order_type !== 'ALL') {
                 $q->where('order_type', $request->order_type);
@@ -416,8 +331,8 @@ class LaporanController extends Controller
         })->sum('quantity');
 
         $topProducts = OrderItem::whereHas('order', function ($q) use ($startDate, $endDate, $request) {
-            $q->whereNotIn('status', ['cancelled'])
-                ->whereBetween(DB::raw('DATE(COALESCE(placed_at, created_at))'), [$startDate, $endDate]);
+            $q->where('status', 'completed')
+                ->whereBetween(DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at))'), [$startDate, $endDate]);
 
             if ($request->filled('order_type') && $request->order_type !== 'ALL') {
                 $q->where('order_type', $request->order_type);
@@ -446,37 +361,8 @@ class LaporanController extends Controller
             ->get();
 
         // 📈 Sales Dual-Dataset Chart
-        $rawCashflow = (clone $query)
-            ->select(DB::raw('DATE(COALESCE(placed_at, created_at)) as date'), DB::raw('SUM(total_amount) as total'))
-            ->groupBy('date')
-            ->pluck('total', 'date')
-            ->toArray();
-
-        $rawRealized = Order::where('status', 'completed')
-            ->where(DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at))'), '<=', $todayDate)
-            ->whereBetween(DB::raw('DATE(COALESCE(placed_at, created_at))'), [$startDate, $endDate])
-            ->when($request->filled('order_type') && $request->order_type !== 'ALL', function ($q) use ($request) {
-                $q->where('order_type', $request->order_type);
-            })
-            ->when($request->filled('payment_scheme') && $request->payment_scheme !== 'ALL', function ($q) use ($request) {
-                $scheme = strtolower($request->payment_scheme);
-                if ($scheme === 'dp') {
-                    $q->where(function ($sub) {
-                        $sub->where('payment_plan', 'dp')
-                            ->orWhere('payment_plan', 'like', '%dp%');
-                    });
-                } elseif ($scheme === 'full') {
-                    $q->where(function ($sub) {
-                        $sub->where('payment_plan', 'full')
-                            ->orWhere('payment_plan', 'like', '%full%')
-                            ->orWhereNull('payment_plan');
-                    });
-                }
-            })
-            ->select(
-                DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at)) as date'),
-                DB::raw('SUM(total_amount) as total')
-            )
+        $rawRealized = (clone $query)
+            ->select(DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at)) as date'), DB::raw('SUM(total_amount) as total'))
             ->groupBy('date')
             ->pluck('total', 'date')
             ->toArray();
@@ -490,7 +376,7 @@ class LaporanController extends Controller
             foreach ($period as $date) {
                 $dateKey = $date->format('Y-m-d');
                 $chartLabels[] = $date->format('d M');
-                $chartCashflow[] = (float) ($rawCashflow[$dateKey] ?? 0);
+                $chartCashflow[] = (float) ($rawRealized[$dateKey] ?? 0);
                 $chartRealized[] = (float) ($rawRealized[$dateKey] ?? 0);
             }
         } catch (\Exception $e) {
@@ -537,8 +423,10 @@ class LaporanController extends Controller
         $startDate = $request->filled('start_date') ? $request->input('start_date') : now()->startOfMonth()->toDateString();
         $endDate = $request->filled('end_date') ? $request->input('end_date') : now()->toDateString();
 
-        $query = Order::with('items')->whereNotIn('status', ['cancelled'])
-            ->whereBetween(DB::raw('DATE(COALESCE(placed_at, created_at))'), [$startDate, $endDate]);
+        // 🟢 HANYA EXPORT ORDER BERSTATUS COMPLETED
+        $query = Order::with('items')
+            ->where('status', 'completed')
+            ->whereBetween(DB::raw('DATE(COALESCE(fulfill_at, placed_at, created_at))'), [$startDate, $endDate]);
 
         if ($request->filled('order_type') && $request->order_type !== 'ALL') {
             $query->where('order_type', $request->order_type);
@@ -587,7 +475,6 @@ class LaporanController extends Controller
             })->implode(' | ');
 
             $placedDate = $order->placed_at ?? $order->created_at;
-            // ⚡ Perbaikan bug typo $order->placedDate -> $placedDate
             $fulfillDate = $order->fulfill_at ?? $placedDate;
 
             $orderTypeVal = is_object($order->order_type) ? ($order->order_type->value ?? $order->order_type->name ?? (string) $order->order_type) : (string) $order->order_type;

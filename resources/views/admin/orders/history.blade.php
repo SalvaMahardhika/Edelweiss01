@@ -112,14 +112,24 @@
 
     {{-- 3. TABEL UTAMA HISTORY PESANAN --}}
     <div class="backdrop-blur-2xl bg-white/40 border border-white/50 rounded-[2rem] shadow-xl p-5 flex-1 flex flex-col">
-        {{-- Header Bar Atas Tabel: Tombol Reset Urutan Tabel --}}
+        {{-- Header Bar Atas Tabel: Tombol Refresh & Reset Urutan Tabel --}}
         <div class="flex justify-between items-center mb-3 px-1">
             <span class="text-xs font-bold text-[#3e2723]/70 uppercase tracking-wider">
                 <i class="fa-solid fa-list-check mr-1"></i> Data History Pesanan
             </span>
-            <button type="button" id="btnResetSort" onclick="resetTableOrder()" class="px-3 py-1.5 bg-white/80 border border-white/60 hover:bg-[#3e2723] hover:text-white text-[#3e2723] text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5">
-                <i class="fa-solid fa-arrow-down-short-wide"></i> Reset Urutan Tabel
-            </button>
+
+            <div class="flex items-center gap-2">
+                {{-- 🟢 TOMBOL REFRESH DATA TABEL & STATISTIK --}}
+                <button type="button" onclick="refreshHistoryTableData()" title="Refresh Data History" class="px-3 py-1.5 bg-emerald-600/90 hover:bg-emerald-700 border border-emerald-500/50 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrows-rotate text-xs"></i>
+                    <span class="hidden sm:inline">Refresh Data</span>
+                </button>
+
+                {{-- TOMBOL RESET SORT --}}
+                <button type="button" id="btnResetSort" onclick="resetTableOrder()" class="px-3 py-1.5 bg-white/80 border border-white/60 hover:bg-[#3e2723] hover:text-white text-[#3e2723] text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-down-short-wide"></i> Reset Urutan Tabel
+                </button>
+            </div>
         </div>
 
         <div class="overflow-x-auto rounded-2xl border border-white/40 bg-white/20 shadow-inner p-2 flex-1 flex flex-col">
@@ -225,7 +235,13 @@
 
 <script>
     let historyOrderTable = null;
-    let historyAutoRefreshTimer = null;
+
+    // 🔄 FUNGSI REFRESH DATA TABEL & STATISTIK SISI CLIENT
+    function refreshHistoryTableData() {
+        if (historyOrderTable) {
+            historyOrderTable.ajax.reload(null, false);
+        }
+    }
 
     function initHistoryOrdersDataTable() {
         if (typeof $ === 'undefined' || !$.fn.DataTable) {
@@ -458,27 +474,6 @@
             $('#filter_status').val('ALL');
             historyOrderTable.draw();
         });
-
-        // 🔄 AUTO POLLING DATATABLES REALTIME (SETIAP 5 DETIK - SILENT & TERKONTROL)
-        if (historyAutoRefreshTimer) {
-            clearInterval(historyAutoRefreshTimer);
-        }
-
-        historyAutoRefreshTimer = setInterval(function() {
-            if (historyOrderTable && typeof historyOrderTable.ajax !== 'undefined') {
-                let settings = historyOrderTable.settings()[0];
-                if (settings.jqXHR && settings.jqXHR.readyState !== 4) {
-                    return;
-                }
-
-                let oldProcessing = settings.oFeatures.bProcessing;
-                settings.oFeatures.bProcessing = false;
-
-                historyOrderTable.ajax.reload(function() {
-                    settings.oFeatures.bProcessing = oldProcessing;
-                }, false);
-            }
-        }, 5000); // 5 detik
     }
 
     // 🔄 FUNGSI MENGEMBALIKAN URUTAN TABEL KE POSISI AWAL (DESKTOP / MOBILE)
