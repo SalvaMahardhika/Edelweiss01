@@ -587,7 +587,8 @@ class LaporanController extends Controller
             })->implode(' | ');
 
             $placedDate = $order->placed_at ?? $order->created_at;
-            $fulfillDate = $order->fulfill_at ?? $order->placedDate;
+            // ⚡ Perbaikan bug typo $order->placedDate -> $placedDate
+            $fulfillDate = $order->fulfill_at ?? $placedDate;
 
             $orderTypeVal = is_object($order->order_type) ? ($order->order_type->value ?? $order->order_type->name ?? (string) $order->order_type) : (string) $order->order_type;
             $paymentPlanVal = is_object($order->payment_plan) ? ($order->payment_plan->value ?? $order->payment_plan->name ?? (string) $order->payment_plan) : (string) $order->payment_plan;

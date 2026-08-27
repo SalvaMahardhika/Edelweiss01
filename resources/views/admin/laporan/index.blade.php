@@ -264,14 +264,13 @@
     </div>
 </div>
 
-{{-- SCRIPT RENDERING CHART.JS & DATATABLES REALTIME AJAX --}}
+{{-- SCRIPT RENDERING CHART.JS & DATATABLES EVENT-DRIVEN AJAX --}}
 <script>
     let reportTable = null;
     let mainRevenueChart = null;
     let paymentSchemeChart = null;
     let currentGranularity = 'daily';
     let searchTimer = null;
-    let autoRefreshInterval = null;
 
     // Data Awal dari Backend Controller
     let rawDailyLabels    = @json($chartLabels ?? []);
@@ -357,6 +356,13 @@
         }
     }
 
+    // ⚡ HELPER FUNGSI GLOBAL EVENT-DRIVEN UNTUK RELOAD TABEL DARI EVENT/MODAL LAIN
+    window.reloadReportTable = function(resetPaging = false) {
+        if (reportTable) {
+            reportTable.ajax.reload(null, resetPaging);
+        }
+    };
+
     // 👑 RENDERING DYNAMIC TOP PRODUCTS
     function renderTopProducts(products) {
         const container = $('#topProductsContainer');
@@ -411,7 +417,7 @@
 
         $.fn.dataTable.ext.errMode = 'throw';
 
-        // ⚡ REGISTRASI EVENT LISTENER 'xhr.dt' SEBELUM INIT DATATABLES (REALTIME ALL DATA UPDATE)
+        // ⚡ REGISTRASI EVENT LISTENER 'xhr.dt' SEBELUM INIT DATATABLES (EVENT-DRIVEN STATS & CHART SYNC)
         $('#reportTable').off('xhr.dt').on('xhr.dt', function (e, settings, json, xhr) {
             if (json) {
                 // 1. Update KPI Cards
@@ -431,7 +437,7 @@
                     renderTopProducts(json.topProducts);
                 }
 
-                // 3. Update Chart Datasets Realtime
+                // 3. Update Chart Datasets
                 if (json.chart) {
                     rawDailyLabels = json.chart.labels || [];
                     rawDailyCashflow = json.chart.cashflow || [];
@@ -460,7 +466,7 @@
                     d.start_date = $('#start_date').val();
                     d.end_date = $('#end_date').val();
                     d.order_type = $('#order_type').val();
-                    d.payment_scheme = $('#payment_scheme').val(); // Menikung filter skema ke backend
+                    d.payment_scheme = $('#payment_scheme').val();
                 }
             },
             columns: [
@@ -526,7 +532,7 @@
             }
         });
 
-        // 🔍 HANDLER SEARCH LIVE REALTIME (DEBOUNCE 400ms - Nama, No HP, & No Order)
+        // 🔍 EVENT-DRIVEN: LIVE SEARCH (DEBOUNCE 400ms)
         $('#report_search').off('keyup input').on('keyup input', function() {
             clearTimeout(searchTimer);
             searchTimer = setTimeout(function() {
@@ -534,7 +540,7 @@
             }, 400);
         });
 
-        // 📅 HANDLER AUTO-FILTER INPUT TANGGAL, SELECT TIPE ORDER, & SKEMA PEMBAYARAN
+        // 📅 EVENT-DRIVEN: PERUBAHAN INPUT FILTER
         $('#start_date, #end_date, #order_type, #payment_scheme').off('change').on('change', function() {
             const params = $.param({
                 start_date: $('#start_date').val(),
@@ -547,7 +553,7 @@
             reportTable.draw();
         });
 
-        // 🔄 HANDLER RESET FILTER LAPORAN
+        // 🔄 EVENT-DRIVEN: RESET FILTER LAPORAN
         $('#btnResetReportFilter').off('click').on('click', function() {
             const now = new Date();
             const yyyy = now.getFullYear();
@@ -573,14 +579,6 @@
 
             reportTable.draw();
         });
-
-        // ⚡ AUTO-POLLING INTERVAL (Setiap 12 Detik Refresh Data Otomatis Secara Background)
-        if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-        autoRefreshInterval = setInterval(function() {
-            if (reportTable && document.visibilityState === 'visible') {
-                reportTable.ajax.reload(null, false);
-            }
-        }, 12000);
     }
 
     document.addEventListener('DOMContentLoaded', function () {
